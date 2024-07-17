@@ -40,7 +40,7 @@ docker run -d -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:
 | TAO_EXPIRES      | 登录有效期，单位天                                           | 2      |
 | TAO_LOG_LEVEL    | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1      |
 | TAO_LOG_SAVE     | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7      |
-| TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 60     |
+| TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0      |
 | TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72     |
 
 ## 页面截图
