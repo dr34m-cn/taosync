@@ -1,7 +1,7 @@
-# taosync
-`tao-sync`是一个适用于`AList v3`的自动化同步工具，**即将开源**，预计两周内。
+# TaoSync
+`TaoSync`是一个适用于`AList v3`的自动化同步工具，**即将开源**，预计两周内。
 
-**新项目急需Star，感谢各位！！**[github地址](https://github.com/dr34-m/taosync) [gitee地址](https://gitee.com/dr34m/taosync)
+**如果好用，请Star！非常感谢**[Github地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
 
 本工具主要用于同步备份功能，可以定时扫描指定目录下文件差异，让目标目录与源目录相同（全同步模式）；或仅新增存在于源目录，却不存在于目标目录的文件（仅新增模式）。
 
@@ -59,17 +59,23 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 # 更新记录
 
+### 0.2.1（计划中）
+
+* [ ] 支持windows
+* [ ] 任务整体进度条展示
+
 ### 0.2.0（研发中）
 
 * [ ] 开放源代码
-* [ ] 从源头上解决杜绝密码泄露的可能性，不再使用用户名密码登录AList，改用令牌
+* [ ] 从源头上杜绝密码泄露的可能性，不再使用用户名密码登录AList，改用令牌
+* [x] Linux下全处理器平台支持
 * [x] 加强安全问题，不再写死加密秘钥而是在第一次运行时生成随机秘钥
 * [x] 自动化构建实现，可以通过[Github Actions](https://docs.github.com/zh/actions)自动构建docker镜像并推送到[dockerhub](https://hub.docker.com/r/dr34m/tao-sync)
 * [x] 用户校验改为在内存中进行不再每次读取磁盘数据库（除了第一次读取后写入内存外，之后速度快数倍），所有请求快1ms！
 * [x] 版号不再写死，改为打包构建时自动从`version.txt`读取填充
 * [x] 作业详情-任务进度样式调整，在小屏幕自动换行显示（之前会挡住看不全）
 * [ ] 执行失败的任务项支持查看原因
-* [ ] 执行成功的任务项自动删除AList中的任务记录
+* [x] 执行成功的任务项自动删除AList中的任务记录
 
 
 ### 0.1.4（2024-07-17）
