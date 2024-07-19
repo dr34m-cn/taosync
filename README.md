@@ -1,5 +1,5 @@
 # taosync
-`tao-sync`是一个适用于`AList v3`的自动化同步工具，目前正处于早期版本，出于安全考虑暂不开源，待系统完善到一定程度后再开源。
+`tao-sync`是一个适用于`AList v3`的自动化同步工具，**即将开源**，预计两周内。
 
 **新项目急需Star，感谢各位！！**[github地址](https://github.com/dr34-m/taosync) [gitee地址](https://gitee.com/dr34m/taosync)
 
@@ -7,7 +7,7 @@
 
 桃桃是我女儿的名字，我女儿的名字叫桃桃。本工具意为：桃桃的自动同步工具
 
-**警告！不要在外网暴露本系统，否则后果自负！如确实需要，请使用强密码！**
+**警告！不要在外网暴露本系统，否则后果自负！**本系统已经做了一定的安全方面的工作，但仍不能保证绝对安全。如确实需要，请务必使用强密码
 
 ## 须知
 
@@ -18,7 +18,7 @@
 ## 使用方法
 
 ```sh
-docker run -d -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:latest
+docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:latest
 ```
 
 把其中`/opt/data`替换为你实际的目录，然后访问`http://127.0.0.1:8023`
@@ -58,6 +58,19 @@ docker run -d -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:
 ![任务详情](README/任务详情.png)
 
 # 更新记录
+
+### 0.2.0（研发中）
+
+* [ ] 开放源代码
+* [ ] 从源头上解决杜绝密码泄露的可能性，不再使用用户名密码登录AList，改用令牌
+* [x] 加强安全问题，不再写死加密秘钥而是在第一次运行时生成随机秘钥
+* [x] 自动化构建实现，可以通过[Github Actions](https://docs.github.com/zh/actions)自动构建docker镜像并推送到[dockerhub](https://hub.docker.com/r/dr34m/tao-sync)
+* [x] 用户校验改为在内存中进行不再每次读取磁盘数据库（除了第一次读取后写入内存外，之后速度快数倍），所有请求快1ms！
+* [x] 版号不再写死，改为打包构建时自动从`version.txt`读取填充
+* [x] 作业详情-任务进度样式调整，在小屏幕自动换行显示（之前会挡住看不全）
+* [ ] 执行失败的任务项支持查看原因
+* [ ] 执行成功的任务项自动删除AList中的任务记录
+
 
 ### 0.1.4（2024-07-17）
 
