@@ -1,5 +1,9 @@
 # TaoSync
-`TaoSync`是一个适用于`AList v3`的自动化同步工具。
+
+<div align="center">
+  <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
+  <p><em>TaoSync是一个适用于AList v3的自动化同步工具。</em></p>
+</div>
 
 **如果好用，请Star！非常感谢！** [Github地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
 
@@ -87,10 +91,11 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 保留历史N个版本
 * [ ] 配置导入导出
 
-### 0.2.0
+### 0.2.0（2024-07-20）
 
 * [x] 开放源代码
 * [x] 从源头上杜绝密码泄露的可能性，不再使用用户名密码登录AList，改用令牌
+* [x] 打包后为单个文件
 * [x] Linux下全处理器平台支持
 * [x] 加强安全问题，不再写死加密秘钥而是在第一次运行时生成随机秘钥
 * [x] 自动化构建实现，可以通过[Github Actions](https://docs.github.com/zh/actions)自动构建docker镜像并推送到[dockerhub](https://hub.docker.com/r/dr34m/tao-sync)
