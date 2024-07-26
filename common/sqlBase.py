@@ -1,18 +1,28 @@
 import logging
 import sqlite3
+import time
 
 from common.config import CONFIG
+
+RUN_FLAG = False
 
 
 def connect_sql(func):
     def wrapper(*args, **kwargs):
-        conn = sqlite3.connect(CONFIG['db']['dbname'])
+        global RUN_FLAG
+        while RUN_FLAG:
+            time.sleep(0.073)
+        RUN_FLAG = True
+        conn = None
         try:
+            conn = sqlite3.connect(CONFIG['db']['dbname'])
             result = func(conn, *args, **kwargs)
         except Exception as e:
             raise Exception(e)
         finally:
-            conn.close()
+            RUN_FLAG = False
+            if conn:
+                conn.close()
         return result
 
     return wrapper
