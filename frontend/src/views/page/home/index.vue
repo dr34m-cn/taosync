@@ -7,14 +7,14 @@
 		</div>
 		<el-table :data="jobData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading">
 			<el-table-column type="index" label="序号" align="center" width="60"></el-table-column>
-			<el-table-column prop="srcPath" label="来源目录">
+			<el-table-column prop="srcPath" label="来源目录" min-width="80">
 				<template slot-scope="scope">
 					<div class="pathList">
 						<div class="pathBox bg-8">{{scope.row.srcPath}}</div>
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column prop="dstPath" label="目标目录">
+			<el-table-column prop="dstPath" label="目标目录" min-width="120">
 				<template slot-scope="scope">
 					<div class="pathList">
 						<div class="pathBox bg-1" v-for="item in scope.row.dstPath.split(':')">{{item}}</div>
@@ -48,16 +48,16 @@
 					{{scope.row.createTime | timeStampFilter}}
 				</template>
 			</el-table-column>
-			<el-table-column label="操作" align="center" width="280">
+			<el-table-column label="操作" align="center" min-width="280">
 				<template slot-scope="scope">
-					<el-button type="danger" icon="el-icon-delete" :loading="btnLoading" size="small"
-						@click="delJob(scope.row.id)">删除</el-button>
-					<el-button type="warning" icon="el-icon-video-pause" :loading="btnLoading" size="small"
-						@click="putJob(scope.row.id, true)" v-if="scope.row.enable">禁用</el-button>
-					<el-button type="success" icon="el-icon-video-play" :loading="btnLoading" size="small"
-						@click="putJob(scope.row.id, false)" v-else>启用</el-button>
-					<el-button type="primary" icon="el-icon-view" @click="detail(scope.row.id)" :loading="btnLoading"
-						size="small">详情</el-button>
+					<el-button type="warning" :loading="btnLoading" size="small" @click="putJob(scope.row.id, true)"
+						v-if="scope.row.enable">禁用</el-button>
+					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id, false)"
+						v-else>启用</el-button>
+					<el-button type="danger" :loading="btnLoading" size="small" @click="delJob(scope.row.id)">删除</el-button>
+					<el-button type="warning" :loading="btnLoading" size="small" @click="editJobShow(scope.row)">编辑</el-button>
+					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id)">手动执行</el-button>
+					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
@@ -67,8 +67,8 @@
 				layout="total, sizes, prev, pager, next, jumper" :page-sizes="[10, 20, 50, 100]">
 			</el-pagination>
 		</div>
-		<el-dialog top="5vh" :close-on-click-modal="false" :visible.sync="editShow" title="新增作业" width="460px"
-			:before-close="closeShow" :append-to-body="true">
+		<el-dialog top="5vh" :close-on-click-modal="false" :visible.sync="editShow" :append-to-body="true"
+			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="460px" :before-close="closeShow">
 			<div class="elform-box">
 				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="80px">
 					<el-form-item prop="enable" label="是否启用">
@@ -102,7 +102,8 @@
 									<div class="bg-1" style="border-radius: 3px; padding: 0 6px; line-height: 20px;margin-right: -4px;">
 										{{item}}
 									</div>
-									<el-button style="border-radius: 0 3px 3px 0;" type="danger" size="mini" @click="delDstPath(index)">删除</el-button>
+									<el-button style="border-radius: 0 3px 3px 0;" type="danger" size="mini"
+										@click="delDstPath(index)">删除</el-button>
 								</div>
 								<el-button type="primary" size="mini"
 									@click="selectPath(false)">{{editData.dstPath.length == 0 ? '选择' : '添加'}}目录</el-button>
@@ -230,9 +231,12 @@
 					this.alistList = res.data;
 				})
 			},
-			putJob(jobId, pause) {
+			putJob(jobId, pause = null) {
 				this.btnLoading = true;
-				jobPut(jobId, pause).then(res => {
+				jobPut({
+					id: jobId,
+					pause: pause
+				}).then(res => {
 					this.btnLoading = false;
 					this.$message({
 						message: res.msg,
@@ -242,6 +246,18 @@
 				}).catch(err => {
 					this.btnLoading = false;
 				})
+			},
+			editJobShow(row) {
+				if (row.enable) {
+					this.$message.error("禁用作业后才能编辑");
+					return
+				}
+				if (this.alistList.length == 0) {
+					this.getAlistList();
+				}
+				this.editData = JSON.parse(JSON.stringify(row));
+				this.editData.dstPath = this.editData.dstPath.split(':');
+				this.editShow = true;
 			},
 			addShow() {
 				if (this.alistList.length == 0) {

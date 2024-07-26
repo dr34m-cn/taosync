@@ -80,7 +80,6 @@ def editJobClient(job):
     jobMapper.updateJob(job)
     client = jobClient.JobClient(job)
     key = f"jId-{jobId}"
-    global jobClientList
     jobClientList[key] = client
 
 

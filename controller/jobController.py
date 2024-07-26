@@ -60,7 +60,9 @@ class Job(BaseHandler):
     @run_on_executor
     @handle_request
     def put(self, req):
-        if req['pause']:
+        if req['pause'] is None:
+            jobService.doJobManual(req['id'])
+        elif req['pause'] is True:
             jobService.pauseJob(req['id'])
         else:
             jobService.continueJob(req['id'])

@@ -88,18 +88,15 @@ export function jobGetJob(params) {
 	})
 }
 
-// 禁用/启用作业
-export function jobPut(id, pause) {
+// 禁用/启用作业/手动执行
+export function jobPut(data) {
 	return request({
 		url: '/job',
 		headers: {
 			isMask: false
 		},
 		method: 'put',
-		data: {
-			pause,
-			id
-		}
+		data
 	})
 }
 

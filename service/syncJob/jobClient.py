@@ -148,9 +148,9 @@ class JobClient:
         self.job = job
         self.interval = job['interval']
         self.scheduled = None
+        self.jobDoing = False
         if self.job['enable'] == 1:
             self.createJob()
-        self.jobDoing = False
 
     def doJob(self):
         """
@@ -186,9 +186,10 @@ class JobClient:
 
     def doByTime(self):
         self.doJob()
-        self.scheduled = BlockingScheduler()
-        self.scheduled.add_job(self.doJob, 'interval', minutes=self.interval)
-        self.scheduled.start()
+        if self.job['enable'] == 1:
+            self.scheduled = BlockingScheduler()
+            self.scheduled.add_job(self.doJob, 'interval', minutes=self.interval)
+            self.scheduled.start()
 
     def createJob(self):
         """
