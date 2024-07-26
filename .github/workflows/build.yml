@@ -3,10 +3,10 @@ name: 构建
 on:
   push:
     branches: [ 'main' ]
-    paths: [ 'version.txt', '.github/workflows/build.yml' ]
+    paths: [ 'version.txt' ]
 
 jobs:
-  build_docker:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -59,12 +59,14 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le
 
       - name: 打tag
+        if: ${{ !contains(env.version, 'dev') && !contains(env.version, 'pre') }}
         run: |
           git config --local user.email "1416814478@qq.com"
           git config --local user.name "dr34-m"
           git tag -a $version -m "release $version"
 
       - name: 推送tag
+        if: ${{ !contains(env.version, 'dev') && !contains(env.version, 'pre') }}
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
