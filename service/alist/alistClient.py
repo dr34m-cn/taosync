@@ -55,7 +55,8 @@ class AlistClient:
         if res['code'] != 200:
             if res['code'] == 401:
                 raise Exception(f"AList鉴权失败，可能是令牌已失效")
-            raise Exception(f"系统返回{res['code']}错误，原因为：{res['message']}")
+            raise Exception(f"AList返回{res['code']}错误，原因为：{res['message']}/"
+                            f"AList returns {res['code']}, reason: {res['message']}")
         return res['data']
 
     def post(self, url, data=None, params=None):
