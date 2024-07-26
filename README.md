@@ -4,7 +4,6 @@
   <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
   <p><em>TaoSync是一个适用于AList v3的自动化同步工具。</em></p>
 </div>
-
 **如果好用，请Star！非常感谢！** [Github地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
 
 本工具主要用于同步备份功能，可以定时扫描指定目录下文件差异，让目标目录与源目录相同（全同步模式）；或仅新增存在于源目录，却不存在于目标目录的文件（仅新增模式）。
@@ -81,15 +80,28 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 # 更新记录
 
-### 规划中（随时改变，概不负责）
+如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)找最新的含`dev`或`pre`的tag（如有。正式版发布后会删除所有先前的开发版本和预发布版本），例如`v0.1.0-dev-build0`
 
-* [ ] 支持windows
-* [ ] 开发APP（移动端适配）
+### 规划中（随时改变or废弃，概不负责）
+
+* [ ] 支持windows/macos/linux可执行程序的自动构建（目前在三种系统都可通过docker运行）
+* [ ] 移动端适配（可能顺便开发个app？）
 * [ ] 支持本地引擎（不基于`AList`）
-* [ ] 任务整体进度条展示
+* [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
+* [ ] 任务剩余时间预估
+* [ ] 任务同步速度计算
 * [ ] 本地引擎支持加密同步
-* [ ] 保留历史N个版本
+* [ ] 保留历史N个版本（N可自定义，可无限）
 * [ ] 配置导入导出
+* [ ] 支持cron方式定时执行
+* [ ] 增加排除目录（即指定目录不同步）
+
+### 0.2.1（研发中）
+
+* [ ] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
+* [ ] 支持手动创建一个同步任务（即立即执行作业）
+* [ ] 支持已禁用的作业的编辑
+* [ ] 禁用任务时，如有进行中的任务，将会取消所有任务子项
 
 ### 0.2.0（2024-07-20）
 
@@ -98,7 +110,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [x] 打包后为单个文件
 * [x] Linux下全处理器平台支持
 * [x] 加强安全问题，不再写死加密秘钥而是在第一次运行时生成随机秘钥
-* [x] 自动化构建实现，可以通过[Github Actions](https://docs.github.com/zh/actions)自动构建docker镜像并推送到[dockerhub](https://hub.docker.com/r/dr34m/tao-sync)
+* [x] 自动化构建实现，可以通过[Github Actions](https://docs.github.com/zh/actions)自动构建docker镜像并推送到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 * [x] 用户校验改为在内存中进行不再每次读取磁盘数据库（除了第一次读取后写入内存外，之后速度快数倍），所有请求快1ms！
 * [x] 版号不再写死，改为打包构建时自动从`version.txt`读取填充
 * [x] 作业详情-任务进度样式调整，在小屏幕自动换行显示（之前会挡住看不全）
