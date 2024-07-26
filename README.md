@@ -52,6 +52,10 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 ## 页面截图
 
+<details>
+
+<summary>点击展开截图</summary>
+
 由于更新频繁，截图仅供参考，以实际为准
 
 #### 引擎管理
@@ -78,6 +82,8 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 ![任务详情](README/任务详情.png)
 
+</details>
+
 # 更新记录
 
 如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)找最新的含`dev`或`pre`的tag（如有。正式版发布后会删除所有先前的开发版本和预发布版本），例如`v0.1.0-dev-build0`
@@ -98,9 +104,9 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 ### 0.2.1（研发中）
 
-* [ ] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
+* [x] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
 * [ ] 支持手动创建一个同步任务（即立即执行作业）
-* [ ] 支持已禁用的作业的编辑
+* [ ] 支持已禁用的作业的编辑 [#1](https://github.com/dr34-m/taosync/issues/1)
 * [ ] 禁用任务时，如有进行中的任务，将会取消所有任务子项
 
 ### 0.2.0（2024-07-20）
