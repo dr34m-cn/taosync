@@ -4,7 +4,10 @@
   <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
   <p><em>TaoSync是一个适用于AList v3的自动化同步工具。</em></p>
 </div>
-**如果好用，请Star！非常感谢！** [Github地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
+
+**如果好用，请Star！非常感谢！** 
+
+[GitHub地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
 
 本工具主要用于同步备份功能，可以定时扫描指定目录下文件差异，让目标目录与源目录相同（全同步模式）；或仅新增存在于源目录，却不存在于目标目录的文件（仅新增模式）。
 
