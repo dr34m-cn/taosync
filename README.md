@@ -5,7 +5,7 @@
     <a href="https://github.com/dr34-m/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34-m/taosync" alt="License" />
     </a>
-    <a href="https://github.com/dr34-m/taosync/actions?query=workflow%3Abuild">
+    <a href="https://github.com/dr34-m/taosync/actions?query=workflow%3A构建">
       <img src="https://img.shields.io/github/actions/workflow/status/dr34-m/taosync/build.yml?branch=main" alt="Build status" />
     </a>
     <a href="https://hub.docker.com/r/dr34m/tao-sync">
