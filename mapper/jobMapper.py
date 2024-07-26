@@ -16,13 +16,18 @@ def getJobById(jobId):
     if rst:
         return rst[0]
     else:
-        raise Exception("未找到作业，可能已经被删除")
+        raise Exception("未找到作业，可能已经被删除_/_The job was not found and may have been deleted")
 
 
 def addJob(job):
     # 新增作业
     return sqlBase.execute_insert("insert into job (enable, srcPath, dstPath, alistId, speed, method, interval) "
                                   "VALUES (:enable, :srcPath, :dstPath, :alistId, :speed, :method, :interval)", job)
+
+
+def updateJob(job):
+    sqlBase.execute_update("update job set enable=:enable, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
+                           "speed=:speed, method=:method, interval=:interval where id=:id", job)
 
 
 def updateJobEnable(jobId, enable):
@@ -60,7 +65,7 @@ def getJobTaskById(taskId):
     if rst:
         return rst[0]
     else:
-        raise Exception("未找到任务，可能已经被删除")
+        raise Exception("未找到任务，可能已经被删除_/_Task not found, may have been deleted")
 
 
 def addJobTask(jobTask):
@@ -118,7 +123,7 @@ def getUnSuccessJobTaskItemList(taskId):
 
 
 def updateJobTaskItemStatusByIdMany(taskList):
-    sqlBase.execute_manny("update job_task_item set status=:status, progress=:progress,errMsg=:errMsg "
+    sqlBase.execute_manny("update job_task_item set status=:status, progress=:progress, errMsg=:errMsg "
                           "where id=:id", taskList)
 
 

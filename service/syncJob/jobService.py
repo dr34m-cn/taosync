@@ -56,6 +56,44 @@ def addJobClient(job):
     jobClientList[key] = client
 
 
+def editJobClient(job):
+    """
+    编辑作业客户端
+    :param job: {
+        id: 1,
+        enable: 1,
+        srcPath: '',
+        dstPath: '',
+        alistId: null,
+        speed: 0,
+        method: 0,
+        interval: 60
+    }
+    """
+    jobId = job['id']
+    client = getJobClientById(jobId)
+    if client.job['enable'] == 1:
+        raise Exception("请先禁用任务才能编辑_/_Please disable the task before editing it")
+    key = f'jId-{jobId}'
+    global jobClientList
+    del jobClientList[key]
+    jobMapper.updateJob(job)
+    client = jobClient.JobClient(job)
+    key = f"jId-{jobId}"
+    global jobClientList
+    jobClientList[key] = client
+
+
+def doJobManual(jobId):
+    """
+    手动执行作业
+    :param jobId:
+    :return:
+    """
+    client = getJobClientById(jobId)
+    client.doManual()
+
+
 def removeJobClient(jobId):
     """
     删除作业

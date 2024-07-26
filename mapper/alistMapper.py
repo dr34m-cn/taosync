@@ -14,7 +14,7 @@ def getAlistById(alistId):
     if rst:
         return rst[0]
     else:
-        raise Exception("未找到alist，可能已经被删除")
+        raise Exception("未找到alist，可能已经被删除_/_Alist not found, may have been deleted")
 
 
 def addAlist(alist):

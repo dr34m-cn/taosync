@@ -95,7 +95,7 @@ class JobTask:
                     eMsg = str(e)
                     if 'AList返回404错误' in eMsg:
                         eMsg = ("任务未找到。可能是您手动到AList中删除了复制任务；"
-                                "或者Alist因手动/异常奔溃被重启，导致任务记录丢失/task not found."
+                                "或者Alist因手动/异常奔溃被重启，导致任务记录丢失_/_task not found."
                                 "You may have manually deleted the replication task in AList;"
                                 "or Alist was restarted manually or abnormally, resulting in the loss of task records.")
                     taskInfo = {
@@ -137,25 +137,29 @@ class JobClient:
         初始化job
         :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, speed, method, interval}
         """
-        job['id'] = job['id'] if 'id' in job else jobMapper.addJob(job)
         if 'enable' not in job:
             job['enable'] = 1
         if 'speed' not in job:
             job['speed'] = 0
         if 'method' not in job:
             job['method'] = 0
+        job['id'] = job['id'] if 'id' in job else jobMapper.addJob(job)
         self.jobId = job['id']
         self.job = job
         self.interval = job['interval']
         self.scheduled = None
         if self.job['enable'] == 1:
             self.createJob()
+        self.jobDoing = False
 
     def doJob(self):
         """
         执行作业
         :return:
         """
+        while self.jobDoing:
+            time.sleep(10)
+        self.jobDoing = True
         try:
             taskId = jobMapper.addJobTask({
                 'jobId': self.jobId,
@@ -164,8 +168,21 @@ class JobClient:
             JobTask(taskId, self.job)
         except Exception as e:
             logger = logging.getLogger()
-            logger.error(f"执行任务失败，原因为：{str(e)}")
+            logger.error(f"执行任务失败，原因为：{str(e)}_/_Task execution failed due to: {str(e)}")
             logger.exception(e)
+        finally:
+            self.jobDoing = False
+
+    def doManual(self):
+        """
+        手动执行作业
+        :return:
+        """
+        if self.jobDoing:
+            raise Exception("当前有任务执行中，请稍后再试_/_There is a task "
+                            "currently being executed, please try again later")
+        doJobThread = threading.Thread(target=self.doJob)
+        doJobThread.start()
 
     def doByTime(self):
         self.doJob()
@@ -196,7 +213,7 @@ class JobClient:
                 self.scheduled.shutdown(wait=False)
             except Exception as e:
                 logger = logging.getLogger()
-                logger.warning(f"停止定时任务失败，原因为：{str(e)}")
+                logger.warning(f"停止定时任务失败，原因为：{str(e)}_/_Failed to stop the scheduled task due to: {str(e)}")
                 logger.exception(e)
             self.scheduled = None
         if remove:

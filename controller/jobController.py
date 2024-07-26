@@ -52,7 +52,10 @@ class Job(BaseHandler):
     @run_on_executor
     @handle_request
     def post(self, req):
-        jobService.addJobClient(req)
+        if 'id' in req:
+            jobService.editJobClient(req)
+        else:
+            jobService.addJobClient(req)
 
     @run_on_executor
     @handle_request

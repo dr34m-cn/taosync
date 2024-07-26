@@ -27,10 +27,10 @@ def make_app():
     # 初始化数据库，没有则创建
     passwd = sqlInit.init_sql()
     if passwd is not None:
-        msg = f"Password for admin/已为admin生成随机密码：{passwd}"
+        msg = f"Password for admin_/_已为admin生成随机密码：{passwd}"
         print(msg, flush=True)
         logger.critical(msg)
-    logger.info("初始化数据库完成")
+    logger.info("初始化数据库完成_/_Initializing the database completed")
     # 启动日志文件与任务定时清理任务
     logJobService.startJob()
     # 修改异常中止状态，启动任务
@@ -51,7 +51,7 @@ async def main():
     app = make_app()
     logger = logging.getLogger()
     app.listen(server['port'])
-    logger.info("启动成功：http://0.0.0.0:%s/" % server['port'])
+    logger.info(f"启动成功：http://0.0.0.0:%s/{server['port']}_/_Running at http://0.0.0.0:%s/{server['port']}")
     await asyncio.Event().wait()
 
 

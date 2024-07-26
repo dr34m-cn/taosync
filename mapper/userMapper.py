@@ -15,7 +15,7 @@ def getUserByName(name):
         users[f"uId-{user['id']}"] = user
         return user
     else:
-        raise Exception("用户不存在/User does not exist")
+        raise Exception("用户不存在_/_User does not exist")
 
 
 def getUserById(userId):
@@ -29,7 +29,7 @@ def getUserById(userId):
         users[f"uId-{user['id']}"] = user
         return user
     else:
-        raise Exception("用户不存在/User does not exist")
+        raise Exception("用户不存在_/_User does not exist")
 
 
 def resetPasswd(userId, passwd):

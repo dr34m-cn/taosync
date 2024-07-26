@@ -22,7 +22,7 @@ def handle_request(func):
         if not uri.startswith('/svr/noAuth'):
             if user is None:
                 self.clear_cookie(cookieName)
-                msg = commonService.result_map("请登录", 401)
+                msg = commonService.result_map("请登录_/_Please sign in", 401)
                 self.write(msg)
                 return
             else:
@@ -32,7 +32,7 @@ def handle_request(func):
                         or 'userName' not in cUser
                         or trueUser['passwd'] != cUser['passwd']
                         or trueUser['userName'] != cUser['userName']):
-                    msg = commonService.result_map("登录失效", 401)
+                    msg = commonService.result_map("登录失效_/_Login failure", 401)
                     self.write(msg)
                     return
         try:

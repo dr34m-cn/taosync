@@ -44,18 +44,19 @@ class AlistClient:
                 res = r.json()
             else:
                 res['code'] = r.status_code
-                res['message'] = '状态码非200/Code not 200'
+                res['message'] = '状态码非200_/_Code not 200'
         except Exception as e:
             if 'Invalid URL' in str(e):
-                raise Exception("alist地址格式有误/The alist address format is incorrect")
+                raise Exception("alist地址格式有误_/_The alist address format is incorrect")
             elif 'Max retries' in str(e):
-                raise Exception("alist连接失败，请检查是否填写正确/"
+                raise Exception("alist连接失败，请检查是否填写正确_/_"
                                 "Alist connection failed, please check whether it is filled in correctly")
             raise Exception(e)
         if res['code'] != 200:
             if res['code'] == 401:
-                raise Exception(f"AList鉴权失败，可能是令牌已失效")
-            raise Exception(f"AList返回{res['code']}错误，原因为：{res['message']}/"
+                raise Exception("AList鉴权失败，可能是令牌已失效_/_AList authentication failed"
+                                ", possibly because the token has expired")
+            raise Exception(f"AList返回{res['code']}错误，原因为：{res['message']}_/_"
                             f"AList returns {res['code']}, reason: {res['message']}")
         return res['data']
 
