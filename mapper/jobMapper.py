@@ -73,8 +73,8 @@ def addJobTask(jobTask):
                                   "VALUES (:jobId, :runTime)", jobTask)
 
 
-def updateJobTaskStatus(taskId, status):
-    sqlBase.execute_update("update job_task set status=? where id=?", (status, taskId))
+def updateJobTaskStatus(taskId, status, errMsg=None):
+    sqlBase.execute_update(f"update job_task set status=?, errMsg=? where id=?", (status, errMsg, taskId))
 
 
 def updateJobTaskStatusByStatus():

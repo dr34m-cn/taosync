@@ -247,3 +247,12 @@ class AlistClient:
         self.post('/api/admin/task/copy/delete', params={
             'tid': taskId
         })
+
+    def copyTaskCancel(self, taskId):
+        """
+        取消复制任务
+        :param taskId: 任务id
+        """
+        self.post('/api/admin/task/copy/cancel', params={
+            'tid': taskId
+        })

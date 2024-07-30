@@ -63,7 +63,7 @@ class Job(BaseHandler):
         if req['pause'] is None:
             jobService.doJobManual(req['id'])
         elif req['pause'] is True:
-            jobService.pauseJob(req['id'])
+            jobService.pauseJob(req['id'], req.get('cancel', False))
         else:
             jobService.continueJob(req['id'])
 
@@ -71,6 +71,6 @@ class Job(BaseHandler):
     @handle_request
     def delete(self, req):
         if 'id' in req:
-            jobService.removeJobClient(req['id'])
+            jobService.removeJobClient(req['id'], req.get('cancel', False))
         elif 'taskId' in req:
             jobService.removeTask(req['taskId'])

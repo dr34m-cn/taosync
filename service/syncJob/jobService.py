@@ -93,14 +93,15 @@ def doJobManual(jobId):
     client.doManual()
 
 
-def removeJobClient(jobId):
+def removeJobClient(jobId, cancel=False):
     """
     删除作业
     :param jobId:
+    :param cancel: 是否取消进行中的任务
     :return:
     """
     client = getJobClientById(jobId)
-    client.stopJob(remove=True)
+    client.stopJob(remove=True, cancel=cancel)
     global jobClientList
     key = f'jId-{jobId}'
     del jobClientList[key]
@@ -115,13 +116,14 @@ def continueJob(jobId):
     client.createJob()
 
 
-def pauseJob(jobId):
+def pauseJob(jobId, cancel=False):
     """
     禁用作业
     :param jobId:
+    :param cancel: 是否取消进行中的任务
     """
     client = getJobClientById(jobId)
-    client.stopJob()
+    client.stopJob(cancel=cancel)
 
 
 def getJobList(req):

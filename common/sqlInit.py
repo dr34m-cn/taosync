@@ -40,7 +40,8 @@ def init_sql(conn):
         cursor.execute("create table job_task("
                        "id integer primary key autoincrement,"
                        "jobId integer,"             # 所属工作id，job.id
-                       "status integer DEFAULT 1,"  # 状态，0-等待中，1-进行中，2-成功，3-完成（部分失败），4-因重启而中止，5-超时
+                       "status integer DEFAULT 1,"  # 状态，0-等待中，1-进行中，2-成功，3-完成（部分失败），4-因重启而中止，5-超时，6-失败
+                       "errMsg text,"               # 失败原因
                        "runTime integer,"           # 开始时间，秒级时间戳
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
