@@ -171,7 +171,11 @@ class JobClient:
             self.currentTaskId = taskId
         except Exception as e:
             logger = logging.getLogger()
-            errMsg = f"执行任务失败，原因为：{str(e)}_/_Task execution failed due to: {str(e)}"
+            if '_/_' in str(e):
+                sm = str(e).split('_/_')
+            else:
+                sm = [str(e), str(e)]
+            errMsg = f"执行任务失败，原因为：{sm[0]}_/_Task execution failed due to: {sm[1]}"
             logger.error(errMsg)
             if taskId is not None:
                 jobMapper.updateJobTaskStatus(taskId, 6, errMsg)

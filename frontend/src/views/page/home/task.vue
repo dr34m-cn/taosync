@@ -5,11 +5,12 @@
 			<div class="top-box-title">作业详情</div>
 			<el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskList"></el-button>
 		</div>
-		<el-table :data="taskData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading" empty-text="暂无任务">
+		<el-table :data="taskData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading"
+			empty-text="暂无任务">
 			<el-table-column type="index" label="序号" align="center" width="120"></el-table-column>
 			<el-table-column prop="status" label="状态" width="140">
 				<template slot-scope="scope">
-					<div :class="`bg-status bg-${scope.row.status}`">
+					<div :class="`bg-status bg-${scope.row.status < 6 ? scope.row.status : 7}`">
 						<template v-if="scope.row.status == 1 && scope.row.allNum == 0">
 							扫描对比中
 						</template>
@@ -17,7 +18,13 @@
 							无需同步
 						</template>
 						<template v-else>
-							{{scope.row.status | taskStatusFilter}}
+							<span v-if="scope.row.status != 6">
+								{{scope.row.status | taskStatusFilter}}
+							</span>
+							<el-popover v-else placement="top-end" title="错误原因" width="200" trigger="hover"
+								:content="scope.row.errMsg">
+								<span slot="reference">失败，<span style="color: #409eff;">原因</span></span>
+							</el-popover>
 						</template>
 					</div>
 				</template>
@@ -41,10 +48,10 @@
 			</el-table-column>
 			<el-table-column label="操作" width="300">
 				<template slot-scope="scope">
-					<el-button type="danger" icon="el-icon-delete" @click="delTask(scope.row.id)" :loading="btnLoading" :disabled="scope.row.status == 1"
-						size="small">{{scope.row.status == 1 ? '进行中的任务无法' : ''}}删除</el-button>
-					<el-button type="primary" icon="el-icon-view" @click="detail(scope.row.id)" :loading="btnLoading"
-						size="small" v-if="scope.row.allNum != 0">详情</el-button>
+					<el-button type="danger" icon="el-icon-delete" @click="delTask(scope.row.id)" :loading="btnLoading"
+						:disabled="scope.row.status == 1" size="small">{{scope.row.status == 1 ? '进行中的任务无法' : ''}}删除</el-button>
+					<el-button type="primary" icon="el-icon-view" @click="detail(scope.row.id)" :loading="btnLoading" size="small"
+						v-if="scope.row.allNum != 0">详情</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
@@ -167,7 +174,7 @@
 				font-weight: bold;
 			}
 		}
-		
+
 		.prgNum {
 			padding: 1px 6px;
 			text-align: center;
@@ -176,7 +183,7 @@
 			min-width: 56px;
 			border-radius: 3px;
 		}
-		
+
 		.prgNum:last-child {
 			margin-right: 0;
 		}
