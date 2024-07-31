@@ -122,7 +122,11 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [x] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
 * [x] 支持手动创建一个同步任务（即立即执行作业）
 * [x] 支持已禁用的作业的编辑
-* [ ] 禁用任务时，如有进行中的任务，将会取消所有任务子项 [#1](https://github.com/dr34-m/taosync/issues/1)
+* [ ] 禁用任务时，如有进行中的任务，可选取消所有任务子项 [#1](https://github.com/dr34-m/taosync/issues/1)
+* [x] 修复任务创建失败无限卡在扫描对比中的问题
+* [x] 增加任务创建时错误的处理，并可展示错误原因
+* [x] 修复本地同目录下复制任务不产生任务id，导致判定其失败的问题
+* [x] 增加数据库版本迭代标识，支持数据库根据版本动态调整
 
 ### 0.2.0（2024-07-20）
 
