@@ -19,8 +19,6 @@ def getClientList():
     clientList = getAlistList()
     for client in clientList:
         del client['token']
-        if 'passwd' in client:
-            del client['passwd']
     return clientList
 
 

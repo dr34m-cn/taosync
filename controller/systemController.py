@@ -11,10 +11,11 @@ class Login(BaseHandler):
     @handle_request
     def post(self, req):
         user = userService.checkPwd(None, req['passwd'], req['userName'])
-        self.set_signed_cookie(cookieName, json.dumps(user, ensure_ascii=False),
+        self.set_signed_cookie(cookieName, json.dumps(user),
                                expires_days=int(server['cookieExpiresDays']))
         userReturn = user.copy()
         del userReturn['passwd']
+        del userReturn['sqlVersion']
         return userReturn
 
     @handle_request
@@ -25,7 +26,8 @@ class Login(BaseHandler):
 class User(BaseHandler):
     @handle_request
     def get(self, req):
-        return req['__user']
+        user = req['__user']
+        return user
 
     @handle_request
     def put(self, req):

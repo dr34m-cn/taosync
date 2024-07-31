@@ -38,7 +38,9 @@ def handle_request(func):
         try:
             req = commonService.get_post_data(self)
             if user:
-                req['__user'] = trueUser
+                req['__user'] = trueUser.copy()
+                del req['__user']['passwd']
+                del req['__user']['sqlVersion']
             msg = commonService.result_map(func(self, req))
         except Exception as e:
             msg = commonService.result_map(str(e), 500)
