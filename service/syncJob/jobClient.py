@@ -92,6 +92,8 @@ class JobTask:
                 try:
                     taskInfo = self.client.taskInfo(item['alistTaskId'])
                 except Exception as e:
+                    logger = logging.getLogger()
+                    logger.exception(e)
                     eMsg = str(e)
                     if 'AList返回404错误' in eMsg:
                         eMsg = ("任务未找到。可能是您手动到AList中删除了复制任务；"

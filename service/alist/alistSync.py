@@ -2,6 +2,8 @@
 @Author：dr34m
 @Date  ：2024/7/9 12:14 
 """
+import logging
+
 from service.alist.alistService import getClientById
 
 
@@ -45,8 +47,14 @@ def copyFiles(srcPath, dstPath, client, files, copyHook=None):
             try:
                 alistTaskId = client.copyFile(srcPath, dstPath, key)
                 if copyHook is not None:
-                    copyHook(srcPath, dstPath, key, files[key], alistTaskId=alistTaskId)
+                    if alistTaskId:
+                        copyHook(srcPath, dstPath, key, files[key], alistTaskId=alistTaskId)
+                    else:
+                        # 本地对本地的任务，不会产生alistTaskId，直接认为其成功
+                        copyHook(srcPath, dstPath, key, files[key], status=2)
             except Exception as e:
+                logger = logging.getLogger()
+                logger.exception(e)
                 if copyHook is not None:
                     copyHook(srcPath, dstPath, key, files[key], status=7, errMsg=str(e))
 

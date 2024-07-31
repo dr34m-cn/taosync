@@ -171,13 +171,17 @@ class AlistClient:
         :param name: 文件名
         :return: 任务id
         """
-        return self.post('/api/fs/copy', data={
+        tasks = self.post('/api/fs/copy', data={
             'src_dir': srcDir,
             'dst_dir': dstDir,
             'names': [
                 name
             ]
-        })['tasks'][0]['id']
+        })['tasks']
+        if tasks:
+            return tasks[0]['id']
+        else:
+            return None
 
     def taskInfo(self, taskId):
         """
