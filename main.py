@@ -51,7 +51,7 @@ async def main():
     app = make_app()
     logger = logging.getLogger()
     app.listen(server['port'])
-    logger.info(f"启动成功：http://0.0.0.0:%s/{server['port']}_/_Running at http://0.0.0.0:%s/{server['port']}")
+    logger.info(f"启动成功_/_Running at http://0.0.0.0:{server['port']}/")
     await asyncio.Event().wait()
 
 
