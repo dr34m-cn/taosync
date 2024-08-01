@@ -84,11 +84,15 @@ class JobTask:
         tmStart = time.time()
         undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.taskId)
         while undoneTaskItem:
+            if self.job['enable'] == 0:
+                return
             if time.time() - tmStart > timeOut * 3600:
                 jobMapper.updateJobTaskStatus(self.taskId, 5)
                 return
             needUpdate = []
             for item in undoneTaskItem[:]:
+                if self.job['enable'] == 0:
+                    return
                 try:
                     taskInfo = self.client.taskInfo(item['alistTaskId'])
                 except Exception as e:
@@ -169,8 +173,8 @@ class JobClient:
                 'jobId': self.jobId,
                 'runTime': int(time.time())
             })
-            JobTask(taskId, self.job)
             self.currentTaskId = taskId
+            JobTask(taskId, self.job)
         except Exception as e:
             logger = logging.getLogger()
             if '_/_' in str(e):
@@ -223,6 +227,7 @@ class JobClient:
         :param cancel: 是否取消进行中的任务
         :return:
         """
+        self.job['enable'] = 0
         if self.scheduled is not None:
             try:
                 self.scheduled.shutdown(wait=False)
@@ -233,42 +238,42 @@ class JobClient:
             self.scheduled = None
         self.jobDoing = False
         if self.currentTaskId is not None and cancel:
-            cancelThread = threading.Thread(target=self.cancelUndoneJobTaskItem)
+            undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.currentTaskId)
+            cancelThread = threading.Thread(target=self.cancelUndoneJobTaskItem, args=(undoneTaskItem, remove))
             cancelThread.start()
         if remove:
             jobMapper.deleteJob(self.jobId)
         else:
-            self.job['enable'] = 0
             jobMapper.updateJobEnable(self.jobId, 0)
             jobMapper.updateJobTaskStatusByStatusAndJobId(self.jobId)
 
-    def cancelUndoneJobTaskItem(self):
+    def cancelUndoneJobTaskItem(self, undoneTaskItem, remove=False):
         """
         取消未完成的作业任务子项
-        :return:
         """
-        undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.currentTaskId)
         needUpdateList = []
         client = alistService.getClientById(self.job['alistId'])
         for item in undoneTaskItem:
             try:
                 client.copyTaskCancel(item['alistTaskId'])
-                needUpdateList.append({
-                    'id': item['id'],
-                    'status': 4,
-                    'progress': 0,
-                    'errMsg': None
-                })
+                if not remove:
+                    needUpdateList.append({
+                        'id': item['id'],
+                        'status': 4,
+                        'progress': 0,
+                        'errMsg': None
+                    })
             except Exception as e:
                 logger = logging.getLogger()
                 errMsg = f"取消任务过程中失败，原因为：{str(e)}_/_The task cancellation process failed due to:{str(e)}"
                 logger.error(errMsg + f" job_task_item.id={item['id']}")
                 logger.exception(e)
-                needUpdateList.append({
-                    'id': item['id'],
-                    'status': 7,
-                    'progress': 0,
-                    'errMsg': errMsg
-                })
+                if not remove:
+                    needUpdateList.append({
+                        'id': item['id'],
+                        'status': 7,
+                        'progress': 0,
+                        'errMsg': errMsg
+                    })
         if needUpdateList:
             jobMapper.updateJobTaskItemStatusByIdMany(needUpdateList)

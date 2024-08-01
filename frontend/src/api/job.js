@@ -101,16 +101,14 @@ export function jobPut(data) {
 }
 
 // 删除作业
-export function jobDelete(id) {
+export function jobDelete(data) {
 	return request({
 		url: '/job',
 		headers: {
 			isMask: false
 		},
 		method: 'delete',
-		data: {
-			id
-		}
+		data
 	})
 }
 

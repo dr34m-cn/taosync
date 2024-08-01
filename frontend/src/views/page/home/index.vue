@@ -50,11 +50,12 @@
 			</el-table-column>
 			<el-table-column label="操作" align="center" min-width="280">
 				<template slot-scope="scope">
-					<el-button type="warning" :loading="btnLoading" size="small" @click="putJob(scope.row.id, true)"
+					<el-button type="warning" :loading="btnLoading" size="small" @click="disableJobShow(scope.row, false)"
 						v-if="scope.row.enable">禁用</el-button>
 					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id, false)"
 						v-else>启用</el-button>
-					<el-button type="danger" :loading="btnLoading" size="small" @click="delJob(scope.row.id)">删除</el-button>
+					<el-button type="danger" :loading="btnLoading" size="small"
+						@click="disableJobShow(scope.row, true)">删除</el-button>
 					<el-button type="warning" :loading="btnLoading" size="small" @click="editJobShow(scope.row)">编辑</el-button>
 					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id)">手动执行</el-button>
 					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
@@ -146,6 +147,21 @@
 				<el-button type="primary" @click="submit" :loading="editLoading">确 定</el-button>
 			</span>
 		</el-dialog>
+		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告" width="460px"
+			:before-close="closeDisableShow">
+			<div style="color: #f56c6c;font-weight: bold;text-align: center;font-size: 20px;">
+				{{disableIsDel ? '此操作不可逆，将永久删除该作业' : '将禁用任务'}}，确认吗？
+			</div>
+			<div style="display: flex;margin-top: 24px; align-items: center;justify-content: center;">
+				<div style="margin-right: 6px;">是否取消执行中的任务（如有，不保证成功）</div>
+				<el-switch v-model="disableCu.cancel">
+				</el-switch>
+			</div>
+			<span slot="footer" class="dialog-footer">
+				<el-button @click="closeDisableShow">取 消</el-button>
+				<el-button type="primary" @click="submitDisable" :loading="editLoading">确 定</el-button>
+			</span>
+		</el-dialog>
 		<pathSelect v-if="editData" :alistId="editData.alistId" ref="pathSelect" @submit="submitPath"></pathSelect>
 	</div>
 </template>
@@ -181,6 +197,13 @@
 				editLoading: false,
 				editData: null,
 				editShow: false,
+				disableShow: false,
+				disableIsDel: false,
+				disableCu: {
+					id: null,
+					pause: true,
+					cancel: false
+				},
 				addRule: {
 					srcPath: [{
 						required: true,
@@ -247,6 +270,11 @@
 					this.btnLoading = false;
 				})
 			},
+			disableJobShow(row, disableIsDel) {
+				this.disableIsDel = disableIsDel;
+				this.disableCu.id = row.id;
+				this.disableShow = true;
+			},
 			editJobShow(row) {
 				if (row.enable) {
 					this.$message.error("禁用作业后才能编辑");
@@ -277,6 +305,14 @@
 			closeShow() {
 				this.editShow = false;
 			},
+			closeDisableShow() {
+				this.disableShow = false;
+				this.disableCu = {
+					id: null,
+					pause: true,
+					cancel: false
+				};
+			},
 			delDstPath(index) {
 				this.editData.dstPath.splice(index, 1);
 			},
@@ -300,24 +336,33 @@
 					}
 				})
 			},
-			delJob(jobId) {
-				this.$confirm("操作不可逆，将永久删除该作业，确定吗？", '提示', {
-					confirmButtonText: '确定',
-					cancelButtonText: '取消',
-					type: 'warning'
-				}).then(() => {
-					this.btnLoading = true;
-					jobDelete(jobId).then(res => {
-						this.btnLoading = false;
+			submitDisable() {
+				this.editLoading = true;
+				if (this.disableIsDel) {
+					jobDelete(this.disableCu).then(res => {
+						this.editLoading = false;
 						this.$message({
 							message: res.msg,
 							type: 'success'
 						});
 						this.getJobList();
+						this.closeDisableShow();
 					}).catch(err => {
-						this.btnLoading = false;
+						this.editLoading = false;
 					})
-				});
+				} else {
+					jobPut(this.disableCu).then(res => {
+						this.editLoading = false;
+						this.$message({
+							message: res.msg,
+							type: 'success'
+						});
+						this.getJobList();
+						this.closeDisableShow();
+					}).catch(err => {
+						this.editLoading = false;
+					})
+				}
 			},
 			submitPath(path) {
 				if (this.cuIsSrc) {
