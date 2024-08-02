@@ -1,9 +1,9 @@
-FROM dr34m/pyinstaller:taosync as builder
+FROM dr34m/tao-sync:not-for-use-pip-req as builder
 WORKDIR /app
 COPY . /app
 RUN pyinstaller taoSync.spec
 
-FROM alpine:3.20
+FROM dr34m/tao-sync:not-for-use-alpine
 VOLUME /app/data
 WORKDIR /app
 COPY --from=builder /app/dist/taoSync /app/

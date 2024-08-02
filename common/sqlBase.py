@@ -2,7 +2,9 @@ import logging
 import sqlite3
 import time
 
-from common.config import CONFIG
+from common.config import getConfig
+
+CONFIG = getConfig()
 
 RUN_FLAG = False
 

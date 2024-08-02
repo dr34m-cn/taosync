@@ -1,9 +1,10 @@
 import json
 
-from common.config import CONFIG
+from common.config import getConfig
 from controller.baseController import BaseHandler, handle_request, cookieName
 from service.system import userService
 
+CONFIG = getConfig()
 server = CONFIG['server']
 
 

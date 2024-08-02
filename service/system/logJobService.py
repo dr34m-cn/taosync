@@ -10,11 +10,12 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from common.commonService import setLogger
-from common.config import CONFIG
+from common.config import getConfig
 from mapper.jobMapper import deleteJobTaskByRunTime
 
-logSave = int(CONFIG['server']['logSave']) if 'logSave' in CONFIG['server'] else 7
-taskSave = int(CONFIG['server']['taskSave']) if 'taskSave' in CONFIG['server'] else 0
+CONFIG = getConfig()
+logSave = CONFIG['server']['logSave']
+taskSave = CONFIG['server']['taskSave']
 
 
 def logClearJob():

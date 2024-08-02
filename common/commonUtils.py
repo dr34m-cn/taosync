@@ -20,7 +20,8 @@ def passwd2md5(passwd):
     :param passwd: 密码字符串
     :return: md5字符串
     """
-    from common.config import CONFIG
+    from common.config import getConfig
+    CONFIG = getConfig()
     passwd_str = CONFIG['server']['passwdStr']
     hl = hashlib.md5()
     hl.update((passwd + passwd_str).encode(encoding='utf-8'))

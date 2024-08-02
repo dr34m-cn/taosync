@@ -8,11 +8,12 @@ import time
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-from common.config import CONFIG
+from common.config import getConfig
 from mapper import jobMapper
 from service.alist import alistSync, alistService
 
-timeOut = int(CONFIG['server']['timeout'])
+CONFIG = getConfig()
+timeOut = CONFIG['server']['timeout']
 
 
 class JobTask:

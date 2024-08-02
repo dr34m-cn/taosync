@@ -6,11 +6,12 @@ import sys
 from tornado.web import Application, RequestHandler, StaticFileHandler
 
 from common import commonService, sqlInit
-from common.config import CONFIG
+from common.config import getConfig
 from controller import systemController, jobController
 from service.syncJob.jobService import initJob
 from service.system import logJobService
 
+CONFIG = getConfig()
 # 初始化日志
 commonService.setLogger()
 # 后端配置

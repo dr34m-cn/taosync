@@ -3,9 +3,10 @@ import json
 import logging
 import os
 
-from common.config import CONFIG
+from common.config import getConfig
 
-level_int = int(CONFIG['server']['logLevel']) if 'logLevel' in CONFIG['server'] else 1
+CONFIG = getConfig()
+level_int = CONFIG['server']['logLevel']
 
 
 # 日志规定
