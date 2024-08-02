@@ -29,7 +29,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: dockerfiles/Dockerfile.pyinstaller
+          file: dockerfiles/Dockerfile.pipReq
           push: true
           tags: dr34m/tao-sync:not-for-use-pip-req
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le
