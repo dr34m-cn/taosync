@@ -117,7 +117,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 增加排除目录（即指定目录不同步）
 * [ ] 多语言支持
 
-### 0.2.1（研发中）
+### 0.2.1（2024-08-03）
 
 * [x] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
 * [x] 支持手动创建一个同步任务（即立即执行作业）
