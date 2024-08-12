@@ -5,9 +5,63 @@
 			<div class="top-box-title">作业管理</div>
 			<el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getJobList"></el-button>
 		</div>
-		<el-table :data="jobData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading">
+		<el-table :data="jobData.dataList" :default-expand-all="true" class="table-data" height="calc(100% - 117px)" v-loading="loading">
+			<el-table-column type="expand">
+				<template slot-scope="props">
+					<div class="form-box">
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								同步方式
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.method == 0 ? '仅新增' : '全同步'}}
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								同步速度
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.speed == 0 ? '标准' : '快速'}}
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								创建时间
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.createTime | timeStampFilter}}
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								更多操作
+							</div>
+							<div class="form-box-item-value">
+								<el-button type="warning" :loading="btnLoading" size="small" v-if="props.row.enable"
+									@click="disableJobShow(props.row, false)">禁用</el-button>
+								<el-button type="success" :loading="btnLoading" size="small" v-else
+									@click="putJob(props.row.id, false)">启用</el-button>
+								<el-button type="danger" :loading="btnLoading" size="small"
+									@click="disableJobShow(props.row, true)">删除</el-button>
+								<el-button type="warning" :loading="btnLoading" size="small"
+									@click="editJobShow(props.row)">编辑</el-button>
+								<el-button type="success" :loading="btnLoading" size="small"
+									@click="putJob(props.row.id)">手动执行</el-button>
+							</div>
+						</div>
+					</div>
+				</template>
+			</el-table-column>
 			<el-table-column type="index" label="序号" align="center" width="60"></el-table-column>
-			<el-table-column prop="srcPath" label="来源目录" min-width="80">
+			<el-table-column prop="enable" label="状态" align="center" width="80">
+				<template slot-scope="scope">
+					<div :class="`bg-status bg-${scope.row.enable ? '2' : '7'}`" style="width: 50px;">
+						{{scope.row.enable ? '启用' : '禁用'}}
+					</div>
+				</template>
+			</el-table-column>
+			<el-table-column prop="srcPath" label="来源目录" min-width="40">
 				<template slot-scope="scope">
 					<div class="pathList">
 						<div class="pathBox bg-8">{{scope.row.srcPath}}</div>
@@ -21,43 +75,21 @@
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column prop="enable" label="状态" width="80">
-				<template slot-scope="scope">
-					<div :class="`bg-status bg-${scope.row.enable ? '2' : '7'}`" style="width: 50px;">
-						{{scope.row.enable ? '启用' : '禁用'}}
-					</div>
-				</template>
-			</el-table-column>
-			<el-table-column prop="interval" label="同步间隔" width="100">
+			<el-table-column prop="interval" label="同步间隔" width="120">
 				<template slot-scope="scope">
 					{{scope.row.interval}} 分钟
 				</template>
 			</el-table-column>
-			<el-table-column prop="method" label="同步方式" width="90">
+			<el-table-column label="操作" align="center" width="100">
 				<template slot-scope="scope">
-					{{scope.row.method == 0 ? '仅新增' : '全同步'}}
-				</template>
-			</el-table-column>
-			<el-table-column prop="speed" label="同步速度" width="90">
-				<template slot-scope="scope">
-					{{scope.row.speed == 0 ? '标准' : '快速'}}
-				</template>
-			</el-table-column>
-			<el-table-column prop="alarmTime" label="创建时间" width="170">
-				<template slot-scope="scope">
-					{{scope.row.createTime | timeStampFilter}}
-				</template>
-			</el-table-column>
-			<el-table-column label="操作" align="center" min-width="280">
-				<template slot-scope="scope">
-					<el-button type="warning" :loading="btnLoading" size="small" @click="disableJobShow(scope.row, false)"
+					<!-- <el-button type="warning" :loading="btnLoading" size="small" @click="disableJobShow(scope.row, false)"
 						v-if="scope.row.enable">禁用</el-button>
 					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id, false)"
 						v-else>启用</el-button>
 					<el-button type="danger" :loading="btnLoading" size="small"
 						@click="disableJobShow(scope.row, true)">删除</el-button>
 					<el-button type="warning" :loading="btnLoading" size="small" @click="editJobShow(scope.row)">编辑</el-button>
-					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id)">手动执行</el-button>
+					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id)">手动执行</el-button> -->
 					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
 				</template>
 			</el-table-column>

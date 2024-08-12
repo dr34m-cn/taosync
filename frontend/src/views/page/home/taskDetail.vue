@@ -18,11 +18,38 @@
 		</div>
 		<el-table :data="taskItemData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading"
 			empty-text="暂未发现需要同步的文件">
-			<el-table-column type="index" label="序号" align="center" width="80"></el-table-column>
-			<el-table-column prop="srcPath" label="来源目录"></el-table-column>
-			<el-table-column prop="dstPath" label="目标目录"></el-table-column>
+			<el-table-column type="expand">
+				<template slot-scope="props">
+					<div class="form-box">
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								来源目录
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.srcPath}}
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								目标目录
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.dstPath}}
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								创建时间
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.createTime | timeStampFilter}}
+							</div>
+						</div>
+					</div>
+				</template>
+			</el-table-column>
 			<el-table-column prop="fileName" label="文件名"></el-table-column>
-			<el-table-column prop="fileSize" label="文件大小" width="110">
+			<el-table-column prop="fileSize" label="文件大小" width="120">
 				<template slot-scope="scope">
 					{{scope.row.fileSize | sizeFilter}}
 				</template>
@@ -46,11 +73,6 @@
 					</div>
 					<el-progress :stroke-width="20" v-else :text-inside="true" style="width: 90px;" color="rgba(64, 158, 255, .8)"
 						text-color="#fff" define-back-color="rgba(64, 158, 255, .3)" :percentage="scope.row.progress"></el-progress>
-				</template>
-			</el-table-column>
-			<el-table-column prop="alarmTime" label="创建时间" width="170">
-				<template slot-scope="scope">
-					{{scope.row.createTime | timeStampFilter}}
 				</template>
 			</el-table-column>
 		</el-table>

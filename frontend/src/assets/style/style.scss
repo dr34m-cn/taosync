@@ -210,8 +210,12 @@
 	}
 }
 
-.el-table, .el-table__expanded-cell {
+.el-table {
 	background-color: #292b3c;
+}
+
+.el-table__expanded-cell {
+	background-color: #32354a;
 }
 
 .el-table--border::after, .el-table--group::after, .el-table::before {
@@ -421,4 +425,25 @@
 	color: rgb(245, 108, 108);
 	background-color: rgba(245, 108, 108, .3);
 	border: 1px solid rgba(245, 108, 108, .8);
+}
+
+.form-box {
+	display: flex;
+	flex-wrap: wrap;
+	margin-bottom: -12px;
+
+	.form-box-item {
+		min-width: 33%;
+		display: flex;
+		align-items: center;
+		margin-bottom: 12px;
+
+		.form-box-item-label {
+			font-size: 16px;
+			width: 110px;
+			text-align: right;
+			margin-right: 18px;
+			color: #909bd4;
+		}
+	}
 }

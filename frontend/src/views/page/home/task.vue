@@ -7,8 +7,8 @@
 		</div>
 		<el-table :data="taskData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading"
 			empty-text="暂无任务">
-			<el-table-column type="index" label="序号" align="center" width="120"></el-table-column>
-			<el-table-column prop="status" label="状态" width="140">
+			<el-table-column type="index" label="序号" align="center" width="60"></el-table-column>
+			<el-table-column prop="status" label="状态" width="110">
 				<template slot-scope="scope">
 					<div :class="`bg-status bg-${scope.row.status < 6 ? scope.row.status : 7}`">
 						<template v-if="scope.row.status == 1 && scope.row.allNum == 0">
@@ -41,7 +41,7 @@
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column prop="alarmTime" label="创建时间" width="170">
+			<el-table-column prop="alarmTime" label="创建时间" width="160">
 				<template slot-scope="scope">
 					{{scope.row.createTime | timeStampFilter}}
 				</template>
