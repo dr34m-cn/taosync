@@ -80,7 +80,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 ![引擎编辑](README/引擎编辑.png)
 
-#### 新建作业 
+#### 新建作业
 
 ![新建作业](README/新建作业.png)
 
@@ -120,6 +120,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
 * [x] 修复日志文件不自动删除的问题
+* [x] 优化作业列表&任务详情的表格展示，不常用的内容采用展开的形式避免一行内容过多
 
 ### 0.2.1.1（2024-08-12）
 
