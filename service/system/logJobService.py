@@ -30,7 +30,7 @@ def logClearJob():
             if file.endswith('.log') and file not in saveLogList:
                 logger = logging.getLogger()
                 try:
-                    os.remove(f'log/{file}')
+                    os.remove(f'data/log/{file}')
                     logger.info(f"日志文件{file}已被成功删除_/_"
                                 f"The log file {file} has been successfully deleted")
                 except Exception as e:
