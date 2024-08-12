@@ -37,7 +37,7 @@ def handle_request(func):
                     return
         try:
             req = commonService.get_post_data(self)
-            if user:
+            if trueUser:
                 req['__user'] = trueUser.copy()
                 del req['__user']['passwd']
                 del req['__user']['sqlVersion']

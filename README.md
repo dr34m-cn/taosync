@@ -120,6 +120,10 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
 
+### 0.2.1.1（2024-08-12）
+
+* [x] 修复修改密码后无法登陆的问题 [#4](https://github.com/dr34-m/taosync/issues/4)
+
 ### 0.2.1（2024-08-03）
 
 * [x] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
