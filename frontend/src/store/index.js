@@ -31,7 +31,8 @@ const store = new Vuex.Store({
 		vuex_userInfo: lifeData.vuex_userInfo ? lifeData.vuex_userInfo : null, // 用户信息
 		vuex_loading: false, // 加载蒙版显示与否
 		vuex_onRequest: false, // 是否请求中
-		vuex_letfIndex: null
+		vuex_letfIndex: null,
+		vuex_cookieName: 'tao_sync'
 	},
 	mutations: {
 		$uStore(state, payload) {

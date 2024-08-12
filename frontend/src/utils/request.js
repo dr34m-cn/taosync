@@ -10,7 +10,7 @@ import {
 } from "@/utils/utils";
 import errorCode from '@/utils/errorCode';
 import store from '@/store';
-
+import Cookies from 'js-cookie';
 let downloadLoadingInstance;
 // 是否显示重新登录
 export let isRelogin = {
@@ -95,6 +95,7 @@ service.interceptors.response.use(res => {
 					cancelButtonText: '取消',
 					type: 'warning'
 				}).then(() => {
+					Cookies.remove(store.state.vuex_cookieName);
 					isRelogin.show = false;
 					location.href = '/';
 				}).catch(() => {

@@ -19,6 +19,7 @@
 </template>
 
 <script>
+	import Cookies from 'js-cookie';
 	import {
 		login
 	} from "@/api/user";
@@ -50,6 +51,7 @@
 			login() {
 				this.$refs.loginForm.validate((valid) => {
 					if (valid) {
+						Cookies.remove(this.vuex_cookieName);
 						this.loading = true;
 						login(this.loginForm).then(res => {
 							this.$setVuex('vuex_userInfo', res.data);

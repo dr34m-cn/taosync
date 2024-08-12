@@ -24,7 +24,7 @@
 		methods: {
 			init() {
 				try {
-					if (!Cookies.get("tao_sync")) {
+					if (!Cookies.get(this.vuex_cookieName)) {
 						this.to('/login');
 					} else {
 						this.getInfo();
@@ -38,6 +38,7 @@
 					this.$setVuex('vuex_userInfo', res.data);
 					this.to('/home');
 				}).catch(err => {
+					Cookies.remove(this.vuex_cookieName);
 					this.to('/login');
 				})
 			},
