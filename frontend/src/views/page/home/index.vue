@@ -53,15 +53,14 @@
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column type="index" label="序号" align="center" width="60"></el-table-column>
-			<el-table-column prop="enable" label="状态" align="center" width="80">
+			<el-table-column prop="enable" label="状态" width="80">
 				<template slot-scope="scope">
 					<div :class="`bg-status bg-${scope.row.enable ? '2' : '7'}`" style="width: 50px;">
 						{{scope.row.enable ? '启用' : '禁用'}}
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column prop="srcPath" label="来源目录" min-width="40">
+			<el-table-column prop="srcPath" label="来源目录" min-width="60">
 				<template slot-scope="scope">
 					<div class="pathList">
 						<div class="pathBox bg-8">{{scope.row.srcPath}}</div>
@@ -82,14 +81,6 @@
 			</el-table-column>
 			<el-table-column label="操作" align="center" width="100">
 				<template slot-scope="scope">
-					<!-- <el-button type="warning" :loading="btnLoading" size="small" @click="disableJobShow(scope.row, false)"
-						v-if="scope.row.enable">禁用</el-button>
-					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id, false)"
-						v-else>启用</el-button>
-					<el-button type="danger" :loading="btnLoading" size="small"
-						@click="disableJobShow(scope.row, true)">删除</el-button>
-					<el-button type="warning" :loading="btnLoading" size="small" @click="editJobShow(scope.row)">编辑</el-button>
-					<el-button type="success" :loading="btnLoading" size="small" @click="putJob(scope.row.id)">手动执行</el-button> -->
 					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
 				</template>
 			</el-table-column>
