@@ -5,7 +5,7 @@
 			<div class="top-box-title">作业管理</div>
 			<el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getJobList"></el-button>
 		</div>
-		<el-table :data="jobData.dataList" :default-expand-all="true" class="table-data" height="calc(100% - 117px)" v-loading="loading">
+		<el-table :data="jobData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading">
 			<el-table-column type="expand">
 				<template slot-scope="props">
 					<div class="form-box">
