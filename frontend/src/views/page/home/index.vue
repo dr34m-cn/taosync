@@ -27,6 +27,32 @@
 						</div>
 						<div class="form-box-item">
 							<div class="form-box-item-label">
+								调用方式
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.isCron == 0 ? '间隔' : 'cron'}}
+							</div>
+						</div>
+						<div class="form-box-item" v-if="props.row.isCron == 0">
+							<div class="form-box-item-label">
+								同步间隔
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.interval}} 分钟
+							</div>
+						</div>
+						<template v-else>
+							<div class="form-box-item" v-for="item in cronList">
+								<div class="form-box-item-label">
+									{{item.label}}
+								</div>
+								<div class="form-box-item-value">
+									{{props.row[item.label] || '-'}}
+								</div>
+							</div>
+						</template>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
 								创建时间
 							</div>
 							<div class="form-box-item-value">
@@ -60,7 +86,7 @@
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column prop="srcPath" label="来源目录" min-width="60">
+			<el-table-column prop="srcPath" label="来源目录" min-width="50">
 				<template slot-scope="scope">
 					<div class="pathList">
 						<div class="pathBox bg-8">{{scope.row.srcPath}}</div>
@@ -72,11 +98,6 @@
 					<div class="pathList">
 						<div class="pathBox bg-1" v-for="item in scope.row.dstPath.split(':')">{{item}}</div>
 					</div>
-				</template>
-			</el-table-column>
-			<el-table-column prop="interval" label="同步间隔" width="120">
-				<template slot-scope="scope">
-					{{scope.row.interval}} 分钟
 				</template>
 			</el-table-column>
 			<el-table-column label="操作" align="center" width="100">
