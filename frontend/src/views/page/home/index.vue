@@ -44,7 +44,7 @@
 									@click="putJob(props.row.id, false)">启用</el-button>
 								<el-button type="danger" :loading="btnLoading" size="small"
 									@click="disableJobShow(props.row, true)">删除</el-button>
-								<el-button type="warning" :loading="btnLoading" size="small"
+								<el-button type="primary" :loading="btnLoading" size="small"
 									@click="editJobShow(props.row)">编辑</el-button>
 								<el-button type="success" :loading="btnLoading" size="small"
 									@click="putJob(props.row.id)">手动执行</el-button>
@@ -92,77 +92,103 @@
 			</el-pagination>
 		</div>
 		<el-dialog top="5vh" :close-on-click-modal="false" :visible.sync="editShow" :append-to-body="true"
-			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="460px" :before-close="closeShow">
+			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="760px" :before-close="closeShow">
 			<div class="elform-box">
-				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="80px">
-					<el-form-item prop="enable" label="是否启用">
-						<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0">
-						</el-switch>
-					</el-form-item>
-					<el-form-item prop="alistId" label="引擎">
-						<el-select v-model="editData.alistId" placeholder="请选择引擎" style="width: 100%;"
-							no-data-text="暂无引擎,请前往引擎管理创建">
-							<el-option v-for="item in alistList" :label="item.url" :value="item.id">
-								<span
-									style="float: left;margin-right: 16px;">{{item.url}}{{item.remark != null ? `[${item.remark}]` : ''}}</span>
-								<span style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
-							</el-option>
-						</el-select>
-					</el-form-item>
-					<el-form-item prop="srcPath" label="源目录">
-						<div v-if="editData.alistId == null">请先选择引擎</div>
-						<div v-else>
-							{{editData.srcPath}}
-							<el-button type="primary" size="mini" :style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
-								@click="selectPath(true)">{{editData.srcPath == '' ? '选择' : '更换'}}目录</el-button>
-						</div>
-					</el-form-item>
-					<el-form-item prop="dstPath" label="目标目录">
-						<div v-if="editData.alistId == null">请先选择引擎</div>
-						<div v-else>
-							<div style="display: flex;align-items: center;min-height: 42px;flex-wrap: wrap;">
-								<div v-for="(item, index) in editData.dstPath"
-									style="display: flex;align-items: center;margin: 4px 0;margin-right: 12px; flex-shrink: 0;">
-									<div class="bg-1" style="border-radius: 3px; padding: 0 6px; line-height: 20px;margin-right: -4px;">
-										{{item}}
-									</div>
-									<el-button style="border-radius: 0 3px 3px 0;" type="danger" size="mini"
-										@click="delDstPath(index)">删除</el-button>
-								</div>
-								<el-button type="primary" size="mini"
-									@click="selectPath(false)">{{editData.dstPath.length == 0 ? '选择' : '添加'}}目录</el-button>
+				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="120px">
+					<div style="display: flex;flex-wrap: wrap;">
+						<el-form-item prop="enable" label="是否启用">
+							<div class="label_width">
+								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0">
+								</el-switch>
 							</div>
-						</div>
-					</el-form-item>
-					<el-form-item prop="speed" label="同步速度">
-						<el-select v-model="editData.speed" style="width: 100%;">
-							<el-option label="标准" :value="0">
-								<span style="float: left;margin-right: 16px;">标准</span>
-								<span style="float: right; color: #7b9dad; font-size: 13px;">推荐使用</span>
-							</el-option>
-							<el-option label="快速" :value="1">
-								<span style="float: left;margin-right: 16px;">快速</span>
-								<span style="float: right; color: #7b9dad; font-size: 13px;">将使用Alist缓存扫描目标目录</span>
-							</el-option>
-						</el-select>
-					</el-form-item>
-					<el-form-item prop="method" label="同步方法">
-						<el-select v-model="editData.method" style="width: 100%;">
-							<el-option label="仅新增" :value="0">
-								<span style="float: left;margin-right: 16px;">仅新增</span>
-								<span style="float: right; color: #7b9dad; font-size: 13px;">仅新增目标目录没有的文件</span>
-							</el-option>
-							<el-option label="全同步" :value="1">
-								<span style="float: left;margin-right: 16px;">全同步</span>
-								<span style="float: right; color: #7b9dad; font-size: 13px;">目标目录比源目录多的文件将被删除</span>
-							</el-option>
-						</el-select>
-					</el-form-item>
-					<el-form-item prop="interval" label="同步间隔">
-						<el-input v-model.number="editData.interval" placeholder="请输入同步间隔">
-							<template slot="append">分钟</template>
-						</el-input>
-					</el-form-item>
+						</el-form-item>
+						<el-form-item prop="alistId" label="引擎">
+							<el-select v-model="editData.alistId" placeholder="请选择引擎" class="label_width"
+								no-data-text="暂无引擎,请前往引擎管理创建">
+								<el-option v-for="item in alistList" :label="item.url" :value="item.id">
+									<span
+										style="float: left;margin-right: 16px;">{{item.url}}{{item.remark != null ? `[${item.remark}]` : ''}}</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="srcPath" label="源目录">
+							<div v-if="editData.alistId == null" class="label_width">请先选择引擎</div>
+							<div v-else class="label_width">
+								{{editData.srcPath}}
+								<el-button type="primary" size="mini" :style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
+									@click="selectPath(true)">{{editData.srcPath == '' ? '选择' : '更换'}}目录</el-button>
+							</div>
+						</el-form-item>
+						<el-form-item prop="dstPath" label="目标目录">
+							<div v-if="editData.alistId == null" class="label_width">请先选择引擎</div>
+							<div v-else class="label_width">
+								<div style="display: flex;align-items: center;min-height: 42px;flex-wrap: wrap;">
+									<div v-for="(item, index) in editData.dstPath"
+										style="display: flex;align-items: center;margin: 4px 0;margin-right: 12px; flex-shrink: 0;">
+										<div class="bg-1" style="border-radius: 3px; padding: 0 6px; line-height: 20px;margin-right: -4px;">
+											{{item}}
+										</div>
+										<el-button style="border-radius: 0 3px 3px 0;" type="danger" size="mini"
+											@click="delDstPath(index)">删除</el-button>
+									</div>
+									<el-button type="primary" size="mini"
+										@click="selectPath(false)">{{editData.dstPath.length == 0 ? '选择' : '添加'}}目录</el-button>
+								</div>
+							</div>
+						</el-form-item>
+						<el-form-item prop="speed" label="同步速度">
+							<el-select v-model="editData.speed" class="label_width">
+								<el-option label="标准" :value="0">
+									<span style="float: left;margin-right: 16px;">标准</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">推荐使用</span>
+								</el-option>
+								<el-option label="快速" :value="1">
+									<span style="float: left;margin-right: 16px;">快速</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">将使用Alist缓存扫描目标目录</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="method" label="同步方法">
+							<el-select v-model="editData.method" class="label_width">
+								<el-option label="仅新增" :value="0">
+									<span style="float: left;margin-right: 16px;">仅新增</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">仅新增目标目录没有的文件</span>
+								</el-option>
+								<el-option label="全同步" :value="1">
+									<span style="float: left;margin-right: 16px;">全同步</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">目标目录比源目录多的文件将被删除</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="method" label="调用方式">
+							<el-select v-model="editData.isCron" class="label_width">
+								<el-option label="间隔" :value="0">
+									<span style="float: left;margin-right: 16px;">间隔</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">每n分钟同步一次</span>
+								</el-option>
+								<el-option label="cron" :value="1">
+									<span style="float: left;margin-right: 16px;">cron</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">使用cron表达式来调用同步</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="interval" label="同步间隔" v-if="editData.isCron == 0">
+							<el-input v-model.number="editData.interval" placeholder="请输入同步间隔" class="label_width">
+								<template slot="append">分钟</template>
+							</el-input>
+						</el-form-item>
+						<template v-else>
+							<div class="el-form-item">
+								<div class="el-form-item__label" style="width: 120px;">cron表达式</div>
+								<el-image style="height: 36px;" src="/cron.png" :preview-src-list="['/cron.png']"></el-image>
+							</div>
+							<el-form-item v-for="item in cronList" :prop="item.label" :label="item.label">
+								<el-input v-model="editData[item.label]" :placeholder="item.palce" class="label_width">
+								</el-input>
+							</el-form-item>
+						</template>
+					</div>
 				</el-form>
 			</div>
 			<span slot="footer" class="dialog-footer">
@@ -214,6 +240,37 @@
 					pageNum: 1
 				},
 				alistList: [],
+				cronList: [{
+					label: 'year',
+					palce: '2024'
+				}, {
+					label: 'month',
+					palce: '1-12'
+				}, {
+					label: 'day',
+					palce: '1-31'
+				}, {
+					label: 'week',
+					palce: '1-53'
+				}, {
+					label: 'day_of_week',
+					palce: '0-6 or mon,tue,wed,thu,fri,sat,sun'
+				}, {
+					label: 'hour',
+					palce: '0-23'
+				}, {
+					label: 'minute',
+					palce: '0-59'
+				}, {
+					label: 'second',
+					palce: '0-59'
+				}, {
+					label: 'start_date',
+					palce: '2000-01-01'
+				}, {
+					label: 'end_date',
+					palce: '2040-12-31'
+				}],
 				cuIsSrc: false,
 				loading: false,
 				btnLoading: false,
@@ -244,13 +301,7 @@
 						required: true,
 						message: '请选择引擎',
 						trgger: 'change'
-					}],
-					interval: [{
-						type: 'number',
-						required: true,
-						message: '请输入同步间隔',
-						trgger: 'blur'
-					}],
+					}]
 				}
 			};
 		},
@@ -314,15 +365,20 @@
 				if (this.alistList.length == 0) {
 					this.getAlistList();
 				}
-				this.editData = {
+				let editData = {
 					enable: 1,
 					srcPath: '',
 					dstPath: [],
 					alistId: null,
 					speed: 0,
 					method: 0,
-					interval: 1440
+					interval: 1440,
+					isCron: 0
 				}
+				this.cronList.forEach(item => {
+					editData[item.label] = null;
+				})
+				this.editData = editData;
 				this.editShow = true;
 			},
 			closeShow() {
@@ -342,9 +398,30 @@
 			submit() {
 				this.$refs.jobRule.validate((valid) => {
 					if (valid) {
-						this.editLoading = true;
 						let postData = JSON.parse(JSON.stringify(this.editData));
+						for (let i in postData) {
+							if (postData[i] === '') {
+								postData[i] = null;
+							}
+						}
+						if (postData.isCron == 0 && postData.interval == null) {
+							this.$message.error("选择间隔方式时，间隔必填");
+							return
+						}
+						if (postData.isCron == 1) {
+							let flag = 0;
+							this.cronList.forEach(item => {
+								if (postData[item.label] != null) {
+									flag += 1;
+								}
+							})
+							if (flag == 0) {
+								this.$message.error("选择cron方式时，至少有一项不能为空");
+								return
+							}
+						}
 						postData.dstPath = postData.dstPath.join(':');
+						this.editLoading = true;
 						jobPost(postData).then(res => {
 							this.editLoading = false;
 							this.$message({
@@ -421,7 +498,7 @@
 	}
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 	.home {
 		width: 100%;
 		height: 100%;
@@ -461,5 +538,9 @@
 			display: flex;
 			justify-content: right;
 		}
+	}
+
+	.label_width {
+		width: 240px;
 	}
 </style>

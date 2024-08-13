@@ -21,7 +21,7 @@
 			<el-table-column type="expand">
 				<template slot-scope="props">
 					<div class="form-box">
-						<div class="form-box-item">
+						<div class="form-box-item" v-if="props.row.type == 0">
 							<div class="form-box-item-label">
 								来源目录
 							</div>

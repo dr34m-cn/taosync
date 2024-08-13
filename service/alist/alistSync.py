@@ -31,7 +31,7 @@ def getSrcMore(src, dst, sizeCheck=True):
     return moreFile
 
 
-def copyFiles(srcPath, dstPath, client, files, copyHook=None):
+def copyFiles(srcPath, dstPath, client, files, copyHook=None, job=None):
     """
     复制文件
     :param srcPath: 来源路径
@@ -39,10 +39,13 @@ def copyFiles(srcPath, dstPath, client, files, copyHook=None):
     :param client: 客户端
     :param files: 文件
     :param copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None）
+    :param job: 作业
     """
     for key in files.keys():
+        if job is not None and job['enable'] == 0:
+            return
         if key.endswith('/'):
-            copyFiles(f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook)
+            copyFiles(f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
         else:
             try:
                 alistTaskId = client.copyFile(srcPath, dstPath, key)
@@ -59,17 +62,20 @@ def copyFiles(srcPath, dstPath, client, files, copyHook=None):
                     copyHook(srcPath, dstPath, key, files[key], status=7, errMsg=str(e))
 
 
-def delFiles(dstPath, client, files, delHook=None):
+def delFiles(dstPath, client, files, delHook=None, job=None):
     """
     删除文件
     :param dstPath: 目标目录
     :param client: 客户端
     :param files: 文件
     :param delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None）
+    :param job: 作业
     """
     for key in files.keys():
+        if job is not None and job['enable'] == 0:
+            return
         if key.endswith('/'):
-            delFiles(f'{dstPath}{key}', client, files[key], delHook)
+            delFiles(f'{dstPath}{key}', client, files[key], delHook, job)
         else:
             try:
                 client.deleteFile(dstPath, [key])
@@ -80,7 +86,7 @@ def delFiles(dstPath, client, files, delHook=None):
                     delHook(dstPath, key, files[key], status=7, errMsg=str(e))
 
 
-def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=None):
+def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=None, job=None):
     """
     同步方法，仅支持alist
     :param srcPath: 来源路径
@@ -90,6 +96,7 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     :param method: 0-仅新增，1-全同步
     :param copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None）
     :param delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None）
+    :param job: 作业
     """
     client = getClientById(alistId)
     if not srcPath.endswith('/'):
@@ -101,7 +108,9 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
             dstItem = dstItem + '/'
         dstFiles = client.allFileList(dstItem, speed == 0)
         needCopy = getSrcMore(srcFiles, dstFiles)
+        if job is not None and job['enable'] == 0:
+            return
         copyFiles(srcPath, dstItem, client, needCopy, copyHook)
         if method == 1:
             needDel = getSrcMore(dstFiles, srcFiles, False)
-            delFiles(dstItem, client, needDel, delHook)
+            delFiles(dstItem, client, needDel, delHook, job)

@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 240731
+    cuVersion = 240813
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -29,14 +29,24 @@ def init_sql(conn):
                        " unique (url, userName))")
         cursor.execute("create table job("
                        "id integer primary key autoincrement,"
-                       "enable integer DEFAULT 1,"  # 启用，1-启用，0-停用
-                       "srcPath text,"              # 来源目录，结尾有无斜杠都可，建议有斜杠
-                       "dstPath text,"              # 目标目录，结尾有无斜杠都可，建议有斜杠
-                       "alistId integer,"           # 引擎id，alist_list.id
-                       "speed integer,"             # 同步速度：0-标准，1-快速
-                       "method integer,"            # 同步方式，0-仅新增，1-全同步
-                       "interval integer,"          # 同步间隔，单位：分钟
-                       "cron text,"                 # 同步cron（预留，暂时未使用）
+                       "enable integer DEFAULT 1,"          # 启用，1-启用，0-停用
+                       "srcPath text,"                      # 来源目录，结尾有无斜杠都可，建议有斜杠
+                       "dstPath text,"                      # 目标目录，结尾有无斜杠都可，建议有斜杠
+                       "alistId integer,"                   # 引擎id，alist_list.id
+                       "speed integer,"                     # 同步速度：0-标准，1-快速
+                       "method integer,"                    # 同步方式，0-仅新增，1-全同步
+                       "interval integer,"                  # 同步间隔，单位：分钟
+                       "isCron integer DEFAULT 0,"          # 是否使用cron，1-使用cron，0-使用interval
+                       "year text DEFAULT NULL,"            # 四位数的年份
+                       "month text DEFAULT NULL,"           # 1-12月
+                       "day text DEFAULT NULL,"             # 1-31日
+                       "week text DEFAULT NULL,"            # 1-53
+                       "day_of_week text DEFAULT NULL,"     # 0-6
+                       "hour text DEFAULT NULL,"            # 0-23
+                       "minute text DEFAULT NULL,"          # 0-59
+                       "second text DEFAULT NULL,"          # 0-59
+                       "start_date text DEFAULT NULL,"      # 开始时间
+                       "end_date text DEFAULT NULL,"        # 结束时间
                        "createTime integer DEFAULT (strftime('%s', 'now')),"
                        " unique (srcPath, dstPath, alistId))")
         cursor.execute("create table job_task("
@@ -78,6 +88,20 @@ def init_sql(conn):
             if sqlVersion < 240731:
                 cursor.execute("alter table user_list add column sqlVersion integer default 240731")
                 cursor.execute("alter table job_task add column errMsg text")
-                conn.commit()
+            if sqlVersion < 240813:
+                cursor.execute("update user_list set sqlVersion=240813")
+                cursor.execute("alter table job drop column cron")
+                cursor.execute("alter table job add column isCron integer DEFAULT 0")
+                cursor.execute("alter table job add column year text DEFAULT NULL")
+                cursor.execute("alter table job add column month text DEFAULT NULL")
+                cursor.execute("alter table job add column day text DEFAULT NULL")
+                cursor.execute("alter table job add column week text DEFAULT NULL")
+                cursor.execute("alter table job add column day_of_week text DEFAULT NULL")
+                cursor.execute("alter table job add column hour text DEFAULT NULL")
+                cursor.execute("alter table job add column minute text DEFAULT NULL")
+                cursor.execute("alter table job add column second text DEFAULT NULL")
+                cursor.execute("alter table job add column start_date text DEFAULT NULL")
+                cursor.execute("alter table job add column end_date text DEFAULT NULL")
+            conn.commit()
     cursor.close()
     return passwd

@@ -116,7 +116,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 ### 0.2.2（研发中）
 
-* [ ] 支持cron方式定时执行
+* [x] 支持cron方式定时执行
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
 * [x] 修复日志文件不自动删除的问题

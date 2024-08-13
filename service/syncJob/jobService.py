@@ -5,7 +5,7 @@
 from mapper import jobMapper
 from service.syncJob import jobClient
 
-# alist客户端列表，key为jId-{jobId},value为jobClient
+# alist客户端列表，key为jobId,value为jobClient
 jobClientList = {}
 
 
@@ -26,13 +26,12 @@ def getJobClientById(jobId):
     :param jobId:
     :return:
     """
-    key = f'jId-{jobId}'
     global jobClientList
-    if key in jobClientList:
-        return jobClientList[key]
+    if jobId in jobClientList:
+        return jobClientList[jobId]
     job = jobMapper.getJobById(jobId)
     client = jobClient.JobClient(job)
-    jobClientList[key] = client
+    jobClientList[jobId] = client
     return client
 
 
@@ -51,9 +50,8 @@ def addJobClient(job):
     :return:
     """
     client = jobClient.JobClient(job)
-    key = f"jId-{client.jobId}"
     global jobClientList
-    jobClientList[key] = client
+    jobClientList[client.jobId] = client
 
 
 def editJobClient(job):
@@ -74,13 +72,12 @@ def editJobClient(job):
     client = getJobClientById(jobId)
     if client.job['enable'] == 1:
         raise Exception("请先禁用任务才能编辑_/_Please disable the task before editing it")
-    key = f'jId-{jobId}'
+    client.stopJob(remove=True)
     global jobClientList
-    del jobClientList[key]
+    del jobClientList[jobId]
     jobMapper.updateJob(job)
     client = jobClient.JobClient(job)
-    key = f"jId-{jobId}"
-    jobClientList[key] = client
+    jobClientList[jobId] = client
 
 
 def doJobManual(jobId):
@@ -102,9 +99,9 @@ def removeJobClient(jobId, cancel=False):
     """
     client = getJobClientById(jobId)
     client.stopJob(remove=True, cancel=cancel)
+    jobMapper.deleteJob(jobId)
     global jobClientList
-    key = f'jId-{jobId}'
-    del jobClientList[key]
+    del jobClientList[jobId]
 
 
 def continueJob(jobId):
@@ -113,7 +110,7 @@ def continueJob(jobId):
     :param jobId:
     """
     client = getJobClientById(jobId)
-    client.createJob()
+    client.resumeJob()
 
 
 def pauseJob(jobId, cancel=False):

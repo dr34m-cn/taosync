@@ -6,7 +6,7 @@ import logging
 import threading
 import time
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from common.config import getConfig
 from mapper import jobMapper
@@ -74,7 +74,7 @@ class JobTask:
         执行同步
         """
         alistSync.sync(self.job['srcPath'], self.job['dstPath'], self.job['alistId'],
-                       self.job['speed'], self.job['method'], self.copyHook, self.delHook)
+                       self.job['speed'], self.job['method'], self.copyHook, self.delHook, self.job)
         jobMapper.addJobTaskItemMany(self.taskItemList)
         self.updateItemStatus()
 
@@ -153,12 +153,11 @@ class JobClient:
         job['id'] = job['id'] if 'id' in job else jobMapper.addJob(job)
         self.jobId = job['id']
         self.job = job
-        self.interval = job['interval']
         self.scheduled = None
+        self.scheduledJob = None
         self.jobDoing = False
         self.currentTaskId = None
-        if self.job['enable'] == 1:
-            self.createJob()
+        self.doByTime()
 
     def doJob(self):
         """
@@ -166,6 +165,8 @@ class JobClient:
         :return:
         """
         while self.jobDoing:
+            if self.job['enable'] == 0:
+                return
             time.sleep(10)
         self.jobDoing = True
         taskId = None
@@ -178,10 +179,11 @@ class JobClient:
             JobTask(taskId, self.job)
         except Exception as e:
             logger = logging.getLogger()
-            if '_/_' in str(e):
-                sm = str(e).split('_/_')
+            ste = str(e)
+            if '_/_' in ste:
+                sm = ste.split('_/_')
             else:
-                sm = [str(e), str(e)]
+                sm = [ste, ste]
             errMsg = f"执行任务失败，原因为：{sm[0]}_/_Task execution failed due to: {sm[1]}"
             logger.error(errMsg)
             if taskId is not None:
@@ -203,23 +205,42 @@ class JobClient:
         doJobThread.start()
 
     def doByTime(self):
-        self.doJob()
-        if self.job['enable'] == 1:
-            self.scheduled = BlockingScheduler()
-            self.scheduled.add_job(self.doJob, 'interval', minutes=self.interval)
-            self.scheduled.start()
+        params = {
+            'func': self.doJob,
+            'trigger': 'interval' if self.job['isCron'] == 0 else 'cron'
+        }
+        if self.job['isCron'] == 0:
+            interval = self.job['interval']
+            if interval is not None and str(interval).strip() != '':
+                params['minutes'] = interval
+            else:
+                raise Exception("创建间隔型作业时，间隔必填")
+        else:
+            flag = 0
+            for item in ['year', 'month', 'day', 'week', 'day_of_week', 'hour', 'minute', 'second', 'start_date',
+                         'end_date']:
+                if item in self.job and self.job[item] is not None and self.job[item] != '':
+                    flag += 1
+                    params[item] = self.job[item]
+            if flag == 0:
+                raise Exception("创建cron型任务时，至少有一项不为空")
+        self.scheduled = BackgroundScheduler()
+        self.scheduledJob = self.scheduled.add_job(**params)
+        self.scheduled.start()
+        if self.job['enable'] == 0:
+            self.scheduledJob.pause()
 
-    def createJob(self):
+    def resumeJob(self):
         """
-        创建作业定时任务
+        恢复作业
         :return:
         """
-        if self.job['enable'] == 0:
+        if self.scheduledJob is None:
+            raise Exception("作业不存在无法恢复，请删除后重新创建")
+        else:
             jobMapper.updateJobEnable(self.jobId, 1)
             self.job['enable'] = 1
-        doJobThread = threading.Thread(target=self.doByTime)
-        doJobThread.start()
-        time.sleep(0.5)
+            self.scheduledJob.resume()
 
     def stopJob(self, remove=False, cancel=False):
         """
@@ -229,22 +250,31 @@ class JobClient:
         :return:
         """
         self.job['enable'] = 0
-        if self.scheduled is not None:
-            try:
-                self.scheduled.shutdown(wait=False)
-            except Exception as e:
-                logger = logging.getLogger()
-                logger.warning(f"停止定时任务失败，原因为：{str(e)}_/_Failed to stop the scheduled task due to: {str(e)}")
-                logger.exception(e)
-            self.scheduled = None
+        if remove:
+            if self.scheduled is not None:
+                try:
+                    self.scheduled.shutdown(wait=False)
+                except Exception as e:
+                    logger = logging.getLogger()
+                    logger.warning(
+                        f"停止定时任务失败，原因为：{str(e)}_/_Failed to stop the scheduled task due to: {str(e)}")
+                    logger.exception(e)
+                self.scheduled = None
+        else:
+            if self.scheduledJob is not None:
+                try:
+                    self.scheduledJob.pause()
+                except Exception as e:
+                    logger = logging.getLogger()
+                    logger.warning(
+                        f"禁用定时任务失败，原因为：{str(e)}_/_Failed to pause the scheduled task due to: {str(e)}")
+                    logger.exception(e)
         self.jobDoing = False
         if self.currentTaskId is not None and cancel:
             undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.currentTaskId)
             cancelThread = threading.Thread(target=self.cancelUndoneJobTaskItem, args=(undoneTaskItem, remove))
             cancelThread.start()
-        if remove:
-            jobMapper.deleteJob(self.jobId)
-        else:
+        if not remove:
             jobMapper.updateJobEnable(self.jobId, 0)
             jobMapper.updateJobTaskStatusByStatusAndJobId(self.jobId)
 
