@@ -27,6 +27,15 @@
 	}
 }
 
+.el-switch__core {
+	background: #5e648b;
+	border: 1px solid #5e648b;
+}
+
+.el-switch__core:after {
+	background-color: #212c50;
+}
+
 .el-form-item__label {
 	color: #909bd4;
 }

@@ -4,6 +4,8 @@
 """
 import requests
 
+from common.LNG import G
+
 
 class AlistClient:
     def __init__(self, url, token, alistId=None):
@@ -44,20 +46,17 @@ class AlistClient:
                 res = r.json()
             else:
                 res['code'] = r.status_code
-                res['message'] = '状态码非200_/_Code not 200'
+                res['message'] = G('code_not_200')
         except Exception as e:
             if 'Invalid URL' in str(e):
-                raise Exception("alist地址格式有误_/_The alist address format is incorrect")
+                raise Exception(G('address_incorrect'))
             elif 'Max retries' in str(e):
-                raise Exception("alist连接失败，请检查是否填写正确_/_"
-                                "Alist connection failed, please check whether it is filled in correctly")
+                raise Exception(G('alist_connect_fail'))
             raise Exception(e)
         if res['code'] != 200:
             if res['code'] == 401:
-                raise Exception("AList鉴权失败，可能是令牌已失效_/_AList authentication failed"
-                                ", possibly because the token has expired")
-            raise Exception(f"AList返回{res['code']}错误，原因为：{res['message']}_/_"
-                            f"AList returns {res['code']}, reason: {res['message']}")
+                raise Exception(G('alist_un_auth'))
+            raise Exception(G('alist_fail_code_reason').format(res['code'], res['message']))
         return res['data']
 
     def post(self, url, data=None, params=None):

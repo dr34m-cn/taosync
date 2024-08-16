@@ -1,20 +1,19 @@
 import os
 
+from common.commonUtils import generatePasswd, readOrSet
+
 sysConfig = None
 
 
 def getPasswordStr():
+    """
+    获取加密字符串
+    :return: 加密字符串
+    """
     if not os.path.exists('data'):
         os.mkdir('data')
     fileName = 'data/secret.key'
-    if os.path.exists(fileName):
-        with open(fileName, 'r') as file:
-            passwdStr = file.read()
-    else:
-        from common.commonUtils import generatePasswd
-        passwdStr = generatePasswd(256)
-        with open(fileName, 'w') as file:
-            file.write(passwdStr)
+    passwdStr = readOrSet(fileName, generatePasswd(256))
     return passwdStr
 
 

@@ -5,17 +5,9 @@ import sys
 
 from tornado.web import Application, RequestHandler, StaticFileHandler
 
-from common import commonService, sqlInit
 from common.config import getConfig
 from controller import systemController, jobController
-from service.syncJob.jobService import initJob
-from service.system import logJobService
-
-CONFIG = getConfig()
-# 初始化日志
-commonService.setLogger()
-# 后端配置
-server = CONFIG['server']
+from service.system import onStart
 
 
 class MainIndex(RequestHandler):
@@ -24,18 +16,6 @@ class MainIndex(RequestHandler):
 
 
 def make_app():
-    logger = logging.getLogger()
-    # 初始化数据库，没有则创建
-    passwd = sqlInit.init_sql()
-    if passwd is not None:
-        msg = f"Password for admin_/_已为admin生成随机密码：{passwd}"
-        print(msg, flush=True)
-        logger.critical(msg)
-    logger.info("初始化数据库完成_/_Initializing the database completed")
-    # 启动日志文件与任务定时清理任务
-    logJobService.startJob()
-    # 修改异常中止状态，启动任务
-    initJob()
     # 以/svr/noAuth开头的请求无需鉴权，例如登录等
     return Application([
         (r"/svr/noAuth/login", systemController.Login),
@@ -57,4 +37,8 @@ async def main():
 
 
 if __name__ == "__main__":
+    onStart.init()
+    CONFIG = getConfig()
+    # 后端配置
+    server = CONFIG['server']
     asyncio.run(main())

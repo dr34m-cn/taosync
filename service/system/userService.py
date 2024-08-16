@@ -1,6 +1,7 @@
 import time
 
 from common import commonUtils
+from common.LNG import G
 from mapper import userMapper
 
 """
@@ -16,8 +17,7 @@ def checkPwdTime():
         if item + 300 < timeNow:
             ERR_PWD.remove(item)
     if len(ERR_PWD) > 3:
-        raise Exception("5分钟内密码错误超过3次，请稍后再试_/_"
-                        "The password was incorrect more than 3 times within 5 minutes. Please try again later.")
+        raise Exception(G('passwd_wrong_max_time'))
 
 
 def addPwdError():
@@ -49,7 +49,7 @@ def checkPwd(userId, passwd, userName=None):
         if commonUtils.passwd2md5(passwd) == user['passwd']:
             return user
         else:
-            raise Exception("密码错误_/_Wrong password")
+            raise Exception(G('passwd_wrong'))
     except Exception as e:
         addPwdError()
         raise e

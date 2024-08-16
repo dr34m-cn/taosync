@@ -1,4 +1,5 @@
 import hashlib
+import os
 import random
 import string
 from datetime import datetime
@@ -44,3 +45,21 @@ def timeToStamp(timeStr):
     :return: 时间戳，秒级
     """
     return int(datetime.timestamp(datetime.strptime(timeStr, "%Y-%m-%d %H:%M:%S")))
+
+
+def readOrSet(fileName, default, force=False):
+    """
+    从文件读取内容读取，不存在则创建
+    :param fileName: 文件名，如data/111.txt
+    :param default: 不存在文件时默认值，或强制覆盖值
+    :param force: 强制用默认值覆盖
+    :return: 结果
+    """
+    if os.path.exists(fileName) and force is False:
+        with open(fileName, 'r') as file:
+            fnData = file.read()
+    else:
+        fnData = default
+        with open(fileName, 'w') as file:
+            file.write(default)
+    return fnData

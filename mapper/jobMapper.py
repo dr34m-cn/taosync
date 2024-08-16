@@ -3,6 +3,7 @@
 @Date  ：2024/7/9 17:18 
 """
 from common import sqlBase
+from common.LNG import G
 
 
 def getJobList(params=None):
@@ -16,7 +17,7 @@ def getJobById(jobId):
     if rst:
         return rst[0]
     else:
-        raise Exception("未找到作业，可能已经被删除_/_The job was not found and may have been deleted")
+        raise Exception(G('job_not_found'))
 
 
 def addJob(job):
@@ -71,7 +72,7 @@ def getJobTaskById(taskId):
     if rst:
         return rst[0]
     else:
-        raise Exception("未找到任务，可能已经被删除_/_Task not found, may have been deleted")
+        raise Exception(G('task_not_found'))
 
 
 def addJobTask(jobTask):

@@ -1,4 +1,5 @@
 from common import sqlBase
+from common.LNG import G
 
 # 用户列表，key为uId-{user_list.id}，value为用户字典
 users = {}
@@ -15,7 +16,7 @@ def getUserByName(name):
         users[f"uId-{user['id']}"] = user
         return user
     else:
-        raise Exception("用户不存在_/_User does not exist")
+        raise Exception(G('user_not_found'))
 
 
 def getUserById(userId):
@@ -29,7 +30,7 @@ def getUserById(userId):
         users[f"uId-{user['id']}"] = user
         return user
     else:
-        raise Exception("用户不存在_/_User does not exist")
+        raise Exception(G('user_not_found'))
 
 
 def resetPasswd(userId, passwd):

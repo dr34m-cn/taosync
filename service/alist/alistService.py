@@ -4,8 +4,9 @@
 """
 import logging
 
-from service.alist.alistClient import AlistClient
+from common.LNG import G
 from mapper.alistMapper import getAlistById, addAlist, removeAlist, getAlistList, updateAlist
+from service.alist.alistClient import AlistClient
 
 # alist客户端列表，key为aId-{alistId},value为AlistClient
 alistClientList = {}
@@ -65,7 +66,7 @@ def updateClient(alist):
     if alistOld['url'] != alist['url'] or 'token' in alist:
         if 'token' not in alist:
             # 令牌必填，防止通过修改地址为钓鱼地址的方式窃取令牌
-            raise Exception("地址改变时令牌必填_/_Token is required when address changes")
+            raise Exception(G('without_token'))
         client = AlistClient(alist['url'], alist['token'], alistId)
         alistClientList[f'aId-{alistId}'] = client
     updateAlist(alist)
@@ -95,7 +96,7 @@ def addClient(alist):
         client.updateAlistId(alistId)
     except Exception as e:
         logger = logging.getLogger()
-        logger.error(f"新增alist客户端时失败，原因为：{str(e)}_/_Failed to add alist client, reason: {str(e)}")
+        logger.error(G('add_alist_client_fail').format(str(e)))
         raise Exception(e)
     else:
         global alistClientList

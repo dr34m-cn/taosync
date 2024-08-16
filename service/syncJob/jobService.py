@@ -2,6 +2,7 @@
 @Author：dr34m
 @Date  ：2024/7/9 17:17 
 """
+from common.LNG import G
 from mapper import jobMapper
 from service.syncJob import jobClient
 
@@ -71,7 +72,7 @@ def editJobClient(job):
     jobId = job['id']
     client = getJobClientById(jobId)
     if client.job['enable'] == 1:
-        raise Exception("请先禁用任务才能编辑_/_Please disable the task before editing it")
+        raise Exception(G('disable_then_edit'))
     client.stopJob(remove=True)
     global jobClientList
     del jobClientList[jobId]

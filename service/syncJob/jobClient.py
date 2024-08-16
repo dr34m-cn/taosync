@@ -8,6 +8,7 @@ import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from common.LNG import G
 from common.config import getConfig
 from mapper import jobMapper
 from service.alist import alistSync, alistService
@@ -100,11 +101,8 @@ class JobTask:
                     logger = logging.getLogger()
                     logger.exception(e)
                     eMsg = str(e)
-                    if 'AList返回404错误' in eMsg:
-                        eMsg = ("任务未找到。可能是您手动到AList中删除了复制任务；"
-                                "或者Alist因手动/异常奔溃被重启，导致任务记录丢失_/_task not found."
-                                "You may have manually deleted the replication task in AList;"
-                                "or Alist was restarted manually or abnormally, resulting in the loss of task records.")
+                    if '404' in eMsg:
+                        eMsg = (G('task_may_delete'))
                     taskInfo = {
                         'state': 7,
                         'progress': None,
@@ -179,12 +177,7 @@ class JobClient:
             JobTask(taskId, self.job)
         except Exception as e:
             logger = logging.getLogger()
-            ste = str(e)
-            if '_/_' in ste:
-                sm = ste.split('_/_')
-            else:
-                sm = [ste, ste]
-            errMsg = f"执行任务失败，原因为：{sm[0]}_/_Task execution failed due to: {sm[1]}"
+            errMsg = G('do_job_err').format(str(e))
             logger.error(errMsg)
             if taskId is not None:
                 jobMapper.updateJobTaskStatus(taskId, 6, errMsg)
@@ -199,8 +192,7 @@ class JobClient:
         :return:
         """
         if self.jobDoing:
-            raise Exception("当前有任务执行中，请稍后再试_/_There is a task "
-                            "currently being executed, please try again later")
+            raise Exception(G('job_running'))
         doJobThread = threading.Thread(target=self.doJob)
         doJobThread.start()
 
@@ -214,7 +206,7 @@ class JobClient:
             if interval is not None and str(interval).strip() != '':
                 params['minutes'] = interval
             else:
-                raise Exception("创建间隔型作业时，间隔必填")
+                raise Exception(G('interval_lost'))
         else:
             flag = 0
             for item in ['year', 'month', 'day', 'week', 'day_of_week', 'hour', 'minute', 'second', 'start_date',
@@ -223,7 +215,7 @@ class JobClient:
                     flag += 1
                     params[item] = self.job[item]
             if flag == 0:
-                raise Exception("创建cron型任务时，至少有一项不为空")
+                raise Exception(G('cron_lost'))
         self.scheduled = BackgroundScheduler()
         self.scheduledJob = self.scheduled.add_job(**params)
         self.scheduled.start()
@@ -236,7 +228,7 @@ class JobClient:
         :return:
         """
         if self.scheduledJob is None:
-            raise Exception("作业不存在无法恢复，请删除后重新创建")
+            raise Exception(G('cannot_resume_lost_job'))
         else:
             jobMapper.updateJobEnable(self.jobId, 1)
             self.job['enable'] = 1
@@ -256,8 +248,7 @@ class JobClient:
                     self.scheduled.shutdown(wait=False)
                 except Exception as e:
                     logger = logging.getLogger()
-                    logger.warning(
-                        f"停止定时任务失败，原因为：{str(e)}_/_Failed to stop the scheduled task due to: {str(e)}")
+                    logger.warning(G('stop_fail').format(str(e)))
                     logger.exception(e)
                 self.scheduled = None
         else:
@@ -266,8 +257,7 @@ class JobClient:
                     self.scheduledJob.pause()
                 except Exception as e:
                     logger = logging.getLogger()
-                    logger.warning(
-                        f"禁用定时任务失败，原因为：{str(e)}_/_Failed to pause the scheduled task due to: {str(e)}")
+                    logger.warning(G('disable_fail').format(str(e)))
                     logger.exception(e)
         self.jobDoing = False
         if self.currentTaskId is not None and cancel:
@@ -296,7 +286,7 @@ class JobClient:
                     })
             except Exception as e:
                 logger = logging.getLogger()
-                errMsg = f"取消任务过程中失败，原因为：{str(e)}_/_The task cancellation process failed due to:{str(e)}"
+                errMsg = G('cancel_fail').format(str(e))
                 logger.error(errMsg + f" job_task_item.id={item['id']}")
                 logger.exception(e)
                 if not remove:

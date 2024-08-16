@@ -3,6 +3,7 @@
 @Date  ：2024/7/8 16:52 
 """
 from common import sqlBase
+from common.LNG import G
 
 
 def getAlistList():
@@ -14,7 +15,7 @@ def getAlistById(alistId):
     if rst:
         return rst[0]
     else:
-        raise Exception("未找到alist，可能已经被删除_/_Alist not found, may have been deleted")
+        raise Exception(G('alist_not_found'))
 
 
 def addAlist(alist):

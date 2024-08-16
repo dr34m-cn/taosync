@@ -2,6 +2,7 @@ import logging
 import sqlite3
 import time
 
+from common.LNG import G
 from common.config import getConfig
 
 CONFIG = getConfig()
@@ -90,7 +91,7 @@ def execute_insert(conn, query, params=()):
     except sqlite3.IntegrityError as e:
         logger = logging.getLogger()
         logger.exception(e)
-        raise Exception("已存在相同数据，请检查！_/_The same data already exists, please check!")
+        raise Exception(G('same_exists'))
     except Exception as e:
         raise Exception(e)
     finally:
@@ -128,7 +129,7 @@ def check_and_add_sql(sql, params, data):
             sql += " {}=:{},".format(item, item)
             flag += 1
     if flag == 0 or 'id' not in data:
-        raise Exception("入参不全_/_Incomplete participation")
+        raise Exception(G('lost_part'))
     sql = sql[:-1]
     sql += " where id=:id"
     return sql

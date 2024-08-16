@@ -9,6 +9,7 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from common.LNG import G
 from common.commonService import setLogger
 from common.config import getConfig
 from mapper.jobMapper import deleteJobTaskByRunTime
@@ -31,11 +32,9 @@ def logClearJob():
                 logger = logging.getLogger()
                 try:
                     os.remove(f'data/log/{file}')
-                    logger.info(f"日志文件{file}已被成功删除_/_"
-                                f"The log file {file} has been successfully deleted")
+                    logger.info(G('log_del_success').format(file))
                 except Exception as e:
-                    logger.error(f"日志文件{file}删除失败，原因为：{str(e)}_/_"
-                                 f"Failed to delete log file {file}, reason: {str(e)}")
+                    logger.error(G('log_del_fail').format(file, str(e)))
                     logger.exception(e)
     if taskSave > 0:
         now = datetime.now()
@@ -49,14 +48,14 @@ def logChangeJob():
 
 def startJob():
     logger = logging.getLogger()
-    logger.info("日志定时更名任务启动成功_/_The log scheduled renaming task was started successfully")
+    logger.info(G('log_rename_start'))
     startChangeScheduler()
     if logSave == 0:
-        logger.info("日志保留时间为0，将保留所有日志_/_The log retention time is 0, all logs will be retained.")
+        logger.info(G('keep_all_log'))
     if taskSave == 0:
-        logger.info("任务保留时间为0，将保留所有任务_/_The task retention time is 0, all tasks will be retained.")
+        logger.info(G('keep_all_task'))
     if logSave > 0 or taskSave > 0:
-        logger.info("定时清理任务启动成功_/_The scheduled cleanup task was started successfully")
+        logger.info(G('clear_task_start'))
         startClearScheduler()
 
 

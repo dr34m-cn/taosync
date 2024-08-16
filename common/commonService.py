@@ -1,18 +1,16 @@
 import datetime
 import json
 import logging
-import os
 
 from common.config import getConfig
 
 CONFIG = getConfig()
 level_int = CONFIG['server']['logLevel']
+from common.LNG import G
 
 
 # 日志规定
 def setLogger(cusLevel=None):
-    if not os.path.exists('data/log'):
-        os.mkdir('data/log')
     level_list = [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL]
     logger = logging.getLogger()
     if cusLevel is None:
@@ -50,6 +48,6 @@ def result_map(*dt):
     result = {
         "code": 200 if lenDt <= 1 else dt[1],
         "data": dt[0] if lenDt == 1 else None,
-        "msg": "操作成功" if lenDt <= 1 else dt[0]
+        "msg": G('success') if lenDt <= 1 else dt[0]
     }
     return json.dumps(result, ensure_ascii=False)
