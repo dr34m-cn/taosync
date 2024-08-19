@@ -12,7 +12,7 @@ from service.system import onStart
 
 class MainIndex(RequestHandler):
     def get(self):
-        self.render(os.path.join(sys._MEIPASS if getattr(sys, 'frozen', False) else '.', "front/index.html"))
+        self.render(os.path.join(frontendPath, "front/index.html"))
 
 
 def make_app():
@@ -20,11 +20,12 @@ def make_app():
     return Application([
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
+        (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
         (r"/svr/job", jobController.Job),
         (r"/", MainIndex),
         (r"/(.*)", StaticFileHandler,
-         {"path": os.path.join(sys._MEIPASS if getattr(sys, 'frozen', False) else '.', "front")})
+         {"path": os.path.join(frontendPath, "front")})
     ], cookie_secret=server['passwdStr'])
 
 
@@ -39,6 +40,7 @@ async def main():
 if __name__ == "__main__":
     onStart.init()
     CONFIG = getConfig()
+    frontendPath = sys._MEIPASS if getattr(sys, 'frozen', False) else '.'
     # 后端配置
     server = CONFIG['server']
     asyncio.run(main())

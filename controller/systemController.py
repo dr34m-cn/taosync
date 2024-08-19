@@ -1,5 +1,6 @@
 import json
 
+from common.LNG import language
 from common.config import getConfig
 from controller.baseController import BaseHandler, handle_request, cookieName
 from service.system import userService
@@ -34,3 +35,13 @@ class User(BaseHandler):
     def put(self, req):
         user = json.loads(self.get_signed_cookie(cookieName))
         userService.resetPasswd(user['id'], req['passwd'], req['oldPasswd'])
+
+
+class Language(BaseHandler):
+    @handle_request
+    def get(self, req):
+        return language()
+
+    @handle_request
+    def post(self, req):
+        language(req['language'])

@@ -59,12 +59,12 @@ allLng = {
         'alist_fail_code_reason': 'AList returns {}, reason: {}',
         'without_token': 'Token is required when address changes',
         'add_alist_client_fail': 'Failed to add alist client, reason: {}',
-        'task_may_delete': 'task not found. You may have manually deleted the replication task in AList; or Alist was restarted manually or abnormally, resulting in the loss of task records.',
+        'task_may_delete': 'task not found. You may have manually deleted the replication task in AList; or Alist was restarted manually or abnormally, resulting in the loss of task records',
         'do_job_err': 'Task execution failed due to: {}',
         'job_running': 'There is a task currently being executed, please try again later',
-        'interval_lost': '创建间隔型作业时，间隔必填',
-        'cron_lost': '创建cron型任务时，至少有一项不为空',
-        'cannot_resume_lost_job': '作业不存在无法恢复，请删除后重新创建',
+        'interval_lost': 'When creating an interval job, the interval is required',
+        'cron_lost': 'When creating a cron job, at least one of the following items must be non-empty',
+        'cannot_resume_lost_job': 'The job does not exist and cannot be restored. Please delete it and create it again',
         'stop_fail': 'Failed to stop the scheduled task due to: {}',
         'disable_fail': 'Failed to pause the scheduled task due to: {}',
         'cancel_fail': 'The task cancellation process failed due to: {}',
@@ -72,11 +72,11 @@ allLng = {
         'log_del_success': 'The log file {} has been successfully deleted',
         'log_del_fail': 'Failed to delete log file {}, reason: {}',
         'log_rename_start': 'The log scheduled renaming task was started successfully',
-        'keep_all_log': 'The log retention time is 0, all logs will be retained.',
-        'keep_all_task': 'The task retention time is 0, all tasks will be retained.',
-        'clear_task_start': 'The scheduled cleanup task was started successfully.',
+        'keep_all_log': 'The log retention time is 0, all logs will be retained',
+        'keep_all_task': 'The task retention time is 0, all tasks will be retained',
+        'clear_task_start': 'The scheduled cleanup task was started successfully',
         'passwd_wrong': 'Wrong password',
-        'passwd_wrong_max_time': 'The password was incorrect more than 3 times within 5 minutes. Please try again later.'
+        'passwd_wrong_max_time': 'The password was incorrect more than 3 times within 5 minutes. Please try again later'
     }
 }
 
