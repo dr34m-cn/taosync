@@ -38,31 +38,44 @@
 
 ## 使用方法
 
+### 启动
+
+#### docker
+
 ```sh
 docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:latest
 ```
 
-把其中`/opt/data`替换为你实际的目录，然后访问`http://127.0.0.1:8023`
+把其中`/opt/data`替换为你实际的目录
+
+在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://blog.ctftools.com/2024/07/newpost-57/)
+
+#### 可执行程序
+
+前往[Release](https://github.com/dr34-m/taosync/releases)下载对应平台的可执行程序，直接执行
+
+### 使用
+
+访问`http://127.0.0.1:8023`
 
 如果你没有修改，默认账号为`admin`，密码请到日志中查看输出，登录后请立即前往系统设置修改密码
 
-> 如果没有显示这个日志，可以到挂载目录的`/log/sys_xxx.log`文件查看，通常在第一行
+> 如果没有显示这个日志，可以到同级目录的`log/sys_xxx.log`文件查看，通常在第一行
 
 进入系统后先到`引擎管理`菜单创建引擎，然后前往`作业管理`创建同步作业
-
-在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://blog.ctftools.com/2024/07/newpost-57/)
 
 ## 环境变量及其意义
 
 修改环境变量需重启docker才能生效
 
-| 变量名           | 描述                                                         | 默认值 |
-| ---------------- | ------------------------------------------------------------ | ------ |
-| TAO_EXPIRES      | 登录有效期，单位天                                           | 2      |
-| TAO_LOG_LEVEL    | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1      |
-| TAO_LOG_SAVE     | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7      |
-| TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0      |
-| TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72     |
+| 变量名           | 描述                                                         | 默认值        |
+| ---------------- | ------------------------------------------------------------ | ------------- |
+| TAO_EXPIRES      | 登录有效期，单位天                                           | 2             |
+| TAO_LOG_LEVEL    | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
+| TAO_LOG_SAVE     | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
+| TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
+| TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
+| TZ               | 时区                                                         | Asia/Shanghai |
 
 ## 页面截图
 
@@ -104,7 +117,6 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 ### 规划中（随时改变or因太难不做了，概不负责）
 
-* [ ] 支持windows/macos/linux可执行程序的自动构建（目前在三种系统都可通过docker运行）
 * [ ] 移动端适配（可能顺便开发个app？）
 * [ ] 支持本地引擎（不基于`AList`）
 * [ ] 任务剩余时间预估
@@ -113,13 +125,26 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 保留历史N个版本（N可自定义，可无限）
 * [ ] 配置导入导出
 * [ ] 增加排除目录（即指定目录不同步）
-
-### 0.2.2（研发中）
-
-* [x] 支持cron方式定时执行
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
+
+### 0.2.2（2024-08-23）
+
+* [x] 支持cron方式定时执行
 * [x] 修复日志文件不自动删除的问题
+* [x] 支持打包构建以下平台可执行程序
+  * windows-amd64
+  * darwin-amd64
+  * darwin-arm64
+  * linux-amd64
+  * linux-arm64
+  * linux-386
+  * linux-arm-v6
+  * linux-arm-v7
+  * linux-s390x
+  * linux-ppc64le
+* [x] 通过[Github Actions](https://docs.github.com/zh/actions)自动发布Release
+* [x] 使用矩阵多平台同步构建，加快速度
 * [x] 优化作业列表&任务详情的表格展示，不常用的内容采用展开的形式避免一行内容过多
 
 ### 0.2.1.1（2024-08-12）

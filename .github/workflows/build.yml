@@ -5,26 +5,46 @@ on:
     branches: [ 'main' ]
     paths: [ 'version.txt' ]
 
+env:
+  APP_NAME: taoSync
+  DOCKER_USER: dr34m
+  DOCKER_NAME: tao-sync
+
 jobs:
-  build:
+  get-version:
+    name: 获取版本号
     runs-on: ubuntu-latest
+    outputs:
+      TAG_LIST: ${{ steps.getVersion.outputs.TAG_LIST }}
+      VERSION: ${{ steps.getVersion.outputs.VERSION }}
 
     steps:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 获取版本号
+      - id: getVersion
+        name: 获取版本号
         run: |
           versions=$(head -n 1 version.txt)
           tagList=""
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           for version in "${versionList[@]}"; do
-            tagList+="dr34m/tao-sync:$version,"
+            tagList+="-t $DOCKER_USER/$DOCKER_NAME:$version "
           done
-          tagList=${tagList%?}
-          echo "tagList=$tagList" >> $GITHUB_ENV
-          echo "version=$cuVersion" >> $GITHUB_ENV
+          echo "TAG_LIST=$tagList" >> "$GITHUB_OUTPUT"
+          echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+
+  build-frontend:
+    name: 构建前端
+    runs-on: ubuntu-latest
+    needs: [ get-version ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
 
       - name: 安装Node.js 14.x
         uses: actions/setup-node@v4
@@ -33,10 +53,40 @@ jobs:
 
       - name: 安装依赖并构建前端
         run: |
-          sed -i "s/__version_placeholder__/$version/g" frontend/src/views/page/setting/index.vue
+          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
           cd frontend
           npm install
           npm run build
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  build-docker:
+    name: 构建Docker与linux
+    runs-on: ubuntu-latest
+    needs: [ get-version, build-frontend ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+          - linux/arm/v7
+          - linux/386
+          - linux/arm/v6
+          - linux/s390x
+          - linux/ppc64le
+
+    steps:
+      - name: 替换平台名称中的斜杠为横杠
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
@@ -47,28 +97,200 @@ jobs:
       - name: 登录到DockerHub
         uses: docker/login-action@v3
         with:
-          username: dr34m
+          username: ${{ env.DOCKER_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 构建并推送
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - id: build-image
+        name: 构建docker镜像
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          tags: ${{ env.tagList }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le
+          platforms: ${{ matrix.platform }}
+          outputs: |
+            type=docker
+            type=image,name=${{ env.DOCKER_USER }}/${{ env.DOCKER_NAME }},push-by-digest=true,name-canonical=true,push=true
 
-      - name: 打tag
-        if: ${{ !contains(env.version, 'dev') && !contains(env.version, 'pre') }}
+      - name: 导出digest
         run: |
-          git config --local user.email "1416814478@qq.com"
-          git config --local user.name "dr34-m"
-          git tag -a $version -m "release $version"
+          mkdir -p /tmp/digests
+          digest="${{ steps.build-image.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
 
-      - name: 推送tag
-        if: ${{ !contains(env.version, 'dev') && !contains(env.version, 'pre') }}
-        uses: ad-m/github-push-action@master
+      - name: 上传digest到artifact
+        uses: actions/upload-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: main
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          retention-days: 1
 
+      - name: 从镜像中提取可执行文件
+        run: |
+          docker create --name tmp ${{ steps.build-image.outputs.imageid }} /bin/true
+          docker cp tmp:/app/${{ env.APP_NAME }} ${{ env.APP_NAME }}
+          tar czf "$APP_NAME-$VERSION-$PLATFORM_PAIR.tar.gz" ${{ env.APP_NAME }}
+
+      - name: 上传可执行文件到artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ env.PLATFORM_PAIR }}
+          path: ${{ env.APP_NAME }}-${{ env.VERSION }}-${{ env.PLATFORM_PAIR }}.tar.gz
+          retention-days: 1
+
+  merge-docker:
+    name: 合并镜像上传
+    runs-on: ubuntu-latest
+    needs: [get-version, build-docker]
+    env:
+      TAG_LIST: ${{ needs.get-version.outputs.TAG_LIST }}
+    steps:
+      - name: 下载digest
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: 设置Docker BuildX
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录到DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 创建清单并推送
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create ${{ env.TAG_LIST }}$(printf '${{ env.DOCKER_USER }}/${{ env.DOCKER_NAME }}@sha256:%s ' *)
+
+  build-windows-amd64:
+    name: 构建windows amd64
+    runs-on: windows-latest
+    needs: [get-version, build-frontend]
+    env:
+      VERSION: ${{needs.get-version.outputs.VERSION}}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 设置python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖并构建打包
+        run: |
+          python -m pip install 'pyinstaller>=6,<7'
+          python -m pip install -r requirements.txt
+          python -m PyInstaller ${{ env.APP_NAME }}.spec
+          cd dist && 7z a ${{ env.APP_NAME }}-${{ env.VERSION }}-windows-amd64.zip *
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows-amd64
+          path: dist/*.zip
+
+  build-darwin:
+    name: 构建darwin
+    strategy:
+      matrix:
+        os:
+          - macos-13
+          - macos-14
+    runs-on: ${{ matrix.os }}
+    needs: [get-version, build-frontend]
+    env:
+      VERSION: ${{needs.get-version.outputs.VERSION}}
+
+    steps:
+      - name: 判断平台
+        run: |
+          os=${{ matrix.os }}
+          if [ "$os" = "macos-13" ]; then
+            PLATFORM="amd64"
+          else
+            PLATFORM="arm64"
+          fi
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 设置python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖并构建打包
+        run: |
+          python -m pip install 'pyinstaller>=6,<7'
+          python -m pip install -r requirements.txt
+          python -m PyInstaller "$APP_NAME.spec"
+          cd dist
+          tar czf "$APP_NAME-$VERSION-darwin-$PLATFORM.tar.gz" .
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-darwin-${{ env.PLATFORM }}
+          path: dist/*.tar.gz
+
+  create-release:
+    name: 发布release
+    runs-on: ubuntu-latest
+    needs: [get-version, build-windows-amd64, build-darwin, build-docker]
+    env:
+      VERSION: ${{needs.get-version.outputs.VERSION}}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载构建结果
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+
+      - name: 没有版本日志文件自动创建
+        run: |
+          version_first=$(echo $VERSION | cut -d'-' -f1)
+          LOG_FILE="doc/changelog/$version_first.md"
+          if [ ! -f "$LOG_FILE" ]; then
+            touch "$LOG_FILE"
+            echo "$VERSION" > "$LOG_FILE"
+          fi
+          echo "LOG_FILE=$LOG_FILE" >> "$GITHUB_ENV"
+
+      - name: 创建release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          files: dist/*
+          body_path: ${{ env.LOG_FILE }}
+          prerelease: ${{ contains(env.VERSION, 'dev') || contains(env.VERSION, 'pre') }}
