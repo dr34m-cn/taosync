@@ -8,6 +8,9 @@
     <a href="https://github.com/dr34-m/taosync/actions?query=workflow%3A构建">
       <img src="https://img.shields.io/github/actions/workflow/status/dr34-m/taosync/build.yml?branch=main" alt="Build status" />
     </a>
+    <a href="https://github.com/dr34-m/taosync/releases">
+      <img src="https://img.shields.io/github/downloads/dr34-m/taosync/total?color=%239F7AEA&logo=github" alt="Downloads" />
+    </a>
     <a href="https://hub.docker.com/r/dr34m/tao-sync">
       <img src="https://img.shields.io/docker/pulls/dr34m/tao-sync?color=%2348BB78&logo=docker&label=pulls" alt="Downloads" />
     </a>
@@ -128,7 +131,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
 
-### 0.2.2（2024-08-23）
+### 0.2.2（即将发布）
 
 * [x] 支持cron方式定时执行
 * [x] 修复日志文件不自动删除的问题
