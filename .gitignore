@@ -12,6 +12,7 @@ venv/
 
 build/
 dist/
+data/
 
 node_modules/
 .env.local

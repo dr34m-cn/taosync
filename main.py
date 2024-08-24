@@ -33,7 +33,9 @@ async def main():
     app = make_app()
     logger = logging.getLogger()
     app.listen(server['port'])
-    logger.info(f"启动成功_/_Running at http://0.0.0.0:{server['port']}/")
+    successMsg = f"启动成功_/_Running at http://0.0.0.0:{server['port']}/"
+    print(successMsg, flush=True)
+    logger.info(successMsg)
     await asyncio.Event().wait()
 
 

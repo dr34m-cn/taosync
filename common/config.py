@@ -25,7 +25,7 @@ def getConfig():
                 'dbname': 'data/taoSync.db'
             },
             'server': {
-                'port': 8023,
+                'port': int(os.getenv('TAO_PORT', 8023)),
                 'passwdStr': getPasswordStr(),
                 'cookieExpiresDays': int(os.getenv('TAO_EXPIRES', 2)),
                 'logLevel': int(os.getenv('TAO_LOG_LEVEL', 1)),
