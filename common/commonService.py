@@ -5,7 +5,7 @@ import logging
 from common.config import getConfig
 
 CONFIG = getConfig()
-level_int = CONFIG['server']['logLevel']
+level_int = CONFIG['server']['log_level']
 from common.LNG import G
 
 

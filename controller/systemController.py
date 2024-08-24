@@ -14,7 +14,7 @@ class Login(BaseHandler):
     def post(self, req):
         user = userService.checkPwd(None, req['passwd'], req['userName'])
         self.set_signed_cookie(cookieName, json.dumps(user),
-                               expires_days=int(server['cookieExpiresDays']))
+                               expires_days=server['expires'])
         userReturn = user.copy()
         del userReturn['passwd']
         del userReturn['sqlVersion']

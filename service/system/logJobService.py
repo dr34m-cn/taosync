@@ -15,8 +15,8 @@ from common.config import getConfig
 from mapper.jobMapper import deleteJobTaskByRunTime
 
 CONFIG = getConfig()
-logSave = CONFIG['server']['logSave']
-taskSave = CONFIG['server']['taskSave']
+logSave = CONFIG['server']['log_save']
+taskSave = CONFIG['server']['task_save']
 
 
 def logClearJob():

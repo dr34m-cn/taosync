@@ -23,27 +23,63 @@
 
 [GitHub地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
 
-本工具主要用于同步备份功能，可以定时扫描指定目录下文件差异，让目标目录与源目录相同（全同步模式）；或仅新增存在于源目录，却不存在于目标目录的文件（仅新增模式）。
+桃桃是我女儿的乳名，我是桃桃她爸，这也是本程序的logo。本程序开发之初，主要是为了保存桃桃成长的照片，故名`taoSync`
 
-桃桃是我女儿的名字，我女儿的名字叫桃桃。本工具意为：桃桃的自动同步工具
+## 须知
+
+使用本工具前你必须了解并且会使用[AList](https://github.com/alist-org/alist)；本工具没有集成`AList`，你需要额外启动`AList`
 
 **警告！不要在外网暴露本系统，否则后果自负！**
 
 > 本系统已经做了一定的安全方面的工作，但仍不能保证绝对安全。如确实需要，请务必使用强密码，并使用`SSL`
 
-## 须知
+## 用途举例
 
-`v0.2.0`不再兼容之前的版本（因为密码加密方式变更，如果用之前的库文件会提示密码错误，密码为单向加密，无法解密）
+#### 1. 同步备份
 
-本工具不使用`AList`源码而是使用[AList v3 API](https://alist.nn.ci/zh/guide/api/apifox.html)来实现相关功能。使用本工具前你必须了解并且会使用[AList](https://github.com/alist-org/alist)
+把本地文件备份到多个网盘或FTP之类的存储，或者在多个网盘之间同步文件等；
 
-本工具没有集成`AList`，你需要额外启动`AList`
+可以定时扫描指定目录下文件差异，让目标目录与源目录相同（全同步模式）；或仅新增存在于源目录，却不存在于目标目录的文件（仅新增模式）
+
+#### 2. 定时下载
+
+可以设置一次性任务（`cron`方式设置年月日时分秒，将在指定时间执行一次），可在闲时自动从特定网盘下载文件到本地
+
+## 特性
+
+* 开源免费，几乎支持所有常用平台
+  * windows-amd64
+  * darwin-amd64
+  * darwin-arm64
+  * linux-amd64
+  * linux-arm64
+  * linux-386
+  * linux-arm-v6
+  * linux-arm-v7
+  * linux-s390x
+  * linux-ppc64le
+* [Github Actions](https://docs.github.com/zh/actions)自动打包与发布构建好的可执行程序，并支持Docker，下载即用
+* 干净卸载，不用的时候删掉即可，无任何残留或依赖，不影响系统里其他程序
+* 密码加密不可逆，永远不会泄露您的密码，敏感信息均被加密
+* 完全离线运行（仅连接AList），永不上传用户隐私
+* 完善的错误处理，稳定可靠，逻辑自洽；可能出错，但永不崩溃（我猜的）
+* 完善的日志，所有错误都会被记录
+* 引擎管理，可以自由增删改查`AList`
+* 作业管理，可以新增/删除/启用/禁用/编辑/手动执行作业
+* 仅新增与全同步模式
+* 定时同步支持间隔或`cron`方式
+* 同步进度实时可视化查看与筛选
+* 存储可控，合理配置任务记录与日志保留天数，可以控制本程序所占用存储在可控范围内
 
 ## 使用方法
 
-### 启动
+### 先启动
 
-#### docker
+* 可执行程序
+
+前往[Release](https://github.com/dr34-m/taosync/releases)下载对应平台的可执行程序，直接执行
+
+* docker
 
 ```sh
 docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:latest
@@ -51,13 +87,9 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 把其中`/opt/data`替换为你实际的目录
 
-在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://blog.ctftools.com/2024/07/newpost-57/)
+在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://blog.ctftools.com/2024/07/newpost-57/)，在其他支持Docker的NAS中使用大同小异
 
-#### 可执行程序
-
-前往[Release](https://github.com/dr34-m/taosync/releases)下载对应平台的可执行程序，直接执行
-
-### 使用
+### 再使用
 
 访问`http://127.0.0.1:8023`
 
@@ -67,18 +99,39 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 进入系统后先到`引擎管理`菜单创建引擎，然后前往`作业管理`创建同步作业
 
-## 环境变量及其意义
+## 配置项
 
-修改环境变量需重启docker才能生效
+配置优先级：`data/config.ini`>`环境变量`>`默认值`；前一个存在，则后边都将被**忽略**。修改配置需重启程序或Docker。
 
-| 变量名           | 描述                                                         | 默认值        |
-| ---------------- | ------------------------------------------------------------ | ------------- |
-| TAO_EXPIRES      | 登录有效期，单位天                                           | 2             |
-| TAO_LOG_LEVEL    | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
-| TAO_LOG_SAVE     | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
-| TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
-| TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
-| TZ               | 时区                                                         | Asia/Shanghai |
+`data/config.ini`文件示例（如该文件存在，则**优先级最高**）
+
+```ini
+[tao]
+# 运行端口号
+port=8023
+# 登录有效期，单位天
+expires=2
+# 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2
+log_level=1
+# 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理
+log_save=7
+# 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理
+task_save=0
+# 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多
+task_timeout=72
+```
+
+在非docker下，上边的文件将自动创建
+
+| config.ini   | Docker环境变量   | 描述                                                         | 默认值        |
+| ------------ | ---------------- | ------------------------------------------------------------ | ------------- |
+| port         | TAO_PORT         | 运行端口号                                                   | 8023          |
+| expires      | TAO_EXPIRES      | 登录有效期，单位天                                           | 2             |
+| log_level    | TAO_LOG_LEVEL    | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
+| log_save     | TAO_LOG_SAVE     | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
+| task_save    | TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
+| task_timeout | TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
+| -            | TZ               | 时区                                                         | Asia/Shanghai |
 
 ## 页面截图
 
@@ -114,7 +167,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 </details>
 
-# 更新记录
+# 更新记录（0.2.2之后记录在Release页面）
 
 如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
@@ -131,24 +184,8 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
 
-### 0.2.2（即将发布）
-
-* [x] 支持cron方式定时执行
-* [x] 修复日志文件不自动删除的问题
-* [x] 支持打包构建以下平台可执行程序
-  * windows-amd64
-  * darwin-amd64
-  * darwin-arm64
-  * linux-amd64
-  * linux-arm64
-  * linux-386
-  * linux-arm-v6
-  * linux-arm-v7
-  * linux-s390x
-  * linux-ppc64le
-* [x] 通过[Github Actions](https://docs.github.com/zh/actions)自动发布Release
-* [x] 使用矩阵多平台同步构建，加快速度
-* [x] 优化作业列表&任务详情的表格展示，不常用的内容采用展开的形式避免一行内容过多
+<details>
+<summary>点击展开更多</summary>
 
 ### 0.2.1.1（2024-08-12）
 
@@ -178,10 +215,6 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 * [x] 作业详情-任务进度样式调整，在小屏幕自动换行显示（之前会挡住看不全）
 * [x] 执行失败的任务项支持查看原因
 * [x] 执行成功的任务项自动删除AList中的任务记录
-
-<details>
-
-<summary>点击展开更多</summary>
 
 ### 0.1.4（2024-07-17）
 
