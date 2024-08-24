@@ -1,18 +1,15 @@
-name: pipReq构建
+name: buildPipReq
 
 on:
   push:
     branches: [ 'main' ]
-    paths: [ 'dockerfiles/Dockerfile.pipReq' ]
+    paths: [ 'dockerfiles/Dockerfile.pipReq', 'requirements.txt' ]
 
 jobs:
   build_docker:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 检出仓库代码
-        uses: actions/checkout@v4
-
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
         
@@ -28,7 +25,6 @@ jobs:
       - name: 构建并推送
         uses: docker/build-push-action@v6
         with:
-          context: .
           file: dockerfiles/Dockerfile.pipReq
           push: true
           tags: dr34m/tao-sync:not-for-use-pip-req

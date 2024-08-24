@@ -1,2 +1,3 @@
 FROM dr34m/tao-sync:not-for-use-pyinstaller
-RUN pip install --no-cache-dir tornado==6.3.3 requests==2.31.0 APScheduler==3.10.4
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
