@@ -36,7 +36,7 @@ def init_sql(conn):
                        "speed integer,"                     # 同步速度：0-标准，1-快速
                        "method integer,"                    # 同步方式，0-仅新增，1-全同步
                        "interval integer,"                  # 同步间隔，单位：分钟
-                       "isCron integer DEFAULT 0,"          # 是否使用cron，1-使用cron，0-使用interval
+                       "isCron integer DEFAULT 0,"          # 是否使用cron，0-使用interval, 1-使用cron，2-仅手动
                        "year text DEFAULT NULL,"            # 四位数的年份
                        "month text DEFAULT NULL,"           # 1-12月
                        "day text DEFAULT NULL,"             # 1-31日

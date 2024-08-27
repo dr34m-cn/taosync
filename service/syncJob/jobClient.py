@@ -207,7 +207,7 @@ class JobClient:
                 params['minutes'] = interval
             else:
                 raise Exception(G('interval_lost'))
-        else:
+        elif self.job['isCron'] == 1:
             flag = 0
             for item in ['year', 'month', 'day', 'week', 'day_of_week', 'hour', 'minute', 'second', 'start_date',
                          'end_date']:
@@ -216,6 +216,8 @@ class JobClient:
                     params[item] = self.job[item]
             if flag == 0:
                 raise Exception(G('cron_lost'))
+        else:
+            return
         self.scheduled = BackgroundScheduler()
         self.scheduledJob = self.scheduled.add_job(**params)
         self.scheduled.start()

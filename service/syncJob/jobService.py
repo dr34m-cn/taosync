@@ -50,6 +50,8 @@ def addJobClient(job):
     }
     :return:
     """
+    if job['isCron'] == 2:
+        job['enable'] = 1
     client = jobClient.JobClient(job)
     global jobClientList
     jobClientList[client.jobId] = client
@@ -70,8 +72,10 @@ def editJobClient(job):
     }
     """
     jobId = job['id']
+    if job['isCron'] == 2:
+        job['enable'] = 1
     client = getJobClientById(jobId)
-    if client.job['enable'] == 1:
+    if client.job['enable'] == 1 and client.job['isCron'] != 2:
         raise Exception(G('disable_then_edit'))
     client.stopJob(remove=True)
     global jobClientList
@@ -88,6 +92,8 @@ def doJobManual(jobId):
     :return:
     """
     client = getJobClientById(jobId)
+    if client.job['enable'] != 1:
+        raise Exception(G('disabled_job_cannot_run'))
     client.doManual()
 
 
@@ -121,6 +127,8 @@ def pauseJob(jobId, cancel=False):
     :param cancel: 是否取消进行中的任务
     """
     client = getJobClientById(jobId)
+    if client.job['isCron'] == 2:
+        raise Exception(G('cannot_disable_manual_job'))
     client.stopJob(cancel=cancel)
 
 
