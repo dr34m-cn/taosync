@@ -3,16 +3,13 @@ name: alpine构建
 on:
   push:
     branches: [ 'main' ]
-    paths: [ 'dockerfiles/Dockerfile.alpine' ]
+    paths: [ 'dockerfiles/alpine.Dockerfile' ]
 
 jobs:
   build_docker:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 检出仓库代码
-        uses: actions/checkout@v4
-
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
         
@@ -28,8 +25,7 @@ jobs:
       - name: 构建并推送
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: dockerfiles/Dockerfile.alpine
+          file: dockerfiles/alpine.Dockerfile
           push: true
           tags: dr34m/tao-sync:not-for-use-alpine
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le
