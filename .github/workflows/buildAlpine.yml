@@ -1,4 +1,4 @@
-name: alpine构建
+name: build-alpine
 
 on:
   push:

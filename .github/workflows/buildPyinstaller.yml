@@ -1,4 +1,4 @@
-name: pyinstaller构建
+name: build-pyinstaller
 
 on:
   push:
