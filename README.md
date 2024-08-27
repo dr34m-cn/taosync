@@ -19,11 +19,11 @@
 
 ---
 
-**如果好用，请Star！非常感谢！** 
+桃桃是我女儿的乳名，我是桃桃她爸，这也是本程序的logo。
 
-[GitHub地址](https://github.com/dr34-m/taosync) [Gitee地址](https://gitee.com/dr34m/taosync)
+本程序开发之初，主要是为了保存桃桃成长的照片，故名`taoSync`
 
-桃桃是我女儿的乳名，我是桃桃她爸，这也是本程序的logo。本程序开发之初，主要是为了保存桃桃成长的照片，故名`taoSync`
+**如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34-m/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
 ## 须知
 
@@ -167,7 +167,7 @@ task_timeout=72
 
 </details>
 
-# 更新记录（0.2.2之后记录在Release页面）
+# 更新记录（0.2.2之后记录在[Release](https://github.com/dr34-m/taosync/releases)页面）
 
 如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
@@ -183,6 +183,11 @@ task_timeout=72
 * [ ] 增加排除目录（即指定目录不同步）
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
+
+### 0.2.3（研发中）
+
+* [ ] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34-m/taosync/issues/9)
+* [ ] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34-m/taosync/issues/6)
 
 <details>
 <summary>点击展开更多</summary>
