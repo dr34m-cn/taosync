@@ -146,7 +146,7 @@ jobs:
           retention-days: 1
 
   merge-docker:
-    name: 合并镜像上传
+    name: 合并Docker镜像
     runs-on: ubuntu-latest
     needs: [get-version, build-docker]
     env:
