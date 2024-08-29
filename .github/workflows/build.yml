@@ -207,6 +207,7 @@ jobs:
         with:
           name: dist-windows-amd64
           path: dist/*.zip
+          retention-days: 1
 
   build-darwin:
     name: 构建darwin
@@ -258,6 +259,7 @@ jobs:
         with:
           name: dist-darwin-${{ env.PLATFORM }}
           path: dist/*.tar.gz
+          retention-days: 1
 
   create-release:
     name: 发布release
