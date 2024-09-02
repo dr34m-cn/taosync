@@ -9,6 +9,9 @@
       <img src="https://img.shields.io/github/actions/workflow/status/dr34-m/taosync/build.yml?branch=main" alt="Build status" />
     </a>
     <a href="https://github.com/dr34-m/taosync/releases">
+      <img src="https://img.shields.io/github/release/dr34-m/taosync" alt="latest version" />
+    </a>
+    <a href="https://github.com/dr34-m/taosync/releases">
       <img src="https://img.shields.io/github/downloads/dr34-m/taosync/total?color=%239F7AEA&logo=github" alt="Downloads" />
     </a>
     <a href="https://hub.docker.com/r/dr34m/tao-sync">
@@ -180,7 +183,6 @@ task_timeout=72
 * [ ] 本地引擎支持加密同步
 * [ ] 保留历史N个版本（N可自定义，可无限）
 * [ ] 配置导入导出
-* [ ] 增加排除目录（即指定目录不同步）
 * [ ] 任务整体进度条展示（目前只能展示每个文件的进度条）
 * [ ] 多语言支持
 
@@ -188,6 +190,8 @@ task_timeout=72
 
 * [ ] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34-m/taosync/issues/9)
 * [ ] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34-m/taosync/issues/6)
+* [ ] 忘记密码重置
+* [ ] 排除指定目录或文件后缀
 
 <details>
 <summary>点击展开更多</summary>
