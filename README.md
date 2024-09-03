@@ -28,6 +28,38 @@
 
 **如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34-m/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
+<details>
+
+<summary>点击展开截图</summary>
+
+由于更新频繁，截图仅供参考，以实际为准
+
+#### 引擎管理
+
+![引擎列表](README/引擎列表.png)
+
+#### 引擎编辑
+
+![引擎编辑](README/引擎编辑.png)
+
+#### 新建作业
+
+![新建作业](README/新建作业.png)
+
+#### 作业列表
+
+![作业列表](README/作业列表.png)
+
+#### 作业详情（任务列表）
+
+![任务列表](README/任务列表.png)
+
+#### 任务详情
+
+![任务详情](README/任务详情.png)
+
+</details>
+
 ## 须知
 
 使用本工具前你必须了解并且会使用[AList](https://github.com/alist-org/alist)；本工具没有集成`AList`，你需要额外启动`AList`
@@ -135,40 +167,6 @@ task_timeout=72
 | task_save    | TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
 | task_timeout | TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
 | -            | TZ               | 时区                                                         | Asia/Shanghai |
-
-## 页面截图
-
-<details>
-
-<summary>点击展开截图</summary>
-
-由于更新频繁，截图仅供参考，以实际为准
-
-#### 引擎管理
-
-![引擎列表](README/引擎列表.png)
-
-#### 引擎编辑
-
-![引擎编辑](README/引擎编辑.png)
-
-#### 新建作业
-
-![新建作业](README/新建作业.png)
-
-#### 作业列表
-
-![作业列表](README/作业列表.png)
-
-#### 作业详情（任务列表）
-
-![任务列表](README/任务列表.png)
-
-#### 任务详情
-
-![任务详情](README/任务详情.png)
-
-</details>
 
 # 更新记录（0.2.2之后记录在[Release](https://github.com/dr34-m/taosync/releases)页面）
 
