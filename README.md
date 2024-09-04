@@ -2,17 +2,17 @@
   <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
   <p><em>TaoSync是一个适用于AList v3的自动化同步工具。</em></p>
   <div>
-    <a href="https://github.com/dr34-m/taosync/blob/main/LICENSE">
-      <img src="https://img.shields.io/github/license/dr34-m/taosync" alt="License" />
+    <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
+      <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
     </a>
-    <a href="https://github.com/dr34-m/taosync/actions/workflows/build.yml">
-      <img src="https://img.shields.io/github/actions/workflow/status/dr34-m/taosync/build.yml?branch=main" alt="Build status" />
+    <a href="https://github.com/dr34m-cn/taosync/actions/workflows/build.yml">
+      <img src="https://img.shields.io/github/actions/workflow/status/dr34m-cn/taosync/build.yml?branch=main" alt="Build status" />
     </a>
-    <a href="https://github.com/dr34-m/taosync/releases">
-      <img src="https://img.shields.io/github/release/dr34-m/taosync" alt="latest version" />
+    <a href="https://github.com/dr34m-cn/taosync/releases">
+      <img src="https://img.shields.io/github/release/dr34m-cn/taosync" alt="latest version" />
     </a>
-    <a href="https://github.com/dr34-m/taosync/releases">
-      <img src="https://img.shields.io/github/downloads/dr34-m/taosync/total?color=%239F7AEA&logo=github" alt="Downloads" />
+    <a href="https://github.com/dr34m-cn/taosync/releases">
+      <img src="https://img.shields.io/github/downloads/dr34m-cn/taosync/total?color=%239F7AEA&logo=github" alt="Downloads" />
     </a>
     <a href="https://hub.docker.com/r/dr34m/tao-sync">
       <img src="https://img.shields.io/docker/pulls/dr34m/tao-sync?color=%2348BB78&logo=docker&label=pulls" alt="Downloads" />
@@ -26,7 +26,7 @@
 
 本程序开发之初，主要是为了保存桃桃成长的照片，故名`taoSync`
 
-**如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34-m/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
+**如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
 <details>
 
@@ -112,7 +112,7 @@
 
 * 可执行程序
 
-前往[Release](https://github.com/dr34-m/taosync/releases)下载对应平台的可执行程序，直接执行
+前往[Release](https://github.com/dr34m-cn/taosync/releases)下载对应平台的可执行程序，直接执行
 
 * docker
 
@@ -168,7 +168,7 @@ task_timeout=72
 | task_timeout | TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
 | -            | TZ               | 时区                                                         | Asia/Shanghai |
 
-# 更新记录（0.2.2之后记录在[Release](https://github.com/dr34-m/taosync/releases)页面）
+# 更新记录（0.2.2之后记录在[Release](https://github.com/dr34m-cn/taosync/releases)页面）
 
 如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
@@ -186,8 +186,8 @@ task_timeout=72
 
 ### 0.2.3（研发中）
 
-* [ ] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34-m/taosync/issues/9)
-* [ ] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34-m/taosync/issues/6)
+* [ ] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34m-cn/taosync/issues/9)
+* [ ] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34m-cn/taosync/issues/6)
 * [ ] 忘记密码重置
 * [ ] 排除指定目录或文件后缀
 
@@ -196,14 +196,14 @@ task_timeout=72
 
 ### 0.2.1.1（2024-08-12）
 
-* [x] 修复修改密码后无法登陆的问题 [#4](https://github.com/dr34-m/taosync/issues/4)
+* [x] 修复修改密码后无法登陆的问题 [#4](https://github.com/dr34m-cn/taosync/issues/4)
 
 ### 0.2.1（2024-08-03）
 
-* [x] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34-m/taosync/issues/2)
+* [x] 对于任务未找到的做出更友好的提示 [#2](https://github.com/dr34m-cn/taosync/issues/2)
 * [x] 支持手动创建一个同步任务（即立即执行作业）
 * [x] 支持已禁用的作业的编辑
-* [x] 禁用任务时，如有进行中的任务，可选取消所有任务子项 [#1](https://github.com/dr34-m/taosync/issues/1)
+* [x] 禁用任务时，如有进行中的任务，可选取消所有任务子项 [#1](https://github.com/dr34m-cn/taosync/issues/1)
 * [x] 修复任务创建失败无限卡在扫描对比中的问题
 * [x] 增加任务创建时错误的处理，并可展示错误原因
 * [x] 修复本地同目录下复制任务不产生任务id，导致判定其失败的问题
