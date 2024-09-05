@@ -1,7 +1,6 @@
 import datetime
 import json
 import logging
-import sys
 
 from common.LNG import G
 from common.config import getConfig
