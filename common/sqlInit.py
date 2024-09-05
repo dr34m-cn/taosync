@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 240813
+    cuVersion = 240905
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -47,6 +47,8 @@ def init_sql(conn):
                        "second text DEFAULT NULL,"          # 0-59
                        "start_date text DEFAULT NULL,"      # 开始时间
                        "end_date text DEFAULT NULL,"        # 结束时间
+                       "exclude text DEFAULT NULL,"         # 排除无需同步项，以类型-值，英文冒号分隔，示例：0-/path/:1-.
+                                                            # 类型：0-目录，1-开头，2-任意包含，3-结尾
                        "createTime integer DEFAULT (strftime('%s', 'now')),"
                        " unique (srcPath, dstPath, alistId))")
         cursor.execute("create table job_task("
@@ -86,10 +88,9 @@ def init_sql(conn):
                 logger.exception(e)
         if sqlVersion < cuVersion:
             if sqlVersion < 240731:
-                cursor.execute("alter table user_list add column sqlVersion integer default 240731")
+                cursor.execute(f"alter table user_list add column sqlVersion integer default {cuVersion}")
                 cursor.execute("alter table job_task add column errMsg text")
             if sqlVersion < 240813:
-                cursor.execute("update user_list set sqlVersion=240813")
                 cursor.execute("alter table job drop column cron")
                 cursor.execute("alter table job add column isCron integer DEFAULT 0")
                 cursor.execute("alter table job add column year text DEFAULT NULL")
@@ -102,6 +103,9 @@ def init_sql(conn):
                 cursor.execute("alter table job add column second text DEFAULT NULL")
                 cursor.execute("alter table job add column start_date text DEFAULT NULL")
                 cursor.execute("alter table job add column end_date text DEFAULT NULL")
+            if sqlVersion < 240905:
+                cursor.execute(f"update user_list set sqlVersion={cuVersion}")
+                cursor.execute("alter table job add column exclude text DEFAULT NULL")
             conn.commit()
     cursor.close()
     return passwd
