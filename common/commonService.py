@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+import sys
 
 from common.LNG import G
 from common.config import getConfig
@@ -9,22 +10,34 @@ from common.config import getConfig
 # 日志规定
 def setLogger(cusLevel=None):
     cfg = getConfig()
-    level_int = cfg['server']['log_level']
     level_list = [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL]
+    level_int = cfg['server']['log_level']
+    consoleLevelInt = cfg['server']['console_level']
     logger = logging.getLogger()
     if cusLevel is None:
         level = level_list[level_int]
     else:
         level = level_list[cusLevel]
+    consoleLevel = level_list[consoleLevelInt]
     logger.setLevel(level=level)
     log_file = 'data/log/sys_%s.log' % (datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d'))
-    if len(logger.handlers) > 1:
+    handlersLen = len(logger.handlers)
+    if handlersLen == 1 or handlersLen == 0:
+        # 仅在起始是长度为1或0，之后均为2
+        if handlersLen == 1:
+            logger.removeHandler(logger.handlers[0])
+        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+        handlerStream = logging.StreamHandler()
+        handlerStream.setLevel(consoleLevel)
+        handlerStream.setFormatter(formatter)
+        logger.addHandler(handlerStream)
+    if handlersLen > 1:
         logger.removeHandler(logger.handlers[1])
-    handler = logging.FileHandler(log_file, encoding='utf-8')
-    handler.setLevel(level)
+    handlerFile = logging.FileHandler(log_file, encoding='utf-8')
+    handlerFile.setLevel(level)
     formatter = logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    handlerFile.setFormatter(formatter)
+    logger.addHandler(handlerFile)
 
 
 def get_post_data(self):

@@ -26,6 +26,7 @@ def getConfig():
             'port': 8023,
             'expires': 2,
             'log_level': 1,
+            'console_level': 3,
             'log_save': 7,
             'task_save': 0,
             'timeout': 72
@@ -47,6 +48,7 @@ def getConfig():
                 sCfg['port'] = int(os.getenv('TAO_PORT', 8023))
                 sCfg['expires'] = int(os.getenv('TAO_EXPIRES', 2))
                 sCfg['log_level'] = int(os.getenv('TAO_LOG_LEVEL', 1))
+                sCfg['console_level'] = int(os.getenv('TAO_CONSOLE_LEVEL', 3))
                 sCfg['log_save'] = int(os.getenv('TAO_LOG_SAVE', 7))
                 sCfg['task_save'] = int(os.getenv('TAO_TASK_SAVE', 0))
                 sCfg['timeout'] = int(os.getenv('TAO_TASK_TIMEOUT', 72))

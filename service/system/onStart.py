@@ -22,7 +22,6 @@ def init():
     passwd = sqlInit.init_sql()
     if passwd is not None:
         msg = f"Password for admin_/_已为admin生成随机密码：{passwd}"
-        print(msg, flush=True)
         logger.critical(msg)
     logger.info("初始化数据库完成_/_Initializing the database completed")
     # 启动日志文件与任务定时清理任务

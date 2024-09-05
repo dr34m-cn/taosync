@@ -148,6 +148,8 @@ port=8023
 expires=2
 # 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2
 log_level=1
+# 控制台日志等级：适用于v0.2.3及之后版本，与上同
+console_level=3
 # 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理
 log_save=7
 # 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理
@@ -158,15 +160,16 @@ task_timeout=72
 
 上边的文件默认不存在，如需要，您可以手动在程序同级目录的`data`目录下创建`config.ini`，并填入上边的内容。注意，文件应使用`UTF-8`编码
 
-| config.ini   | Docker环境变量   | 描述                                                         | 默认值        |
-| ------------ | ---------------- | ------------------------------------------------------------ | ------------- |
-| port         | TAO_PORT         | 运行端口号                                                   | 8023          |
-| expires      | TAO_EXPIRES      | 登录有效期，单位天                                           | 2             |
-| log_level    | TAO_LOG_LEVEL    | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
-| log_save     | TAO_LOG_SAVE     | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
-| task_save    | TAO_TASK_SAVE    | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
-| task_timeout | TAO_TASK_TIMEOUT | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
-| -            | TZ               | 时区                                                         | Asia/Shanghai |
+| config.ini    | Docker环境变量    | 描述                                                         | 默认值        |
+| ------------- | ----------------- | ------------------------------------------------------------ | ------------- |
+| port          | TAO_PORT          | 运行端口号                                                   | 8023          |
+| expires       | TAO_EXPIRES       | 登录有效期，单位天                                           | 2             |
+| log_level     | TAO_LOG_LEVEL     | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
+| console_level | TAO_CONSOLE_LEVEL | 控制台日志等级：适用于v0.2.3及之后版本；与上同               | 3             |
+| log_save      | TAO_LOG_SAVE      | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
+| task_save     | TAO_TASK_SAVE     | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
+| task_timeout  | TAO_TASK_TIMEOUT  | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
+| -             | TZ                | 时区                                                         | Asia/Shanghai |
 
 # 更新记录（0.2.2之后记录在[Release](https://github.com/dr34m-cn/taosync/releases)页面）
 
