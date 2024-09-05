@@ -31,7 +31,7 @@
 
 <script>
 	import {
-		resetPwd
+		editPwd
 	} from "@/api/user";
 	export default {
 		name: 'User',
@@ -76,7 +76,7 @@
 				this.$refs.resetForm.validate((valid) => {
 					if (valid) {
 						this.loading = true;
-						resetPwd(this.resetForm).then(res => {
+						editPwd(this.resetForm).then(res => {
 							this.$message({
 								message: res.msg,
 								type: 'success'

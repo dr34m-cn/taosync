@@ -20,6 +20,18 @@ export function logout() {
 	})
 }
 
+// 重置密码
+export function resetPwd(data) {
+	return request({
+		url: '/noAuth/login',
+		headers: {
+			isMask: false
+		},
+		method: 'put',
+		data
+	})
+}
+
 // 获取当前用户信息
 export function user() {
 	return request({
@@ -29,7 +41,7 @@ export function user() {
 }
 
 // 修改当前用户密码
-export function resetPwd(data) {
+export function editPwd(data) {
 	return request({
 		url: '/user',
 		headers: {
