@@ -3,7 +3,6 @@
 @Date  ：2024/8/16 14:26 
 """
 import logging
-import os
 
 from common import sqlInit, commonService
 from service.syncJob.jobService import initJob
@@ -11,8 +10,6 @@ from service.system import logJobService
 
 
 def init():
-    if not os.path.exists('data/log'):
-        os.mkdir('data/log')
     # 初始化日志
     commonService.setLogger()
     logger = logging.getLogger()

@@ -14,6 +14,8 @@ def getPasswordStr():
     """
     if not os.path.exists('data'):
         os.mkdir('data')
+    if not os.path.exists('data/log'):
+        os.mkdir('data/log')
     fileName = 'data/secret.key'
     passwdStr = readOrSet(fileName, generatePasswd(256))
     return passwdStr

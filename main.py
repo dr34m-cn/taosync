@@ -40,8 +40,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    onStart.init()
     CONFIG = getConfig()
+    onStart.init()
     frontendPath = sys._MEIPASS if getattr(sys, 'frozen', False) else '.'
     # 后端配置
     server = CONFIG['server']
