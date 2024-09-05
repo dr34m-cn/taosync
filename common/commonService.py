@@ -2,15 +2,14 @@ import datetime
 import json
 import logging
 
-from common.config import getConfig
-
-CONFIG = getConfig()
-level_int = CONFIG['server']['log_level']
 from common.LNG import G
+from common.config import getConfig
 
 
 # 日志规定
 def setLogger(cusLevel=None):
+    cfg = getConfig()
+    level_int = cfg['server']['log_level']
     level_list = [logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL]
     logger = logging.getLogger()
     if cusLevel is None:

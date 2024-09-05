@@ -12,10 +12,6 @@ def getPasswordStr():
     获取加密字符串
     :return: 加密字符串
     """
-    if not os.path.exists('data'):
-        os.mkdir('data')
-    if not os.path.exists('data/log'):
-        os.mkdir('data/log')
     fileName = 'data/secret.key'
     passwdStr = readOrSet(fileName, generatePasswd(256))
     return passwdStr

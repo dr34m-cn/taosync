@@ -5,16 +5,14 @@ from common.config import getConfig
 from controller.baseController import BaseHandler, handle_request, cookieName
 from service.system import userService
 
-CONFIG = getConfig()
-server = CONFIG['server']
-
 
 class Login(BaseHandler):
     @handle_request
     def post(self, req):
+        cfg = getConfig()
         user = userService.checkPwd(None, req['passwd'], req['userName'])
         self.set_signed_cookie(cookieName, json.dumps(user),
-                               expires_days=server['expires'])
+                               expires_days=cfg['server']['expires'])
         userReturn = user.copy()
         del userReturn['passwd']
         del userReturn['sqlVersion']

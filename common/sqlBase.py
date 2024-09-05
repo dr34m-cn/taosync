@@ -5,8 +5,6 @@ import time
 from common.LNG import G
 from common.config import getConfig
 
-CONFIG = getConfig()
-
 RUN_FLAG = False
 
 
@@ -18,7 +16,8 @@ def connect_sql(func):
         RUN_FLAG = True
         conn = None
         try:
-            conn = sqlite3.connect(CONFIG['db']['dbname'])
+            cfg = getConfig()
+            conn = sqlite3.connect(cfg['db']['dbname'])
             result = func(conn, *args, **kwargs)
         except Exception as e:
             raise Exception(e)

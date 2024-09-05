@@ -14,12 +14,11 @@ from common.commonService import setLogger
 from common.config import getConfig
 from mapper.jobMapper import deleteJobTaskByRunTime
 
-CONFIG = getConfig()
-logSave = CONFIG['server']['log_save']
-taskSave = CONFIG['server']['task_save']
-
 
 def logClearJob():
+    cfg = getConfig()
+    logSave = cfg['server']['log_save']
+    taskSave = cfg['server']['task_save']
     if logSave > 0:
         saveLogList = []
         dayNow = int(time.time())
@@ -47,6 +46,9 @@ def logChangeJob():
 
 
 def startJob():
+    cfg = getConfig()
+    logSave = cfg['server']['log_save']
+    taskSave = cfg['server']['task_save']
     logger = logging.getLogger()
     logger.info(G('log_rename_start'))
     startChangeScheduler()

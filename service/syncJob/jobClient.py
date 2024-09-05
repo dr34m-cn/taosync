@@ -13,9 +13,6 @@ from common.config import getConfig
 from mapper import jobMapper
 from service.alist import alistSync, alistService
 
-CONFIG = getConfig()
-timeOut = CONFIG['server']['timeout']
-
 
 class JobTask:
     def __init__(self, taskId, job):
@@ -85,6 +82,8 @@ class JobTask:
         """
         tmStart = time.time()
         undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.taskId)
+        cfg = getConfig()
+        timeOut = cfg['server']['timeout']
         while undoneTaskItem:
             if self.job['enable'] == 0:
                 return
