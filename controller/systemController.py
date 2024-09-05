@@ -21,6 +21,10 @@ class Login(BaseHandler):
         return userReturn
 
     @handle_request
+    def put(self, req):
+        return userService.resetPasswd(req['userName'], req['key'], req.get('passwd', None))
+
+    @handle_request
     def delete(self, req):
         self.clear_cookie(cookieName)
 
@@ -34,7 +38,7 @@ class User(BaseHandler):
     @handle_request
     def put(self, req):
         user = json.loads(self.get_signed_cookie(cookieName))
-        userService.resetPasswd(user['id'], req['passwd'], req['oldPasswd'])
+        userService.editPasswd(user['id'], req['passwd'], req['oldPasswd'])
 
 
 class Language(BaseHandler):

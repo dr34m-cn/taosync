@@ -42,6 +42,7 @@ allLng = {
         'keep_all_task': '任务保留时间为0，将保留所有任务',
         'clear_task_start': '定时清理任务启动成功',
         'passwd_wrong': '密码错误',
+        'key_wrong': '加密秘钥错误',
         'passwd_wrong_max_time': '5分钟内密码错误超过3次，请稍后再试'
     },
     'eng': {
@@ -80,6 +81,7 @@ allLng = {
         'keep_all_task': 'The task retention time is 0, all tasks will be retained',
         'clear_task_start': 'The scheduled cleanup task was started successfully',
         'passwd_wrong': 'Wrong password',
+        'key_wrong': 'Wrong key',
         'passwd_wrong_max_time': 'The password was incorrect more than 3 times within 5 minutes. Please try again later'
     }
 }

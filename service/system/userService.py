@@ -1,6 +1,6 @@
 import time
 
-from common import commonUtils
+from common import commonUtils, config
 from common.LNG import G
 from mapper import userMapper
 
@@ -55,12 +55,31 @@ def checkPwd(userId, passwd, userName=None):
         raise e
 
 
-def resetPasswd(userId, passwd, oldPasswd):
+def editPasswd(userId, passwd, oldPasswd):
     """
-    重置密码
+    修改密码
     :param userId: 用户id
     :param passwd: 新密码
     :param oldPasswd: 旧密码
     """
     checkPwd(userId, oldPasswd)
     userMapper.resetPasswd(userId, commonUtils.passwd2md5(passwd))
+
+
+def resetPasswd(userName, key, passwd=None):
+    """
+    重置密码
+    :param userName: 用户名
+    :param key: 加密字符串
+    :param passwd: 新密码
+    :return:
+    """
+    cfg = config.getConfig()
+    user = userMapper.getUserByName(userName.strip())
+    if key.strip() != cfg['server']['passwdStr']:
+        raise Exception(G('key_wrong'))
+    if passwd is None:
+        passwd = commonUtils.generatePasswd(8)
+        userMapper.resetPasswd(user['id'], commonUtils.passwd2md5(passwd))
+        return passwd
+    userMapper.resetPasswd(user['id'], commonUtils.passwd2md5(passwd.strip()))
