@@ -102,7 +102,8 @@
 			</el-table-column>
 			<el-table-column label="操作" align="center" width="100">
 				<template slot-scope="scope">
-					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
+					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading"
+						size="small">详情</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
@@ -129,7 +130,8 @@
 								<el-option v-for="item in alistList" :label="item.url" :value="item.id">
 									<span
 										style="float: left;margin-right: 16px;">{{item.url}}{{item.remark != null ? `[${item.remark}]` : ''}}</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
+									<span
+										style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
 								</el-option>
 							</el-select>
 						</el-form-item>
@@ -137,7 +139,8 @@
 							<div v-if="editData.alistId == null" class="label_width">请先选择引擎</div>
 							<div v-else class="label_width">
 								{{editData.srcPath}}
-								<el-button type="primary" size="mini" :style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
+								<el-button type="primary" size="mini"
+									:style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
 									@click="selectPath(true)">{{editData.srcPath == '' ? '选择' : '更换'}}目录</el-button>
 							</div>
 						</el-form-item>
@@ -147,7 +150,8 @@
 								<div style="display: flex;align-items: center;min-height: 42px;flex-wrap: wrap;">
 									<div v-for="(item, index) in editData.dstPath"
 										style="display: flex;align-items: center;margin: 4px 0;margin-right: 12px; flex-shrink: 0;">
-										<div class="bg-1" style="border-radius: 3px; padding: 0 6px; line-height: 20px;margin-right: -4px;">
+										<div class="bg-1"
+											style="border-radius: 3px; padding: 0 6px; line-height: 20px;margin-right: -4px;">
 											{{item}}
 										</div>
 										<el-button style="border-radius: 0 3px 3px 0;" type="danger" size="mini"
@@ -190,19 +194,27 @@
 								</el-option>
 								<el-option label="cron" :value="1">
 									<span style="float: left;margin-right: 16px;">cron</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">使用cron表达式来调用同步</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">推荐使用，有教程</span>
 								</el-option>
 							</el-select>
 						</el-form-item>
-						<el-form-item prop="interval" label="同步间隔" v-if="editData.isCron == 0">
-							<el-input v-model.number="editData.interval" placeholder="请输入同步间隔" class="label_width">
-								<template slot="append">分钟</template>
-							</el-input>
-						</el-form-item>
+						<template v-if="editData.isCron == 0">
+							<el-form-item prop="interval" label="同步间隔">
+								<el-input v-model.number="editData.interval" placeholder="请输入同步间隔" class="label_width">
+									<template slot="append">分钟</template>
+								</el-input>
+							</el-form-item>
+							<span style="margin-left: 100px;">间隔方式不会立即调用，如有需要，可在创建后立即手动调用</span>
+						</template>
 						<template v-else>
-							<div class="el-form-item">
-								<div class="el-form-item__label" style="width: 120px;">cron表达式</div>
-								<el-image style="height: 36px;" src="/cron.png" :preview-src-list="['/cron.png']"></el-image>
+							<div class="el-form-item" style="display: flex;align-items: center;">
+								<div class="el-form-item__label" style="width: 120px;">cron教程</div>
+								<!-- <el-image style="height: 36px;" src="/cron.png"
+									:preview-src-list="['/cron.png']"></el-image> -->
+								<span @click="toCron"
+									style="color: #409eff;margin-left: 16px;text-decoration: underline;cursor: pointer;">
+									简易教程
+								</span>
 							</div>
 							<el-form-item v-for="item in cronList" :prop="item.label" :label="item.label">
 								<el-input v-model="editData[item.label]" :placeholder="item.palce" class="label_width">
@@ -217,8 +229,8 @@
 				<el-button type="primary" @click="submit" :loading="editLoading">确 定</el-button>
 			</span>
 		</el-dialog>
-		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告" width="460px"
-			:before-close="closeDisableShow">
+		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告"
+			width="460px" :before-close="closeDisableShow">
 			<div style="color: #f56c6c;font-weight: bold;text-align: center;font-size: 20px;">
 				{{disableIsDel ? '此操作不可逆，将永久删除该作业' : '将禁用任务'}}，确认吗？
 			</div>
@@ -349,6 +361,9 @@
 					this.alistList = res.data;
 				})
 			},
+			toCron() {
+				window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
+			},
 			putJob(jobId, pause = null) {
 				this.btnLoading = true;
 				jobPut({
@@ -394,7 +409,7 @@
 					speed: 0,
 					method: 0,
 					interval: 1440,
-					isCron: 0
+					isCron: 1
 				}
 				this.cronList.forEach(item => {
 					editData[item.label] = null;
