@@ -194,7 +194,7 @@ task_timeout=72
 * [x] 忘记密码重置
 * [ ] 排除指定目录或文件不同步 [#10](https://github.com/dr34m-cn/taosync/issues/10)
 * [x] 支持控制台日志输出，并增加控制台日志等级配置项
-* [x] 修复启动当日日志文件存有全部天数日志的问题
+* [x] 修复启动当日日志文件存有其后部分非当天日志的问题
 
 <details>
 <summary>点击展开更多</summary>
