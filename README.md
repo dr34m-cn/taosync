@@ -8,6 +8,12 @@
     <a href="https://github.com/dr34m-cn/taosync/actions/workflows/build.yml">
       <img src="https://img.shields.io/github/actions/workflow/status/dr34m-cn/taosync/build.yml?branch=main" alt="Build status" />
     </a>
+    <a href="https://www.python.org/">
+      <img src="https://img.shields.io/badge/backend-python-326c9c.svg" alt="Python" />
+    </a>
+    <a href="https://vuejs.org/">
+      <img src="https://img.shields.io/badge/frontend-vue-42b883.svg" alt="Vue" />
+    </a>
     <a href="https://github.com/dr34m-cn/taosync/releases">
       <img src="https://img.shields.io/github/release/dr34m-cn/taosync" alt="latest version" />
     </a>
@@ -15,7 +21,7 @@
       <img src="https://img.shields.io/github/downloads/dr34m-cn/taosync/total?color=%239F7AEA&logo=github" alt="Downloads" />
     </a>
     <a href="https://hub.docker.com/r/dr34m/tao-sync">
-      <img src="https://img.shields.io/docker/pulls/dr34m/tao-sync?color=%2348BB78&logo=docker&label=pulls" alt="Downloads" />
+      <img src="https://img.shields.io/docker/pulls/dr34m/tao-sync?color=%2348BB78&logo=docker&label=pulls" alt="DockerHub" />
     </a>
   </div>
 </div>
