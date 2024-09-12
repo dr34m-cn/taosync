@@ -30,7 +30,7 @@
 								调用方式
 							</div>
 							<div class="form-box-item-value">
-								{{props.row.isCron == 0 ? '间隔' : 'cron'}}
+								{{props.row.isCron == 0 ? '间隔' : (props.row.isCron == 1 ? 'cron' : '仅手动')}}
 							</div>
 						</div>
 						<div class="form-box-item" v-if="props.row.isCron == 0">
@@ -41,7 +41,7 @@
 								{{props.row.interval}} 分钟
 							</div>
 						</div>
-						<template v-else>
+						<template v-else-if="props.row.isCron == 1">
 							<div class="form-box-item" v-for="item in cronList">
 								<div class="form-box-item-label">
 									{{item.label}}
@@ -64,16 +64,18 @@
 								更多操作
 							</div>
 							<div class="form-box-item-value">
-								<el-button type="warning" :loading="btnLoading" size="small" v-if="props.row.enable"
-									@click="disableJobShow(props.row, false)">禁用</el-button>
-								<el-button type="success" :loading="btnLoading" size="small" v-else
-									@click="putJob(props.row.id, false)">启用</el-button>
+								<template v-if="props.row.isCron != 2">
+									<el-button type="warning" :loading="btnLoading" size="small" v-if="props.row.enable"
+										@click="disableJobShow(props.row, false)">禁用</el-button>
+									<el-button type="success" :loading="btnLoading" size="small" v-else
+										@click="putJob(props.row, false)">启用</el-button>
+								</template>
 								<el-button type="danger" :loading="btnLoading" size="small"
 									@click="disableJobShow(props.row, true)">删除</el-button>
 								<el-button type="primary" :loading="btnLoading" size="small"
 									@click="editJobShow(props.row)">编辑</el-button>
 								<el-button type="success" :loading="btnLoading" size="small"
-									@click="putJob(props.row.id)">手动执行</el-button>
+									@click="putJob(props.row)">手动执行</el-button>
 							</div>
 						</div>
 					</div>
@@ -120,8 +122,10 @@
 					<div style="display: flex;flex-wrap: wrap;">
 						<el-form-item prop="enable" label="是否启用">
 							<div class="label_width">
-								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0">
+								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0"
+									v-if="editData.isCron != 2">
 								</el-switch>
+								<span v-else>启用</span>
 							</div>
 						</el-form-item>
 						<el-form-item prop="alistId" label="引擎">
@@ -166,7 +170,7 @@
 							<el-select v-model="editData.speed" class="label_width">
 								<el-option label="标准" :value="0">
 									<span style="float: left;margin-right: 16px;">标准</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">推荐使用</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">不会选就用这个</span>
 								</el-option>
 								<el-option label="快速" :value="1">
 									<span style="float: left;margin-right: 16px;">快速</span>
@@ -186,7 +190,7 @@
 								</el-option>
 							</el-select>
 						</el-form-item>
-						<el-form-item prop="method" label="调用方式">
+						<el-form-item prop="isCron" label="调用方式">
 							<el-select v-model="editData.isCron" class="label_width">
 								<el-option label="间隔" :value="0">
 									<span style="float: left;margin-right: 16px;">间隔</span>
@@ -195,6 +199,10 @@
 								<el-option label="cron" :value="1">
 									<span style="float: left;margin-right: 16px;">cron</span>
 									<span style="float: right; color: #7b9dad; font-size: 13px;">推荐使用，有教程</span>
+								</el-option>
+								<el-option label="仅手动" :value="2">
+									<span style="float: left;margin-right: 16px;">仅手动</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">不自动调用</span>
 								</el-option>
 							</el-select>
 						</el-form-item>
@@ -206,11 +214,9 @@
 							</el-form-item>
 							<span style="margin-left: 100px;">间隔方式不会立即调用，如有需要，可在创建后立即手动调用</span>
 						</template>
-						<template v-else>
+						<template v-else-if="editData.isCron == 1">
 							<div class="el-form-item" style="display: flex;align-items: center;">
 								<div class="el-form-item__label" style="width: 120px;">cron教程</div>
-								<!-- <el-image style="height: 36px;" src="/cron.png"
-									:preview-src-list="['/cron.png']"></el-image> -->
 								<span @click="toCron"
 									style="color: #409eff;margin-left: 16px;text-decoration: underline;cursor: pointer;">
 									简易教程
@@ -364,10 +370,14 @@
 			toCron() {
 				window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
 			},
-			putJob(jobId, pause = null) {
+			putJob(row, pause = null) {
+				if (row.enable != 1 && pause !== false) {
+					this.$message.error("如需手动执行，请先启用作业");
+					return
+				}
 				this.btnLoading = true;
 				jobPut({
-					id: jobId,
+					id: row.id,
 					pause: pause
 				}).then(res => {
 					this.btnLoading = false;
@@ -386,7 +396,7 @@
 				this.disableShow = true;
 			},
 			editJobShow(row) {
-				if (row.enable) {
+				if (row.enable && row.isCron != 2) {
 					this.$message.error("禁用作业后才能编辑");
 					return
 				}

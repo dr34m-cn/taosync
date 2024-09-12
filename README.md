@@ -195,7 +195,7 @@ task_timeout=72
 
 ### 0.2.3（研发中）
 
-* [ ] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34m-cn/taosync/issues/9)
+* [x] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34m-cn/taosync/issues/9)
 * [ ] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34m-cn/taosync/issues/6)
 * [x] 忘记密码重置
 * [ ] 排除指定目录或文件不同步 [#10](https://github.com/dr34m-cn/taosync/issues/10)
