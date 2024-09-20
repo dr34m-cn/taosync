@@ -33,7 +33,7 @@ def init_sql(conn):
                        "srcPath text,"                      # 来源目录，结尾有无斜杠都可，建议有斜杠
                        "dstPath text,"                      # 目标目录，结尾有无斜杠都可，建议有斜杠
                        "alistId integer,"                   # 引擎id，alist_list.id
-                       "speed integer,"                     # 同步速度：0-标准，1-快速
+                       "speed integer,"                     # 同步速度：0-标准，1-快速，2-低速
                        "method integer,"                    # 同步方式，0-仅新增，1-全同步
                        "interval integer,"                  # 同步间隔，单位：分钟
                        "isCron integer DEFAULT 0,"          # 是否使用cron，0-使用interval, 1-使用cron，2-仅手动

@@ -2,6 +2,8 @@
 @Author：dr34m
 @Date  ：2024/7/4 13:57 
 """
+import time
+
 import requests
 
 from common.LNG import G
@@ -93,19 +95,21 @@ class AlistClient:
         """
         self.alistId = alistId
 
-    def fileListApi(self, path, refresh=True):
+    def fileListApi(self, path, speed=0):
         """
         目录列表
         :param path: 目录
-        :param refresh: 强制刷新，true/false
+        :param speed: 速度，0-标准，1-快速，2-低速
         :return: {
             "test1-1/": {},  # key以/结尾表示目录
             "test1.txt": 4  # 不以/结尾，表示文件，存文件大小
         }
         """
+        if speed == 2:
+            time.sleep(3)
         res = self.post('/api/fs/list', data={
             'path': path,
-            'refresh': refresh
+            'refresh': speed != 1
         })['content']
         if res is not None:
             return {
@@ -130,11 +134,11 @@ class AlistClient:
         else:
             return []
 
-    def allFileList(self, path, refresh=True):
+    def allFileList(self, path, speed=0):
         """
         递归获取文件列表
         :param path: 根路径
-        :param refresh: 强制刷新，true/false
+        :param speed: 速度，0-标准，1-快速，2-低速
         :return: {
             "test1-1/": {
                 "test1-3/": {
@@ -145,10 +149,10 @@ class AlistClient:
             "test1.txt": 4
         }
         """
-        fList = self.fileListApi(path, refresh)
+        fList = self.fileListApi(path, speed)
         for key in fList.keys():
             if key.endswith('/'):
-                fList[key] = self.allFileList(f"{path}/{key[:-1]}", refresh)
+                fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed)
         return fList
 
     def deleteFile(self, path, names=None):

@@ -22,7 +22,7 @@
 								同步速度
 							</div>
 							<div class="form-box-item-value">
-								{{props.row.speed == 0 ? '标准' : '快速'}}
+								{{props.row.speed == 0 ? '标准' : (props.row.speed == 1 ? '快速' : '低速')}}
 							</div>
 						</div>
 						<div class="form-box-item">
@@ -175,6 +175,10 @@
 								<el-option label="快速" :value="1">
 									<span style="float: left;margin-right: 16px;">快速</span>
 									<span style="float: right; color: #7b9dad; font-size: 13px;">将使用Alist缓存扫描目标目录</span>
+								</el-option>
+								<el-option label="低速" :value="2">
+									<span style="float: left;margin-right: 16px;">低速</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">频繁被网盘限制可尝试这个选项</span>
 								</el-option>
 							</el-select>
 						</el-form-item>

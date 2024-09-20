@@ -92,7 +92,7 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     :param srcPath: 来源路径
     :param dstPath: 目标路径，多个以英文冒号[:]分隔
     :param alistId: 客户端id
-    :param speed: 速度，0-标准，1-快速
+    :param speed: 速度，0-标准，1-快速，2-低速
     :param method: 0-仅新增，1-全同步
     :param copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None）
     :param delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None）
@@ -106,7 +106,7 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     for dstItem in dstPathList:
         if not dstItem.endswith('/'):
             dstItem = dstItem + '/'
-        dstFiles = client.allFileList(dstItem, speed == 0)
+        dstFiles = client.allFileList(dstItem, speed)
         needCopy = getSrcMore(srcFiles, dstFiles)
         if job is not None and job['enable'] == 0:
             return
