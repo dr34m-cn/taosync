@@ -187,9 +187,9 @@ task_timeout=72
 
 </details>
 
-# 研发状态
+## 研发状态
 
-历史记录在doc/changelog目录下
+历史记录在[这里](https://github.com/dr34m-cn/taosync/tree/main/doc/changelog)；
 
 如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)或[Release](https://github.com/dr34m-cn/taosync/releases)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
