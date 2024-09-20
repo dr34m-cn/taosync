@@ -98,15 +98,26 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     :param delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None）
     :param job: 作业
     """
+    jobExclude = job['exclude']
+    excludes = []
+    if jobExclude is not None and jobExclude.strip() != '':
+        jobExcludeList = jobExclude.split(':')
+        for item in jobExcludeList:
+            itemSplit = item.split('-', maxsplit=1)
+            if len(itemSplit) == 2:
+                excludes.append({
+                    'type': itemSplit[0],
+                    'val': itemSplit[1]
+                })
     client = getClientById(alistId)
     if not srcPath.endswith('/'):
         srcPath = srcPath + '/'
-    srcFiles = client.allFileList(srcPath)
+    srcFiles = client.allFileList(srcPath, excludes)
     dstPathList = dstPath.split(':')
     for dstItem in dstPathList:
         if not dstItem.endswith('/'):
             dstItem = dstItem + '/'
-        dstFiles = client.allFileList(dstItem, speed)
+        dstFiles = client.allFileList(dstItem, speed, excludes)
         needCopy = getSrcMore(srcFiles, dstFiles)
         if job is not None and job['enable'] == 0:
             return

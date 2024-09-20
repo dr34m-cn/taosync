@@ -139,7 +139,7 @@ class JobClient:
     def __init__(self, job):
         """
         初始化job
-        :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, speed, method, interval}
+        :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, speed, method, interval, exclude, cron相关}
         """
         if 'enable' not in job:
             job['enable'] = 1
@@ -147,7 +147,9 @@ class JobClient:
             job['speed'] = 0
         if 'method' not in job:
             job['method'] = 0
-        job['id'] = job['id'] if 'id' in job else jobMapper.addJob(job)
+        if 'id' not in job:
+            jobId = jobMapper.addJob(job)
+            job = jobMapper.getJobById(jobId)
         self.jobId = job['id']
         self.job = job
         self.scheduled = None

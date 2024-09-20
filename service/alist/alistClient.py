@@ -95,11 +95,16 @@ class AlistClient:
         """
         self.alistId = alistId
 
-    def fileListApi(self, path, speed=0):
+    def fileListApi(self, path, speed=0, excludes=None):
         """
         目录列表
         :param path: 目录
         :param speed: 速度，0-标准，1-快速，2-低速
+        :param excludes: 排除项
+        [{
+            'type': 0, # 0-全匹配，1-开头，2-任意包含，3-结尾
+            'val': 'xx'
+        }]
         :return: {
             "test1-1/": {},  # key以/结尾表示目录
             "test1.txt": 4  # 不以/结尾，表示文件，存文件大小
@@ -112,12 +117,14 @@ class AlistClient:
             'refresh': speed != 1
         })['content']
         if res is not None:
-            return {
+            rts = {
                 f"{item['name']}/" if item['is_dir'] else item['name']: {} if item['is_dir']
                 else item['size'] for item in res
             }
         else:
-            return {}
+            rts = {}
+        # TODO 排除项判断
+        return rts
 
     def filePathList(self, path):
         """
@@ -134,11 +141,12 @@ class AlistClient:
         else:
             return []
 
-    def allFileList(self, path, speed=0):
+    def allFileList(self, path, speed=0, excludes=None):
         """
         递归获取文件列表
         :param path: 根路径
         :param speed: 速度，0-标准，1-快速，2-低速
+        :param excludes: 排除项
         :return: {
             "test1-1/": {
                 "test1-3/": {
@@ -149,7 +157,7 @@ class AlistClient:
             "test1.txt": 4
         }
         """
-        fList = self.fileListApi(path, speed)
+        fList = self.fileListApi(path, speed, excludes)
         for key in fList.keys():
             if key.endswith('/'):
                 fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed)

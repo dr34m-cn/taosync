@@ -47,8 +47,8 @@ def init_sql(conn):
                        "second text DEFAULT NULL,"          # 0-59
                        "start_date text DEFAULT NULL,"      # 开始时间
                        "end_date text DEFAULT NULL,"        # 结束时间
-                       "exclude text DEFAULT NULL,"         # 排除无需同步项，以类型-值，英文冒号分隔，示例：0-/path/:1-.
-                                                            # 类型：0-目录，1-开头，2-任意包含，3-结尾
+                       "exclude text DEFAULT NULL,"         # 排除无需同步项，以类型-值，英文冒号分隔，示例：0-path/:1-.
+                                                            # 类型：0-全匹配，1-开头，2-任意包含，3-结尾
                        "createTime integer DEFAULT (strftime('%s', 'now')),"
                        " unique (srcPath, dstPath, alistId))")
         cursor.execute("create table job_task("
