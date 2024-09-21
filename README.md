@@ -196,6 +196,8 @@ task_timeout=72
 ### 规划中（随时改变or因太难不做了，概不负责）
 
 * windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
+* 通知功能 [#14](https://github.com/dr34m-cn/taosync/issues/14)
+* 移动模式 [#16](https://github.com/dr34m-cn/taosync/issues/16)
 * 移动端适配（可能顺便开发个app？）
 * 支持本地引擎（不基于`AList`）
 * 任务剩余时间预估
