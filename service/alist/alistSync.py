@@ -4,6 +4,8 @@
 """
 import logging
 
+import igittigitt
+
 from service.alist.alistService import getClientById
 
 
@@ -99,25 +101,20 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     :param job: 作业
     """
     jobExclude = job['exclude']
-    excludes = []
+    parser = None
     if jobExclude is not None and jobExclude.strip() != '':
-        jobExcludeList = jobExclude.split(':')
-        for item in jobExcludeList:
-            itemSplit = item.split('-', maxsplit=1)
-            if len(itemSplit) == 2:
-                excludes.append({
-                    'type': itemSplit[0],
-                    'val': itemSplit[1]
-                })
+        parser = igittigitt.IgnoreParser()
+        for exItem in jobExclude.split(':'):
+            parser.add_rule(exItem, '/')
     client = getClientById(alistId)
     if not srcPath.endswith('/'):
         srcPath = srcPath + '/'
-    srcFiles = client.allFileList(srcPath, excludes)
+    srcFiles = client.allFileList(srcPath, parser=parser)
     dstPathList = dstPath.split(':')
     for dstItem in dstPathList:
         if not dstItem.endswith('/'):
             dstItem = dstItem + '/'
-        dstFiles = client.allFileList(dstItem, speed, excludes)
+        dstFiles = client.allFileList(dstItem, speed, parser=parser)
         needCopy = getSrcMore(srcFiles, dstFiles)
         if job is not None and job['enable'] == 0:
             return

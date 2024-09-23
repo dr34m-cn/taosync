@@ -9,6 +9,26 @@ import requests
 from common.LNG import G
 
 
+def checkExs(path, rts, parser):
+    """
+    检查并排除排除项
+    :param path: 所在路径
+    :param rts: 内容列表，例如
+        {
+            "test1-1/": {},  # key以/结尾表示目录
+            "test1.txt": 4  # 不以/结尾，表示文件，存文件大小
+        }
+    :param parser: 排除规则
+    :return: 排除后的内容列表
+    """
+
+    rtsNew = rts.copy()
+    for rtsItem in rts.keys():
+        if parser.match(path + rtsItem):
+            del rtsNew[rtsItem]
+    return rtsNew
+
+
 class AlistClient:
     def __init__(self, url, token, alistId=None):
         """
@@ -95,20 +115,17 @@ class AlistClient:
         """
         self.alistId = alistId
 
-    def fileListApi(self, path, speed=0, excludes=None):
+    def fileListApi(self, path, speed=0, parser=None, rootPath=None):
         """
         目录列表
         :param path: 目录
         :param speed: 速度，0-标准，1-快速，2-低速
-        :param excludes: 排除项
-        [{
-            'type': 0, # 0-全匹配，1-开头，2-任意包含，3-结尾
-            'val': 'xx'
-        }]
+        :param parser: 排除项规则
         :return: {
             "test1-1/": {},  # key以/结尾表示目录
             "test1.txt": 4  # 不以/结尾，表示文件，存文件大小
         }
+        :param rootPath: 同步根目录
         """
         if speed == 2:
             time.sleep(3)
@@ -123,7 +140,10 @@ class AlistClient:
             }
         else:
             rts = {}
-        # TODO 排除项判断
+        if parser and rts:
+            if rootPath is None:
+                rootPath = path
+            rts = checkExs('/' + path[len(rootPath):], rts, parser)
         return rts
 
     def filePathList(self, path):
@@ -141,12 +161,13 @@ class AlistClient:
         else:
             return []
 
-    def allFileList(self, path, speed=0, excludes=None):
+    def allFileList(self, path, speed=0, parser=None, rootPath=None):
         """
         递归获取文件列表
         :param path: 根路径
         :param speed: 速度，0-标准，1-快速，2-低速
-        :param excludes: 排除项
+        :param parser: 排除项规则
+        :param rootPath: 同步根目录
         :return: {
             "test1-1/": {
                 "test1-3/": {
@@ -157,10 +178,12 @@ class AlistClient:
             "test1.txt": 4
         }
         """
-        fList = self.fileListApi(path, speed, excludes)
+        if rootPath is None:
+            rootPath = path
+        fList = self.fileListApi(path, speed, parser, rootPath)
         for key in fList.keys():
             if key.endswith('/'):
-                fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed)
+                fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, parser, rootPath)
         return fList
 
     def deleteFile(self, path, names=None):
