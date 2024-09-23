@@ -36,6 +36,24 @@ def getJobClientById(jobId):
     return client
 
 
+def cleanJobInput(job):
+    """
+    清洗输入的数据
+    :param job: job对象
+    :return:
+    """
+    if job['isCron'] == 2 and job['enable'] != 1:
+        job['enable'] = 1
+    for key, value in job.items():
+        if type(value) == str:
+            if value.strip() == '':
+                job[key] = None
+            else:
+                job[key] = value.strip()
+    if job['exclude'] is not None:
+        job['exclude'] = [item.strip() for item in job['exclude'].split(':')]
+
+
 def addJobClient(job):
     """
     新增作业客户端
@@ -50,8 +68,7 @@ def addJobClient(job):
     }
     :return:
     """
-    if job['isCron'] == 2:
-        job['enable'] = 1
+    cleanJobInput(job)
     client = jobClient.JobClient(job)
     global jobClientList
     jobClientList[client.jobId] = client
@@ -72,8 +89,7 @@ def editJobClient(job):
     }
     """
     jobId = job['id']
-    if job['isCron'] == 2:
-        job['enable'] = 1
+    cleanJobInput(job)
     client = getJobClientById(jobId)
     if client.job['enable'] == 1 and client.job['isCron'] != 2:
         raise Exception(G('disable_then_edit'))

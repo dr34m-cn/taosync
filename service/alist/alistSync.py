@@ -102,7 +102,7 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     """
     jobExclude = job['exclude']
     parser = None
-    if jobExclude is not None and jobExclude.strip() != '':
+    if jobExclude is not None:
         parser = igittigitt.IgnoreParser()
         for exItem in jobExclude.split(':'):
             parser.add_rule(exItem, '/')
