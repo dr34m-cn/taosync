@@ -53,6 +53,19 @@
 						</template>
 						<div class="form-box-item">
 							<div class="form-box-item-label">
+								排除项
+							</div>
+							<div class="form-box-item-value">
+								<span v-if="props.row.exclude == null">--</span>
+								<template v-else>
+									<span class="exclude-item" v-for="item in props.row.exclude.split(':')">
+										{{item}}
+									</span>
+								</template>
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
 								创建时间
 							</div>
 							<div class="form-box-item-value">
@@ -74,8 +87,7 @@
 									@click="disableJobShow(props.row, true)">删除</el-button>
 								<el-button type="primary" :loading="btnLoading" size="small"
 									@click="editJobShow(props.row)">编辑</el-button>
-								<el-button type="success" :loading="btnLoading" size="small"
-									@click="putJob(props.row)">手动执行</el-button>
+								<el-button type="success" :loading="btnLoading" size="small" @click="putJob(props.row)">手动执行</el-button>
 							</div>
 						</div>
 					</div>
@@ -104,8 +116,7 @@
 			</el-table-column>
 			<el-table-column label="操作" align="center" width="100">
 				<template slot-scope="scope">
-					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading"
-						size="small">详情</el-button>
+					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
@@ -122,8 +133,7 @@
 					<div style="display: flex;flex-wrap: wrap;">
 						<el-form-item prop="enable" label="是否启用">
 							<div class="label_width">
-								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0"
-									v-if="editData.isCron != 2">
+								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0" v-if="editData.isCron != 2">
 								</el-switch>
 								<span v-else>启用</span>
 							</div>
@@ -134,8 +144,7 @@
 								<el-option v-for="item in alistList" :label="item.url" :value="item.id">
 									<span
 										style="float: left;margin-right: 16px;">{{item.url}}{{item.remark != null ? `[${item.remark}]` : ''}}</span>
-									<span
-										style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
 								</el-option>
 							</el-select>
 						</el-form-item>
@@ -143,26 +152,44 @@
 							<div v-if="editData.alistId == null" class="label_width">请先选择引擎</div>
 							<div v-else class="label_width">
 								{{editData.srcPath}}
-								<el-button type="primary" size="mini"
-									:style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
+								<el-button type="primary" size="mini" :style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
 									@click="selectPath(true)">{{editData.srcPath == '' ? '选择' : '更换'}}目录</el-button>
 							</div>
 						</el-form-item>
 						<el-form-item prop="dstPath" label="目标目录">
 							<div v-if="editData.alistId == null" class="label_width">请先选择引擎</div>
 							<div v-else class="label_width">
-								<div style="display: flex;align-items: center;min-height: 42px;flex-wrap: wrap;">
-									<div v-for="(item, index) in editData.dstPath"
-										style="display: flex;align-items: center;margin: 4px 0;margin-right: 12px; flex-shrink: 0;">
-										<div class="bg-1"
-											style="border-radius: 3px; padding: 0 6px; line-height: 20px;margin-right: -4px;">
+								<div class="label-list-box">
+									<div v-for="(item, index) in editData.dstPath" class="label-list-item">
+										<div class="bg-1 label-list-item-left">
 											{{item}}
 										</div>
-										<el-button style="border-radius: 0 3px 3px 0;" type="danger" size="mini"
-											@click="delDstPath(index)">删除</el-button>
+										<el-button type="danger" size="mini" @click="delDstPath(index)">删除</el-button>
 									</div>
 									<el-button type="primary" size="mini"
 										@click="selectPath(false)">{{editData.dstPath.length == 0 ? '选择' : '添加'}}目录</el-button>
+								</div>
+							</div>
+						</el-form-item>
+						<el-form-item prop="exclude" label="排除项语法">
+							<div class="label_width">类gitignore，不支持[非]与先后顺序
+								<span @click="toIgnore" class="to-link">
+									点击查看排除项简易教程
+								</span>
+							</div>
+						</el-form-item>
+						<el-form-item prop="exclude" label="排除项">
+							<div class="label_width">
+								<div class="label-list-box">
+									<el-input v-model="excludeTmp" placeholder="请输入排除项">
+										<el-button slot="append" @click="addExclude">添加</el-button>
+									</el-input>
+									<div v-for="(item, index) in editData.exclude" class="label-list-item">
+										<div class="bg-3 label-list-item-left">
+											{{item}}
+										</div>
+										<el-button type="danger" size="mini" @click="delExclude(index)">删除</el-button>
+									</div>
 								</div>
 							</div>
 						</el-form-item>
@@ -219,13 +246,14 @@
 							<span style="margin-left: 100px;">间隔方式不会立即调用，如有需要，可在创建后立即手动调用</span>
 						</template>
 						<template v-else-if="editData.isCron == 1">
-							<div class="el-form-item" style="display: flex;align-items: center;">
-								<div class="el-form-item__label" style="width: 120px;">cron教程</div>
-								<span @click="toCron"
-									style="color: #409eff;margin-left: 16px;text-decoration: underline;cursor: pointer;">
-									简易教程
-								</span>
-							</div>
+							<el-form-item prop="isCron" label="简易教程">
+								<div class="label_width">
+									<span @click="toCron" class="to-link">
+										点击查看cron简易教程
+									</span>
+								</div>
+
+							</el-form-item>
 							<el-form-item v-for="item in cronList" :prop="item.label" :label="item.label">
 								<el-input v-model="editData[item.label]" :placeholder="item.palce" class="label_width">
 								</el-input>
@@ -239,8 +267,8 @@
 				<el-button type="primary" @click="submit" :loading="editLoading">确 定</el-button>
 			</span>
 		</el-dialog>
-		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告"
-			width="460px" :before-close="closeDisableShow">
+		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告" width="460px"
+			:before-close="closeDisableShow">
 			<div style="color: #f56c6c;font-weight: bold;text-align: center;font-size: 20px;">
 				{{disableIsDel ? '此操作不可逆，将永久删除该作业' : '将禁用任务'}}，确认吗？
 			</div>
@@ -319,6 +347,7 @@
 				btnLoading: false,
 				editLoading: false,
 				editData: null,
+				excludeTmp: '',
 				editShow: false,
 				disableShow: false,
 				disableIsDel: false,
@@ -374,6 +403,9 @@
 			toCron() {
 				window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
 			},
+			toIgnore() {
+				// window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
+			},
 			putJob(row, pause = null) {
 				if (row.enable != 1 && pause !== false) {
 					this.$message.error("如需手动执行，请先启用作业");
@@ -407,8 +439,14 @@
 				if (this.alistList.length == 0) {
 					this.getAlistList();
 				}
+				this.excludeTmp = '';
 				this.editData = JSON.parse(JSON.stringify(row));
 				this.editData.dstPath = this.editData.dstPath.split(':');
+				if (this.editData.exclude) {
+					this.editData.exclude = this.editData.exclude.split(':');
+				} else {
+					this.editData.exclude = [];
+				}
 				this.editShow = true;
 			},
 			addShow() {
@@ -423,12 +461,14 @@
 					speed: 0,
 					method: 0,
 					interval: 1440,
-					isCron: 1
+					isCron: 1,
+					exclude: []
 				}
 				this.cronList.forEach(item => {
 					editData[item.label] = null;
 				})
 				this.editData = editData;
+				this.excludeTmp = '';
 				this.editShow = true;
 			},
 			closeShow() {
@@ -441,6 +481,15 @@
 					pause: true,
 					cancel: false
 				};
+			},
+			addExclude() {
+				if (this.excludeTmp != '') {
+					this.editData.exclude.push(this.excludeTmp);
+				}
+				this.excludeTmp = '';
+			},
+			delExclude(index) {
+				this.editData.exclude.splice(index, 1);
 			},
 			delDstPath(index) {
 				this.editData.dstPath.splice(index, 1);
@@ -471,6 +520,7 @@
 							}
 						}
 						postData.dstPath = postData.dstPath.join(':');
+						postData.exclude = postData.exclude.join(':');
 						this.editLoading = true;
 						jobPost(postData).then(res => {
 							this.editLoading = false;
@@ -592,5 +642,47 @@
 
 	.label_width {
 		width: 240px;
+
+		.label-list-box {
+			display: flex;
+			align-items: center;
+			flex-wrap: wrap;
+			min-height: 42px;
+
+			.label-list-item {
+				display: flex;
+				align-items: center;
+				margin: 4px 0;
+				margin-right: 12px;
+				flex-shrink: 0;
+
+				.label-list-item-left {
+					border-radius: 3px;
+					padding: 0 6px;
+					line-height: 20px;
+					margin-right: -4px;
+				}
+
+				.el-button {
+					border-radius: 0 3px 3px 0;
+				}
+			}
+		}
+
+		.to-link {
+			color: #409eff;
+			text-decoration: underline;
+			cursor: pointer;
+		}
+	}
+
+	.exclude-item {
+		padding-right: 16px;
+		border-right: 1px solid #FFFFFF;
+	}
+
+	.exclude-item:last-child {
+		padding-right: 0;
+		border-right: 0;
 	}
 </style>

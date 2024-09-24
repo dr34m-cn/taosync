@@ -51,7 +51,7 @@ def cleanJobInput(job):
             else:
                 job[key] = value.strip()
     if job['exclude'] is not None:
-        job['exclude'] = [item.strip() for item in job['exclude'].split(':')]
+        job['exclude'] = ":".join([item.strip() for item in job['exclude'].split(':')])
 
 
 def addJobClient(job):
