@@ -209,11 +209,11 @@ task_timeout=72
 * 多语言支持
 * linux一键安装、更新与卸载脚本
 
-### 0.2.3（研发中）
+### 0.2.3（测试中）
 
 * [x] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34m-cn/taosync/issues/9)
 * [x] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34m-cn/taosync/issues/6)
 * [x] 忘记密码重置
-* [ ] 排除指定目录或文件不同步 [#10](https://github.com/dr34m-cn/taosync/issues/10)
+* [x] 排除指定目录或文件不同步 [#10](https://github.com/dr34m-cn/taosync/issues/10)
 * [x] 支持控制台日志输出，并增加控制台日志等级配置项
 * [x] 修复启动当日日志文件存有其后部分非当天日志的问题
