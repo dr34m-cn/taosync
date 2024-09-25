@@ -56,7 +56,7 @@
 								排除项
 							</div>
 							<div class="form-box-item-value">
-								<span v-if="props.row.exclude == null">--</span>
+								<span v-if="props.row.exclude == null">-</span>
 								<template v-else>
 									<span class="exclude-item" v-for="item in props.row.exclude.split(':')">
 										{{item}}
@@ -677,12 +677,12 @@
 	}
 
 	.exclude-item {
-		padding-right: 16px;
+		padding: 0 5px;
 		border-right: 1px solid #FFFFFF;
 	}
 
 	.exclude-item:last-child {
-		padding-right: 0;
+		padding: 0 0 0 5px;
 		border-right: 0;
 	}
 </style>

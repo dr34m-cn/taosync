@@ -68,10 +68,11 @@
 
 ## 须知
 
-使用本工具前你必须了解并且会使用[AList](https://github.com/alist-org/alist)；本工具没有集成`AList`，你需要额外启动`AList`
+> [!IMPORTANT]
+> 使用本工具前你必须了解并且会使用[AList](https://github.com/alist-org/alist)；本工具没有集成`AList`，你需要额外启动`AList`
 
-**警告！不要在外网暴露本系统，否则后果自负！**
-
+> [!WARNING]
+> **警告！不要在外网暴露本系统，否则后果自负！**
 > 本系统已经做了一定的安全方面的工作，但仍不能保证绝对安全。如确实需要，请务必使用强密码，并使用`SSL`
 
 ## 用途举例
