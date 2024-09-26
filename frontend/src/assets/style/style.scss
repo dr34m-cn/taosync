@@ -46,11 +46,23 @@
 	color: #FFFFFF;
 }
 
+.el-input__inner::placeholder {
+	color: #4b516f;
+}
+
 .el-input-group__append {
 	background-color: #19203b;
 	border: 1px solid #09122d;
 	color: #909bd4;
 	border-left: none;
+	
+	.el-button {
+		border: none !important;
+	}
+}
+
+.el-input-group__append:focus, .el-input-group__append:hover {
+	background-color: #19203b;
 }
 
 .el-button:not(.el-button--primary,.el-button--danger,.el-button--warning,.el-button--success) {

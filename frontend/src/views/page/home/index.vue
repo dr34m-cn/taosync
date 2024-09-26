@@ -53,12 +53,12 @@
 						</template>
 						<div class="form-box-item">
 							<div class="form-box-item-label">
-								排除项
+								排除项规则
 							</div>
 							<div class="form-box-item-value">
 								<span v-if="props.row.exclude == null">-</span>
 								<template v-else>
-									<span class="exclude-item" v-for="item in props.row.exclude.split(':')">
+									<span class="exclude-item bg-3" v-for="item in props.row.exclude.split(':')">
 										{{item}}
 									</span>
 								</template>
@@ -178,10 +178,10 @@
 								</span>
 							</div>
 						</el-form-item>
-						<el-form-item prop="exclude" label="排除项">
+						<el-form-item prop="exclude" label="排除项规则">
 							<div class="label_width">
 								<div class="label-list-box">
-									<el-input v-model="excludeTmp" placeholder="请输入排除项">
+									<el-input v-model="excludeTmp" placeholder="输入后点添加才生效">
 										<el-button slot="append" @click="addExclude">添加</el-button>
 									</el-input>
 									<div v-for="(item, index) in editData.exclude" class="label-list-item">
@@ -404,7 +404,7 @@
 				window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
 			},
 			toIgnore() {
-				// window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
+				window.open('https://blog.ctftools.com/2024/09/newpost-60/', '_blank');
 			},
 			putJob(row, pause = null) {
 				if (row.enable != 1 && pause !== false) {
@@ -677,12 +677,12 @@
 	}
 
 	.exclude-item {
-		padding: 0 5px;
-		border-right: 1px solid #FFFFFF;
+		margin-right: 6px;
+		padding: 0 2px;
+		border-radius: 3px;
 	}
 
 	.exclude-item:last-child {
-		padding: 0 0 0 5px;
-		border-right: 0;
+		margin-right: 0;
 	}
 </style>
