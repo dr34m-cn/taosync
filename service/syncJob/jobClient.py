@@ -12,6 +12,7 @@ from common.LNG import G
 from common.config import getConfig
 from mapper import jobMapper
 from service.alist import alistSync, alistService
+from service.syncJob import taskService
 
 
 class JobTask:
@@ -88,7 +89,7 @@ class JobTask:
             if self.job['enable'] == 0:
                 return
             if time.time() - tmStart > timeOut * 3600:
-                jobMapper.updateJobTaskStatus(self.taskId, 5)
+                taskService.updateJobTaskStatus(self.taskId, 5)
                 return
             needUpdate = []
             for item in undoneTaskItem[:]:
@@ -132,7 +133,7 @@ class JobTask:
         """
         unSuccessTaskItem = jobMapper.getUnSuccessJobTaskItemList(self.taskId)
         status = 2 if not unSuccessTaskItem else 3
-        jobMapper.updateJobTaskStatus(self.taskId, status)
+        taskService.updateJobTaskStatus(self.taskId, status)
 
 
 class JobClient:
@@ -181,7 +182,7 @@ class JobClient:
             errMsg = G('do_job_err').format(str(e))
             logger.error(errMsg)
             if taskId is not None:
-                jobMapper.updateJobTaskStatus(taskId, 6, errMsg)
+                taskService.updateJobTaskStatus(taskId, 6, errMsg)
             logger.exception(e)
         finally:
             self.jobDoing = False

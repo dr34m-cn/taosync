@@ -8,7 +8,7 @@ from tornado.concurrent import run_on_executor
 
 from controller.baseController import BaseHandler, handle_request
 from service.alist import alistService
-from service.syncJob import jobService
+from service.syncJob import jobService, taskService
 
 
 class Alist(BaseHandler):
@@ -44,9 +44,9 @@ class Job(BaseHandler):
     @handle_request
     def get(self, req):
         if 'id' in req:
-            return jobService.getTaskList(req)
+            return taskService.getTaskList(req)
         elif 'taskId' in req:
-            return jobService.getTaskItemList(req)
+            return taskService.getTaskItemList(req)
         return jobService.getJobList(req)
 
     @run_on_executor
@@ -73,4 +73,4 @@ class Job(BaseHandler):
         if 'id' in req:
             jobService.removeJobClient(req['id'], req.get('cancel', False))
         elif 'taskId' in req:
-            jobService.removeTask(req['taskId'])
+            taskService.removeTask(req['taskId'])
