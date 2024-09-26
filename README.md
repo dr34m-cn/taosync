@@ -210,14 +210,5 @@ task_timeout=72
 
 ### 0.2.4（规划中）
 
-* 通知功能 [#14](https://github.com/dr34m-cn/taosync/issues/14)
-* 移动模式 [#16](https://github.com/dr34m-cn/taosync/issues/16)
-
-### 0.2.3（测试中）
-
-* [x] 修复禁用任务后，手动执行显示`无需同步`的问题 [#9](https://github.com/dr34m-cn/taosync/issues/9)
-* [x] 增加`低速`选项，在特定情况下可能可以避免访问频率过高导致触发网盘临时禁用的问题 [#6](https://github.com/dr34m-cn/taosync/issues/6)
-* [x] 忘记密码重置
-* [x] 排除指定目录或文件不同步 [#10](https://github.com/dr34m-cn/taosync/issues/10)
-* [x] 支持控制台日志输出，并增加控制台日志等级配置项
-* [x] 修复启动当日日志文件存有其后部分非当天日志的问题
+* [ ] 通知功能 [#14](https://github.com/dr34m-cn/taosync/issues/14)
+* [ ] 移动模式 [#16](https://github.com/dr34m-cn/taosync/issues/16)
