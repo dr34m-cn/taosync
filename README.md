@@ -125,6 +125,9 @@
 
 前往[Release](https://github.com/dr34m-cn/taosync/releases)下载对应平台的可执行程序，直接执行
 
+> [!TIP]
+> 开机自启、守护进程等可以参考[AList的方式](https://alist.nn.ci/zh/guide/install/manual.html#%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B)，注意，本程序**不需要`server`参数**
+
 * docker
 
 ```sh
@@ -198,6 +201,8 @@ task_timeout=72
 ### 规划中（随时改变or因太难不做了，概不负责）
 
 * windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
+* Alist支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
+* 边扫描边同步，扫描失败不中断任务 [#19](https://github.com/dr34m-cn/taosync/issues/19)
 * 移动端适配（可能顺便开发个app？）
 * 支持本地引擎（不基于`AList`）
 * 任务剩余时间预估
