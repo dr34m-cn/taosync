@@ -123,7 +123,7 @@
 前往[Release](https://github.com/dr34m-cn/taosync/releases)下载对应平台的可执行程序，直接执行
 
 > [!TIP]
-> 开机自启、守护进程等可以参考[AList的方式](https://alist.nn.ci/zh/guide/install/manual.html#%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B)，注意，本程序**不需要`server`参数**
+> 开机自启、守护进程等可以参考[AList的方式](https://alist.nn.ci/zh/guide/install/manual.html#%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B)，把其中的`alist`改为`taoSync`；注意，本程序**不需要`server`参数**
 
 * docker
 
