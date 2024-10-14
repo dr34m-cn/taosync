@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 240905
+    cuVersion = 241014
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -74,6 +74,13 @@ def init_sql(conn):
                        "errMsg text,"               # 失败原因
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
+        cursor.execute("create table notify("
+                       "id integer primary key autoincrement,"
+                       "enable integer DEFAULT 1,"  # 启用，1-启用，0-停用
+                       "method integer,"            # 方式：0-自定义；1-server酱
+                       "params text,"               # 以json字符串存储参数
+                       "createTime integer DEFAULT (strftime('%s', 'now'))"
+                       ")")
         conn.commit()
     else:
         try:
@@ -105,6 +112,14 @@ def init_sql(conn):
             if sqlVersion < 240905:
                 cursor.execute(f"update user_list set sqlVersion={cuVersion}")
                 cursor.execute("alter table job add column exclude text DEFAULT NULL")
+            if sqlVersion < 241014:
+                cursor.execute("create table notify("
+                               "id integer primary key autoincrement,"
+                               "enable integer DEFAULT 1,"
+                               "method integer,"
+                               "params text,"
+                               "createTime integer DEFAULT (strftime('%s', 'now'))"
+                               ")")
             conn.commit()
     cursor.close()
     return passwd
