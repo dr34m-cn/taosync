@@ -51,6 +51,10 @@
 						index: '/engine',
 						title: '引擎管理',
 						icon: 'receiving'
+					},{
+						index: '/notify',
+						title: '通知配置',
+						icon: 'bell'
 					},
 					{
 						index: '/setting',

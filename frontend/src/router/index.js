@@ -67,6 +67,18 @@ const routes = [{
 		}]
 	},
 	{
+		path: '/notify',
+		component: Layout,
+		children: [{
+			path: '',
+			component: () => import('@/views/page/notify/index'),
+			name: '通知配置',
+			meta: {
+				letfIndex: '/notify'
+			}
+		}]
+	},
+	{
 		path: '/setting',
 		component: Layout,
 		children: [{
