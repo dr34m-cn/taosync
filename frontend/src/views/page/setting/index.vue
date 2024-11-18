@@ -12,10 +12,12 @@
 				</div>
 				<el-form :model="resetForm" :rules="rules" ref="resetForm" label-width="0">
 					<el-form-item prop="oldPasswd">
-						<el-input class="input" placeholder="请输入旧密码" show-password v-model="resetForm.oldPasswd"></el-input>
+						<el-input class="input" placeholder="请输入旧密码" show-password
+							v-model="resetForm.oldPasswd"></el-input>
 					</el-form-item>
 					<el-form-item prop="passwd">
-						<el-input placeholder="请输入新密码" show-password v-model="resetForm.passwd" show-password></el-input>
+						<el-input placeholder="请输入新密码" show-password v-model="resetForm.passwd"
+							show-password></el-input>
 					</el-form-item>
 					<el-form-item prop="passwd2">
 						<el-input placeholder="确认新密码" show-password v-model="resetForm.passwd2" show-password
@@ -25,7 +27,11 @@
 				<el-button type="primary" :loading="loading" @click="resetPasswd">修改密码</el-button>
 			</template>
 		</div>
-		<div class="version">TaoSync 版本：__version_placeholder__</div>
+		<div class="setting-bottom">
+			<div class="setting-bottom-item">TaoSync 版本：__version_placeholder__</div>
+			<div class="setting-bottom-item"><a href="https://github.com/dr34m-cn/taosync">项目地址（GitHub）</a></div>
+			<div class="setting-bottom-item"><a href="https://github.com/dr34m-cn/taosync/issues">问题反馈（GitHub Issues）</a></div>
+		</div>
 	</div>
 </template>
 
@@ -181,16 +187,33 @@
 
 			.setting-box-box:last-child {
 				margin-bottom: 0px;
-
 			}
 		}
 
-		.version {
+		.setting-bottom {
 			position: absolute;
 			bottom: 16px;
 			left: 0;
 			right: 0;
-			text-align: center;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+
+			.setting-bottom-item {
+				margin-right: 16px;
+				
+				a {
+					color: #409eff;
+				}
+				
+				a:hover {
+					color: #66b1ff;
+				}
+			}
+
+			.setting-bottom-item:last-child {
+				margin-right: 0;
+			}
 		}
 	}
 </style>
