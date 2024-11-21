@@ -43,7 +43,13 @@ allLng = {
         'clear_task_start': '定时清理任务启动成功',
         'passwd_wrong': '密码错误',
         'key_wrong': '加密秘钥错误',
-        'passwd_wrong_max_time': '5分钟内密码错误超过3次，请稍后再试'
+        'passwd_wrong_max_time': '5分钟内密码错误超过3次，请稍后再试',
+        'task_status': ['等待中', '进行中', '成功', '完成（部分失败）', '因重启而中止', '超时', '失败', '无需同步'],
+        'task_end_msg_title': 'taoSync同步结果：{}',
+        'task_end_msg_content': '来源目录为 {} 、目标目录为 {} 的作业执行结束。\n\n共 {} 个需要同步的文件，成功 {} 个，失败 {} 个。',
+        'task_end_msg_error': '失败原因为：{}',
+        'notify_error': '发送通知过程中失败，原因为：{}',
+        'notify_test_msg': '这是一条由您自己发送的TaoSync测试消息，当你看到这条消息，说明你的配置是正确可用的。'
     },
     'eng': {
         'success': 'success',
@@ -82,7 +88,16 @@ allLng = {
         'clear_task_start': 'The scheduled cleanup task was started successfully',
         'passwd_wrong': 'Wrong password',
         'key_wrong': 'Wrong key',
-        'passwd_wrong_max_time': 'The password was incorrect more than 3 times within 5 minutes. Please try again later'
+        'passwd_wrong_max_time': 'The password was incorrect more than 3 times within 5 minutes. Please try again later',
+        'task_status': ['waiting', 'in progress', 'success', 'complete (partially failed)',
+                        'Aborted due to reboot', 'timeout', 'failed', 'No files need sync'],
+        'task_end_msg_title': 'TaoSync Result: {}',
+        'task_end_msg_content': 'The job with source directory {} and target directory {} has completed execution.\n\n'
+                                'There are {} files that need to be synchronized, {} of them succeeded and {} failed.',
+        'task_end_msg_error': 'Failed due to {}',
+        'notify_error': 'Failed to send notification due to: {}',
+        'notify_test_msg': 'This is a TaoSync test message sent by yourself. '
+                           'When you see this message, it means your configuration is correct and available.'
     }
 }
 

@@ -6,7 +6,7 @@ import sys
 from tornado.web import Application, RequestHandler, StaticFileHandler
 
 from common.config import getConfig
-from controller import systemController, jobController
+from controller import systemController, jobController, notifyController
 from service.system import onStart
 
 
@@ -23,6 +23,7 @@ def make_app():
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
         (r"/svr/job", jobController.Job),
+        (r"/svr/notify", notifyController.Notify),
         (r"/", MainIndex),
         (r"/(.*)", StaticFileHandler,
          {"path": os.path.join(frontendPath, "front")})

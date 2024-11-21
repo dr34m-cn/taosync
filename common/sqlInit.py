@@ -31,7 +31,7 @@ def init_sql(conn):
                        "id integer primary key autoincrement,"
                        "enable integer DEFAULT 1,"          # 启用，1-启用，0-停用
                        "srcPath text,"                      # 来源目录，结尾有无斜杠都可，建议有斜杠
-                       "dstPath text,"                      # 目标目录，结尾有无斜杠都可，建议有斜杠
+                       "dstPath text,"                      # 目标目录，结尾有无斜杠都可，建议有斜杠，多个以英文冒号[:]分隔
                        "alistId integer,"                   # 引擎id，alist_list.id
                        "speed integer,"                     # 同步速度：0-标准，1-快速，2-低速
                        "method integer,"                    # 同步方式，0-仅新增，1-全同步
@@ -77,7 +77,7 @@ def init_sql(conn):
         cursor.execute("create table notify("
                        "id integer primary key autoincrement,"
                        "enable integer DEFAULT 1,"  # 启用，1-启用，0-停用
-                       "method integer,"            # 方式：0-自定义；1-server酱
+                       "method integer,"            # 方式：0-自定义；1-server酱；待扩展更多
                        "params text,"               # 以json字符串存储参数
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
@@ -110,7 +110,6 @@ def init_sql(conn):
                 cursor.execute("alter table job add column start_date text DEFAULT NULL")
                 cursor.execute("alter table job add column end_date text DEFAULT NULL")
             if sqlVersion < 240905:
-                cursor.execute(f"update user_list set sqlVersion={cuVersion}")
                 cursor.execute("alter table job add column exclude text DEFAULT NULL")
             if sqlVersion < 241014:
                 cursor.execute("create table notify("
@@ -120,6 +119,7 @@ def init_sql(conn):
                                "params text,"
                                "createTime integer DEFAULT (strftime('%s', 'now'))"
                                ")")
+            cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
     cursor.close()
     return passwd

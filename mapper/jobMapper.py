@@ -20,6 +20,20 @@ def getJobById(jobId):
         raise Exception(G('job_not_found'))
 
 
+def getJobByTaskId(taskId):
+    """
+    通过任务id获取作业详情
+    :param taskId: 任务id
+    :return:
+    """
+    rst = sqlBase.fetchall_to_table("select * from job where id in (select jobId from job_task where id = ?)",
+                                    (taskId,))
+    if rst:
+        return rst[0]
+    else:
+        raise Exception(G('job_not_found'))
+
+
 def addJob(job):
     # 新增作业
     return sqlBase.execute_insert("insert into job (enable, srcPath, dstPath, alistId, speed, method, interval"
@@ -34,7 +48,8 @@ def updateJob(job):
     sqlBase.execute_update("update job set enable=:enable, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
                            "speed=:speed, method=:method, interval=:interval, isCron=:isCron, year=:year, "
                            "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
-                           "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude where id=:id", job)
+                           "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude where id=:id",
+                           job)
 
 
 def updateJobEnable(jobId, enable):

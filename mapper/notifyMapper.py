@@ -7,7 +7,7 @@ def getNotifyList(needEnable=False):
     :param needEnable:
     :return:
     """
-    sqlBase.fetchall_to_table(f"select * from notify{' where enable = 1' if needEnable else ''}")
+    return sqlBase.fetchall_to_table("select * from notify where enable = ?", (1 if needEnable else 0,))
 
 
 def addNotify(notify):
@@ -36,3 +36,12 @@ def updateNotifyStatus(notifyId, enable):
     :return:
     """
     sqlBase.execute_update("update notify set enable=? where id=?", (enable, notifyId))
+
+
+def deleteNotify(notifyId):
+    """
+    删除通知配置
+    :param notifyId:
+    :return:
+    """
+    sqlBase.execute_update("delete from notify where id=?", (notifyId,))
