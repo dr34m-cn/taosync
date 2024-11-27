@@ -3,6 +3,7 @@ import {
 } from "@/utils/utils";
 import taskItemStatus from '@/utils/taskItemStatus';
 import taskStatus from '@/utils/taskStatus';
+import notifyMethod from '@/utils/notifyMethod';
 
 const timeStampFilter = (value) => {
 	return value ? parseTime(value) : '--';
@@ -33,6 +34,14 @@ const sizeFilter = (val) => {
 	    return (val / (1024 ** (i - 1))).toFixed(2).replace(/\.?0*$/, '') + unitList[i - 1];
 }
 
+const notifyMethodFilter = (val) => {
+	if (val != null) {
+		return notifyMethod[val];
+	} else {
+		return '--';
+	}
+}
+
 const taskItemStatusFilter = (value) => {
 	if (value != null) {
 		return taskItemStatus[value];
@@ -46,5 +55,6 @@ export default {
 	timeFull,
 	taskStatusFilter,
 	taskItemStatusFilter,
-	sizeFilter
+	sizeFilter,
+	notifyMethodFilter
 }

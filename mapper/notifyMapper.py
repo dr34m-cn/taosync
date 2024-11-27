@@ -7,7 +7,7 @@ def getNotifyList(needEnable=False):
     :param needEnable:
     :return:
     """
-    return sqlBase.fetchall_to_table("select * from notify where enable = ?", (1 if needEnable else 0,))
+    return sqlBase.fetchall_to_table(f"select * from notify{' where enable = 1' if needEnable else ''}")
 
 
 def addNotify(notify):
