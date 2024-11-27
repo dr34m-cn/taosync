@@ -29,8 +29,8 @@
 		</div>
 		<div class="setting-bottom">
 			<div class="setting-bottom-item">TaoSync 版本：__version_placeholder__</div>
-			<div class="setting-bottom-item"><a href="https://github.com/dr34m-cn/taosync">项目地址（GitHub）</a></div>
-			<div class="setting-bottom-item"><a href="https://github.com/dr34m-cn/taosync/issues">问题反馈（GitHub Issues）</a></div>
+			<div class="setting-bottom-item"><a href="https://github.com/dr34m-cn/taosync" target="_blank">项目地址（GitHub）</a></div>
+			<div class="setting-bottom-item"><a href="https://github.com/dr34m-cn/taosync/issues" target="_blank">问题反馈（GitHub Issues）</a></div>
 		</div>
 	</div>
 </template>
