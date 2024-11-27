@@ -39,6 +39,7 @@
 						</el-select>
 					</el-form-item>
 					<template v-if="editData.method == 0">
+						
 						<el-form-item prop="params.url" label="请求地址">
 							<el-input v-model="editData.params.url" placeholder="请输入请求地址"></el-input>
 						</el-form-item>
@@ -70,6 +71,8 @@
 						</el-form-item>
 					</template>
 					<template v-else-if="editData.method == 1">
+						<div class="tip-box">同时支持 <a href="https://sct.ftqq.com/" target="_blank">Server酱ᵀ</a>(免费5次/天)
+						与 <a href="https://sc3.ft07.com/" target="_blank">Server酱³</a>(公测不限次)</div>
 						<el-form-item prop="params.url" label="SendKey">
 							<el-input v-model="editData.params.sendKey" placeholder="请输入SendKey"></el-input>
 						</el-form-item>
@@ -261,12 +264,24 @@
 	}
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
+	.tip-box {
+		margin: 0 0 20px 100px;
+		color: #909bd4;
+		
+		a {
+			color: #409eff;
+		}
+		
+		a:hover {
+			color: #66b1ff;
+		}
+	}
 	.notify {
 		box-sizing: border-box;
 		padding: 8px;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(340px, 2fr));
+		grid-template-columns: repeat(auto-fill, minmax(380px, 2fr));
 		width: 100%;
 		height: 100%;
 
