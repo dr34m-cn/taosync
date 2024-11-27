@@ -1,4 +1,4 @@
-tornado==6.4.1
+tornado==6.4.2
 requests==2.32.3
 APScheduler==3.10.4
 configparser==7.1.0
