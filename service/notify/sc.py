@@ -3,7 +3,7 @@ import re
 import requests
 
 
-def send(sendKey, title, content=''):
+def send(sendKey, title, timeout, content=''):
     params = {
         'title': title,
         'desp': content
@@ -23,4 +23,4 @@ def send(sendKey, title, content=''):
     headers = {
         'Content-Type': 'application/json;charset=utf-8'
     }
-    return requests.post(url, json=params, headers=headers, timeout=(5, 30))
+    return requests.post(url, json=params, headers=headers, timeout=timeout)

@@ -76,7 +76,7 @@ def sendNotify(notify, title, content):
         1: {'sendKey': 'xxx'}
         2: {'url': ''}
     """
-    timeout = (5, 30)
+    timeout = (10, 30)
     params = json.loads(notify['params'])
     if notify['method'] == 0:
         reqData = {
@@ -99,7 +99,7 @@ def sendNotify(notify, title, content):
             raise Exception(r.text)
     elif notify['method'] == 1:
         # server酱
-        r = sc.send(params['sendKey'], title, content)
+        r = sc.send(params['sendKey'], title, timeout, content)
         if r.status_code != 200:
             raise Exception(r.text)
         else:
@@ -112,7 +112,7 @@ def sendNotify(notify, title, content):
             'text': {
                 'content': f'{title}\n\n{content}'
             }
-        })
+        }, timeout=timeout)
         rst = r.json()
         if rst['errcode'] != 0:
             raise Exception(rst['errmsg'])
