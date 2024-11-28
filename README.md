@@ -212,7 +212,7 @@ task_timeout=72
 
 ### 0.2.4（规划开发中，随时调整）
 
-* [ ] 通知功能 [#14](https://github.com/dr34m-cn/taosync/issues/14)
+* [x] 通知功能 [#14](https://github.com/dr34m-cn/taosync/issues/14)
 * [ ] 移动模式 [#16](https://github.com/dr34m-cn/taosync/issues/16)
 
 <!--## Stargazers over time
