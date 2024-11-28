@@ -24,22 +24,23 @@
 			</template>
 			<span v-else>新增</span>
 		</div>
-		<el-dialog :close-on-click-modal="false" :visible.sync="editShow" :title="editFlag ? '编辑' : '新增'" width="600px"
-			:before-close="closeShow" :append-to-body="true">
+		<el-dialog :close-on-click-modal="false" top="6vh" :visible.sync="editShow" :title="editFlag ? '编辑' : '新增'"
+			width="680px" :before-close="closeShow" :append-to-body="true">
 			<div class="elform-box">
-				<el-form :model="editData" :rules="editRule" ref="addRule" v-if="editShow" label-width="100px">
+				<el-form :model="editData" :rules="editRule[editData.method]" ref="addRule" v-if="editShow" label-width="100px">
 					<el-form-item prop="enable" label="是否启用">
 						<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0">
 						</el-switch>
 					</el-form-item>
 					<el-form-item prop="method" label="方式">
 						<el-select v-model="editData.method" @change="methodChange" style="width: 100%;">
-							<el-option :key="0" :value="0" label="自定义"></el-option>
-							<el-option :key="1" :value="1" label="server酱"></el-option>
+							<el-option :key="meItem - 1" :value="meItem - 1" :label="meItem - 1 | notifyMethodFilter"
+								v-for="meItem in 3"></el-option>
+							<!-- <el-option :key="1" :value="1" label="server酱"></el-option>
+							<el-option :key="2" :value="2" label="钉钉机器人"></el-option> -->
 						</el-select>
 					</el-form-item>
 					<template v-if="editData.method == 0">
-						
 						<el-form-item prop="params.url" label="请求地址">
 							<el-input v-model="editData.params.url" placeholder="请输入请求地址"></el-input>
 						</el-form-item>
@@ -72,19 +73,20 @@
 					</template>
 					<template v-else-if="editData.method == 1">
 						<div class="tip-box">同时支持 <a href="https://sct.ftqq.com/" target="_blank">Server酱ᵀ</a>(免费5次/天)
-						与 <a href="https://sc3.ft07.com/" target="_blank">Server酱³</a>(公测不限次)</div>
-						<el-form-item prop="params.url" label="SendKey">
+							与 <a href="https://sc3.ft07.com/" target="_blank">Server酱³</a>(公测不限次)</div>
+						<el-form-item prop="params.sendKey" label="SendKey">
 							<el-input v-model="editData.params.sendKey" placeholder="请输入SendKey"></el-input>
 						</el-form-item>
 					</template>
-					<!-- <el-form-item prop="remark" label="备注">
-						<el-input v-model="editData.remark" placeholder="备注方便你标识引擎，非必填"></el-input>
-					</el-form-item>
-					<el-form-item prop="token" label="令牌">
-						<el-input v-model="editData.token" show-password
-							:placeholder="`请输入令牌，${editFlag ? '留空表示不修改' : '请到AList管理-设置-其他中复制，保存后不要重置令牌'}`"
-							@keyup.enter.native="submit"></el-input>
-					</el-form-item> -->
+					<template v-else-if="editData.method == 2">
+						<div class="tip-box"><a
+								href="https://open.dingtalk.com/document/orgapp/custom-bot-creation-and-installation"
+								target="_blank">配置指南</a> 安全设置请采用[自定义关键字]，关键字内容为[TaoSync]，不含中括号</div>
+						<el-form-item prop="params.url" label="WebHook">
+							<el-input v-model="editData.params.url"
+								placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxx"></el-input>
+						</el-form-item>
+					</template>
 				</el-form>
 			</div>
 			<span slot="footer" class="dialog-footer">
@@ -118,13 +120,41 @@
 				editData: null,
 				editFlag: false,
 				editShow: false,
-				editRule: {
-					url: [{
-						required: true,
-						message: '请输入地址',
-						trgger: 'blur'
-					}]
-				}
+				editRule: [{
+					params: {
+						url: [{
+							type: 'string',
+							required: true,
+							message: '请输入地址'
+						}],
+						titleName: [{
+							type: 'string',
+							required: true,
+							message: '请输入标题名'
+						}],
+						contentName: [{
+							type: 'string',
+							required: true,
+							message: '请输入内容名'
+						}]
+					}
+				}, {
+					params: {
+						sendKey: [{
+							type: 'string',
+							required: true,
+							message: '请输入sendKey'
+						}]
+					}
+				}, {
+					params: {
+						url: [{
+							type: 'string',
+							required: true,
+							message: '请输入WebHook地址'
+						}]
+					}
+				}]
 			};
 		},
 		created() {
@@ -172,7 +202,14 @@
 					this.editData.params = {
 						sendKey: ''
 					}
+				} else if (val === 2) {
+					this.editData.params = {
+						url: ''
+					}
 				}
+				this.$nextTick(() => {
+					this.$refs.addRule.clearValidate();
+				})
 			},
 			closeShow() {
 				this.editShow = false;
@@ -224,7 +261,18 @@
 					}
 				})
 			},
-			tstCu(item = this.editData) {
+			tstCu(item = null) {
+				if (item == null) {
+					this.$refs.addRule.validate((valid) => {
+						if (valid) {
+							this.tstCuTrueDo(this.editData);
+						}
+					})
+				} else {
+					this.tstCuTrueDo(item);
+				}
+			},
+			tstCuTrueDo(item) {
 				this.tstLoading = true;
 				let it = JSON.parse(JSON.stringify(item));
 				if (typeof it.params === 'object' && it.params !== null) {
@@ -268,22 +316,22 @@
 	.tip-box {
 		margin: 0 0 20px 100px;
 		color: #909bd4;
-		
+
 		a {
 			color: #409eff;
 		}
-		
+
 		a:hover {
 			color: #66b1ff;
 		}
 	}
+
 	.notify {
 		box-sizing: border-box;
 		padding: 8px;
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(380px, 2fr));
 		width: 100%;
-		height: 100%;
 
 		.card-item {
 			background-color: #292b3c;

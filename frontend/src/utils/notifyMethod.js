@@ -1,1 +1,1 @@
-export default ['自定义', 'server酱']
+export default ['自定义', 'server酱', '钉钉群机器人']

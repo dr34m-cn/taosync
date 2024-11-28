@@ -182,7 +182,7 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(340px, 2fr));
 		width: 100%;
-		height: 100%;
+		// height: 100%;
 
 		.card-item {
 			background-color: #292b3c;
