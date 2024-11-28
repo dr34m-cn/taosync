@@ -99,13 +99,7 @@ def sendNotify(notify, title, content):
             raise Exception(r.text)
     elif notify['method'] == 1:
         # server酱
-        r = sc.send(params['sendKey'], title, timeout, content)
-        if r.status_code != 200:
-            raise Exception(r.text)
-        else:
-            scRs = r.json()
-            if scRs['code'] != 0:
-                raise Exception(scRs['error'])
+        sc.send(params['sendKey'], title, timeout, content)
     elif notify['method'] == 2:
         r = requests.post(params['url'], json={
             'msgtype': 'text',

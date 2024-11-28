@@ -23,4 +23,10 @@ def send(sendKey, title, timeout, content=''):
     headers = {
         'Content-Type': 'application/json;charset=utf-8'
     }
-    return requests.post(url, json=params, headers=headers, timeout=timeout)
+    r = requests.post(url, json=params, headers=headers, timeout=timeout)
+    if r.status_code != 200:
+        raise Exception(r.text)
+    else:
+        scRs = r.json()
+        if scRs['code'] != 0:
+            raise Exception(scRs['error'])
