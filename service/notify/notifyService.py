@@ -74,6 +74,7 @@ def sendNotify(notify, title, content):
         0: {'url': 'http://xxx.xx/api', 'method': 'POST', 'contentType': 'application/json',
             'needContent': True, 'titleName': 'title', 'contentName': 'content'}
         1: {'sendKey': 'xxx'}
+        2: {'url': ''}
     """
     timeout = (5, 30)
     params = json.loads(notify['params'])
@@ -105,5 +106,15 @@ def sendNotify(notify, title, content):
             scRs = r.json()
             if scRs['code'] != 0:
                 raise Exception(scRs['error'])
+    elif notify['method'] == 2:
+        r = requests.post(params['url'], json={
+            'msgtype': 'text',
+            'text': {
+                'content': f'{title}\n\n{content}'
+            }
+        })
+        rst = r.json()
+        if rst['errcode'] != 0:
+            raise Exception(rst['errmsg'])
     else:
         raise Exception("Wrong method")

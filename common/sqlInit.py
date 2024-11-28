@@ -77,7 +77,7 @@ def init_sql(conn):
         cursor.execute("create table notify("
                        "id integer primary key autoincrement,"
                        "enable integer DEFAULT 1,"  # 启用，1-启用，0-停用
-                       "method integer,"            # 方式：0-自定义；1-server酱；待扩展更多
+                       "method integer,"            # 方式：0-自定义；1-server酱；2-钉钉；待扩展更多
                        "params text,"               # 以json字符串存储参数
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
