@@ -3,7 +3,11 @@
 		<div class="top-box">
 			<el-button type="success" icon="el-icon-plus" @click="addShow">新建作业</el-button>
 			<div class="top-box-title">作业管理</div>
-			<el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getJobList"></el-button>
+			<div class="top-box-right">
+				<el-button @click="runAllJob" :loading="btnLoading" type="primary" icon="el-icon-caret-right"
+					circle></el-button>
+				<el-button :loading="loading" type="success" icon="el-icon-refresh" circle @click="getJobList"></el-button>
+			</div>
 		</div>
 		<el-table :data="jobData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading">
 			<el-table-column type="expand">
@@ -87,7 +91,7 @@
 									@click="disableJobShow(props.row, true)">删除</el-button>
 								<el-button type="primary" :loading="btnLoading" size="small"
 									@click="editJobShow(props.row)">编辑</el-button>
-								<el-button type="success" :loading="btnLoading" size="small" @click="putJob(props.row)">手动执行</el-button>
+								<!-- <el-button type="success" :loading="btnLoading" size="small" @click="putJob(props.row)">手动执行</el-button> -->
 							</div>
 						</div>
 					</div>
@@ -114,9 +118,12 @@
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column label="操作" align="center" width="100">
+			<el-table-column label="操作" align="center" width="200">
 				<template slot-scope="scope">
-					<el-button type="primary" @click="detail(scope.row.id)" :loading="btnLoading" size="small">详情</el-button>
+					<el-button icon="el-icon-caret-right" type="primary" @click="putJob(scope.row)" :loading="btnLoading"
+						size="small">手动执行</el-button>
+					<el-button icon="el-icon-view" type="success" @click="detail(scope.row.id)" :loading="btnLoading"
+						size="small">详情</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
@@ -382,6 +389,26 @@
 		},
 		beforeDestroy() {},
 		methods: {
+			runAllJob() {
+				this.$confirm("确认执行所有未禁用的作业吗？", '提示', {
+					confirmButtonText: '确定',
+					cancelButtonText: '取消',
+					type: 'warning'
+				}).then(() => {
+					this.btnLoading = true;
+					jobPut({
+						pause: null
+					}).then(res => {
+						this.btnLoading = false;
+						this.$message({
+							message: res.msg,
+							type: 'success'
+						});
+					}).catch(err => {
+						this.btnLoading = false;
+					})
+				})
+			},
 			getJobList() {
 				this.loading = true;
 				jobGetJob(this.params).then(res => {
@@ -613,6 +640,11 @@
 
 			.top-box-title {
 				font-weight: bold;
+			}
+
+			.top-box-right {
+				display: flex;
+				align-items: center;
 			}
 		}
 

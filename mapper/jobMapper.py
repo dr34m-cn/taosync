@@ -11,6 +11,14 @@ def getJobList(params=None):
     return sqlBase.fetchall_to_page("select * from job order by createTime desc ", params)
 
 
+def getEnableJobList():
+    """
+    获取未禁用的作业列表
+    :return:
+    """
+    return sqlBase.fetchall_to_table("select * from job where enable=1")
+
+
 def getJobById(jobId):
     # 作业详情
     rst = sqlBase.fetchall_to_table("select * from job where id=?", (jobId,))

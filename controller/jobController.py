@@ -61,7 +61,10 @@ class Job(BaseHandler):
     @handle_request
     def put(self, req):
         if req['pause'] is None:
-            jobService.doJobManual(req['id'])
+            if 'id' in req:
+                jobService.doJobManual(req['id'])
+            else:
+                jobService.doAllJobManual()
         elif req['pause'] is True:
             jobService.pauseJob(req['id'], req.get('cancel', False))
         else:

@@ -101,6 +101,20 @@ def editJobClient(job):
     jobClientList[jobId] = client
 
 
+def doAllJobManual():
+    """
+    手动执行所有未禁用的作业
+    :return:
+    """
+    jobList = jobMapper.getEnableJobList()
+    if not jobList:
+        raise Exception(G('no_job_for_run'))
+    for jobItem in jobList:
+        client = getJobClientById(jobItem['id'])
+        if client.job['enable'] == 1:
+            client.doManual()
+
+
 def doJobManual(jobId):
     """
     手动执行作业
