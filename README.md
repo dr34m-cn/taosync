@@ -214,5 +214,6 @@ task_timeout=72
 
 * [ ] 移动模式 [#16](https://github.com/dr34m-cn/taosync/issues/16)
 
-<!--## Stargazers over time
-[![Stargazers over time](https://starchart.cc/dr34m-cn/taosync.svg?variant=adaptive)](https://starchart.cc/dr34m-cn/taosync)-->
+## Star随时间
+
+[![Stargazers over time](https://starchart.cc/dr34m-cn/taosync.svg?variant=adaptive)](https://starchart.cc/dr34m-cn/taosync)

@@ -129,7 +129,7 @@ class JobTask:
 
     def updateTaskStatus(self):
         """
-        更新任务状态
+        所有任务完成后，最终更新任务状态
         """
         unSuccessTaskItem = jobMapper.getUnSuccessJobTaskItemList(self.taskId)
         status = 2 if not unSuccessTaskItem else 3
