@@ -210,10 +210,6 @@ task_timeout=72
 * 多语言支持
 * linux一键安装、更新与卸载脚本
 
-### 0.2.5（规划开发中，随时调整）
-
-* [ ] 移动模式 [#16](https://github.com/dr34m-cn/taosync/issues/16)
-
 ## Star随时间
 
 [![Stargazers over time](https://starchart.cc/dr34m-cn/taosync.svg?variant=adaptive)](https://starchart.cc/dr34m-cn/taosync)
