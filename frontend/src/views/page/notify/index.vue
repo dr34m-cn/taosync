@@ -76,7 +76,7 @@
 							</el-form-item>
 						</template>
 						<template v-else-if="editData.method == 1">
-							<div class="tip-box">同时支持 <a href="https://sct.ftqq.com/" target="_blank">Server酱ᵀ</a>(免费5次/天)
+							<div class="tip-box">同时支持 <a href="https://sct.ftqq.com/r/15503" target="_blank">Server酱ᵀ</a>(免费5次/天)
 								与 <a href="https://sc3.ft07.com/" target="_blank">Server酱³</a>(公测不限次)</div>
 							<el-form-item prop="params.sendKey" label="SendKey">
 								<el-input v-model="editData.params.sendKey" placeholder="请输入SendKey"></el-input>

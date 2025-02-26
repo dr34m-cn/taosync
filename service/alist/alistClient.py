@@ -208,6 +208,7 @@ class AlistClient:
         tasks = self.post('/api/fs/copy', data={
             'src_dir': srcDir,
             'dst_dir': dstDir,
+            'overwrite': True,
             'names': [
                 name
             ]
