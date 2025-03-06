@@ -16,10 +16,13 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
     jobMapper.updateJobTaskStatus(taskId, status, errMsg)
     notifyList = notifyService.getNotifyList(True)
     if notifyList:
+        # 无需同步标识
+        needNotSync = False
         job = jobMapper.getJobByTaskId(taskId)
         taskNum = getCuTaskNum(taskId)
         statusName = G('task_status')[status]
         if status == 2 and taskNum['allNum'] == 0:
+            needNotSync = True
             statusName = G('task_status')[7]
         title = G('task_end_msg_title').format(statusName)
         content = G('task_end_msg_content').format(
@@ -30,7 +33,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
             content += G('task_end_msg_error').format(errMsg)
         for notify in notifyList:
             try:
-                notifyService.sendNotify(notify, title, content)
+                notifyService.sendNotify(notify, title, content, needNotSync)
             except Exception as e:
                 logger = logging.getLogger()
                 logger.error(G('notify_error').format(str(e)))

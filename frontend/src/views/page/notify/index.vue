@@ -91,6 +91,10 @@
 									placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxx"></el-input>
 							</el-form-item>
 						</template>
+						<el-form-item prop="notSendNull" label="忽略无同步">
+							<el-switch v-model="editData.params.notSendNull" :active-value="1" :inactive-value="0">
+							</el-switch>
+						</el-form-item>
 					</el-form>
 				</div>
 				<span slot="footer" class="dialog-footer">
@@ -182,7 +186,8 @@
 					enable: 1,
 					method: 1,
 					params: {
-						sendKey: ''
+						sendKey: '',
+						notSendNull: false
 					}
 				}
 				this.editShow = true;
@@ -190,6 +195,9 @@
 			editShowDialog(row) {
 				this.editData = JSON.parse(JSON.stringify(row));
 				this.editData.params = JSON.parse(this.editData.params);
+				if(!this.editData.params.hasOwnProperty('notSendNull')) {
+					this.editData.params.notSendNull = false;
+				}
 				this.editFlag = true;
 				this.editShow = true;
 			},
@@ -201,15 +209,18 @@
 						contentType: 'application/json',
 						needContent: true,
 						titleName: 'title',
-						contentName: 'content'
+						contentName: 'content',
+						notSendNull: false
 					}
 				} else if (val === 1) {
 					this.editData.params = {
-						sendKey: ''
+						sendKey: '',
+						notSendNull: false
 					}
 				} else if (val === 2) {
 					this.editData.params = {
-						url: ''
+						url: '',
+						notSendNull: false
 					}
 				}
 				this.$nextTick(() => {

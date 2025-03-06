@@ -62,22 +62,26 @@ def testNotify(notify):
                G('notify_test_msg'))
 
 
-def sendNotify(notify, title, content):
+def sendNotify(notify, title, content, needNotSync=False):
     """
     发送通知
     :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；待扩展更多
     'params': None, 'createTime': 1732179402}
     :param title: 通知标题
     :param content: 通知内容
+    :param needNotSync: 是否是无需同步
     :return:
     method: 不同方法params结构
         0: {'url': 'http://xxx.xx/api', 'method': 'POST', 'contentType': 'application/json',
-            'needContent': True, 'titleName': 'title', 'contentName': 'content'}
-        1: {'sendKey': 'xxx'}
-        2: {'url': ''}
+            'needContent': True, 'titleName': 'title', 'contentName': 'content', 'notSendNull': False}
+        1: {'sendKey': 'xxx', 'notSendNull': False}
+        2: {'url': '', 'notSendNull': False}
     """
     timeout = (10, 30)
     params = json.loads(notify['params'])
+    # 如果配置了不发送空消息，并且当前状态为无需同步，则不发送通知
+    if 'notSendNull' in params and params['notSendNull'] and needNotSync:
+        return
     if notify['method'] == 0:
         reqData = {
             params['titleName']: title
