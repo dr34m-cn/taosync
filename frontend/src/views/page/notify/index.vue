@@ -193,11 +193,12 @@
 				this.editShow = true;
 			},
 			editShowDialog(row) {
-				this.editData = JSON.parse(JSON.stringify(row));
-				this.editData.params = JSON.parse(this.editData.params);
-				if(!this.editData.params.hasOwnProperty('notSendNull')) {
-					this.editData.params.notSendNull = false;
+				let editData = JSON.parse(JSON.stringify(row));
+				editData.params = JSON.parse(editData.params);
+				if (!editData.params.hasOwnProperty('notSendNull')) {
+					editData.params['notSendNull'] = false;
 				}
+				this.editData = editData;
 				this.editFlag = true;
 				this.editShow = true;
 			},
