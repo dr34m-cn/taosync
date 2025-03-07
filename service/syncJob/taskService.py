@@ -1,3 +1,4 @@
+import json
 import logging
 
 from common.LNG import G
@@ -15,12 +16,13 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
     """
     jobMapper.updateJobTaskStatus(taskId, status, errMsg)
     notifyList = notifyService.getNotifyList(True)
+    job = jobMapper.getJobByTaskId(taskId)
+    taskNum = getCuTaskNum(taskId)
+    jobMapper.updateJobTaskNum(taskId, json.dumps(taskNum))
+    statusName = G('task_status')[status]
     if notifyList:
         # 无需同步标识
         needNotSync = False
-        job = jobMapper.getJobByTaskId(taskId)
-        taskNum = getCuTaskNum(taskId)
-        statusName = G('task_status')[status]
         if status == 2 and taskNum['allNum'] == 0:
             needNotSync = True
             statusName = G('task_status')[7]
@@ -51,7 +53,12 @@ def getTaskList(req):
     """
     jobTaskList = jobMapper.getJobTaskList(req)
     for item in jobTaskList['dataList']:
-        taskNum = getCuTaskNum(item['id'])
+        if item['taskNum']:
+            taskNum = json.loads(item['taskNum'])
+        else:
+            taskNum = getCuTaskNum(item['id'])
+            if item['status'] > 1:
+                jobMapper.updateJobTaskNum(item['id'], json.dumps(taskNum))
         for k, v in taskNum.items():
             item[k] = v
     return jobTaskList

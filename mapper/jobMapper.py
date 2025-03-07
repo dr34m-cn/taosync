@@ -53,6 +53,7 @@ def addJob(job):
 
 
 def updateJob(job):
+    # 更新作业
     sqlBase.execute_update("update job set enable=:enable, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
                            "speed=:speed, method=:method, interval=:interval, isCron=:isCron, year=:year, "
                            "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
@@ -66,13 +67,20 @@ def updateJobEnable(jobId, enable):
 
 
 def deleteJob(jobId):
+    # 删除作业
     sqlBase.execute_update("delete from job_task_item where "
                            "taskId in (select id from job_task where jobId=?)", (jobId,))
     sqlBase.execute_update("delete from job_task where jobId=?", (jobId,))
     sqlBase.execute_update("delete from job where id=?", (jobId,))
 
 
+def updateJobTaskNum(taskId, taskNum):
+    # 更新任务的结果数量
+    sqlBase.execute_update("update job_task set taskNum=? where id = ?", (taskNum, taskId))
+
+
 def getJobTaskList(req):
+    # 获取任务列表
     return sqlBase.fetchall_to_page("select * from job_task where jobId=:id order by createTime desc ", req)
 
 

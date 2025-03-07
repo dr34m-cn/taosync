@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 241014
+    cuVersion = 250307
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -56,6 +56,7 @@ def init_sql(conn):
                        "status integer DEFAULT 1,"  # 状态，0-等待中，1-进行中，2-成功，3-完成（部分失败），4-因重启而中止，5-超时，6-失败
                        "errMsg text,"               # 失败原因
                        "runTime integer,"           # 开始时间，秒级时间戳
+                       "taskNum text,"              # 结果数量json字符串
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
         cursor.execute("create table job_task_item("
@@ -119,6 +120,8 @@ def init_sql(conn):
                                "params text,"
                                "createTime integer DEFAULT (strftime('%s', 'now'))"
                                ")")
+            if sqlVersion < 250307:
+                cursor.execute("alter table job_task add column taskNum text")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
     cursor.close()
