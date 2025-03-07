@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 
 from common.LNG import G
 from mapper import jobMapper
@@ -18,7 +19,10 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
     notifyList = notifyService.getNotifyList(True)
     job = jobMapper.getJobByTaskId(taskId)
     taskNum = getCuTaskNum(taskId)
-    jobMapper.updateJobTaskNum(taskId, json.dumps(taskNum))
+    jobMapper.updateJobTaskNumMany([{
+        'taskId': taskId,
+        'taskNum': json.dumps(taskNum)
+    }])
     statusName = G('task_status')[status]
     if notifyList:
         # 无需同步标识
@@ -28,7 +32,8 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
             statusName = G('task_status')[7]
         title = G('task_end_msg_title').format(statusName)
         content = G('task_end_msg_content').format(
-            job['srcPath'], job['dstPath'].replace(':', '、'), taskNum['allNum'], taskNum['successNum'], taskNum['failNum'])
+            job['srcPath'], job['dstPath'].replace(':', '、'), taskNum['allNum'], taskNum['successNum'],
+            taskNum['failNum'])
         if 3 < status < 6:
             content += G('task_end_msg_error').format(statusName)
         elif status == 6 and errMsg is not None:
@@ -52,15 +57,23 @@ def getTaskList(req):
     :return: {id, jobId, status, runTime, createTime}
     """
     jobTaskList = jobMapper.getJobTaskList(req)
+    # 需要更新任务数的列表（适配旧版本）
+    needUpdateList = []
     for item in jobTaskList['dataList']:
         if item['taskNum']:
             taskNum = json.loads(item['taskNum'])
         else:
             taskNum = getCuTaskNum(item['id'])
             if item['status'] > 1:
-                jobMapper.updateJobTaskNum(item['id'], json.dumps(taskNum))
+                needUpdateList.append({
+                    'taskId': item['id'],
+                    'taskNum': json.dumps(taskNum)
+                })
         for k, v in taskNum.items():
             item[k] = v
+    if needUpdateList:
+        updateThread = threading.Thread(target=jobMapper.updateJobTaskNumMany, args=(needUpdateList,))
+        updateThread.start()
     return jobTaskList
 
 

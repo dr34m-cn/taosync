@@ -74,9 +74,16 @@ def deleteJob(jobId):
     sqlBase.execute_update("delete from job where id=?", (jobId,))
 
 
-def updateJobTaskNum(taskId, taskNum):
-    # 更新任务的结果数量
-    sqlBase.execute_update("update job_task set taskNum=? where id = ?", (taskNum, taskId))
+def updateJobTaskNumMany(taskNums):
+    """
+    批量更新任务的结果数量
+    :param taskNums: [{
+        'taskId': 1,
+        'taskNum': ""
+    }]
+    :return:
+    """
+    sqlBase.execute_manny("update job_task set taskNum=:taskNum where id=:taskId", taskNums)
 
 
 def getJobTaskList(req):
