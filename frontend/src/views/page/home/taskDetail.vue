@@ -14,7 +14,8 @@
 				</el-select>
 			</div>
 			<div class="top-box-title">任务详情</div>
-			<el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskItemList"></el-button>
+			<menuRefresh :freshInterval="9973" :loading="loading" @getData="getTaskItemList"></menuRefresh>
+			<!-- <el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskItemList"></el-button> -->
 		</div>
 		<el-table :data="taskItemData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading"
 			empty-text="暂未发现需要同步的文件">
@@ -90,9 +91,12 @@
 		jobGetTaskItem
 	} from "@/api/job";
 	import taskItemStatus from '@/utils/taskItemStatus';
+	import menuRefresh from './components/menuRefresh';
 	export default {
 		name: 'TaskDetail',
-		components: {},
+		components: {
+			menuRefresh
+		},
 		data() {
 			return {
 				taskItemData: {

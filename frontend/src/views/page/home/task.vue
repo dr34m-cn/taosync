@@ -3,7 +3,8 @@
 		<div class="top-box">
 			<el-button type="primary" icon="el-icon-back" @click="goback">返回</el-button>
 			<div class="top-box-title">作业详情</div>
-			<el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskList"></el-button>
+			<menuRefresh :loading="loading" @getData="getTaskList"></menuRefresh>
+			<!-- <el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskList"></el-button> -->
 		</div>
 		<el-table :data="taskData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading"
 			empty-text="暂无任务">
@@ -78,9 +79,12 @@
 		jobGetTask,
 		jobDeleteTask
 	} from "@/api/job";
+	import menuRefresh from './components/menuRefresh';
 	export default {
 		name: 'Task',
-		components: {},
+		components: {
+			menuRefresh
+		},
 		data() {
 			return {
 				taskData: {

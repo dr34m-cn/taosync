@@ -1,13 +1,12 @@
 <template>
 	<div class="home">
 		<div class="top-box">
-			<el-button type="success" icon="el-icon-plus" @click="addShow">新建作业</el-button>
-			<div class="top-box-title">作业管理</div>
-			<div class="top-box-right">
-				<el-button @click="runAllJob" :loading="btnLoading" type="primary" icon="el-icon-caret-right"
-					circle></el-button>
-				<el-button :loading="loading" type="success" icon="el-icon-refresh" circle @click="getJobList"></el-button>
+			<div class="top-box-left">
+				<el-button type="success" icon="el-icon-plus" @click="addShow">新建作业</el-button>
+				<el-button @click="runAllJob" icon="el-icon-caret-right" :loading="btnLoading" type="primary">执行全部</el-button>
 			</div>
+			<div class="top-box-title">作业管理</div>
+			<menuRefresh :autoRefresh="false" :freshInterval="5273" :loading="loading" @getData="getJobList"></menuRefresh>
 		</div>
 		<el-table :data="jobData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading">
 			<el-table-column type="expand">
@@ -302,10 +301,12 @@
 		alistGet
 	} from "@/api/job";
 	import pathSelect from './components/pathSelect.vue';
+	import menuRefresh from './components/menuRefresh';
 	export default {
 		name: 'Home',
 		components: {
-			pathSelect
+			pathSelect,
+			menuRefresh
 		},
 		data() {
 			return {
@@ -642,7 +643,7 @@
 				font-weight: bold;
 			}
 
-			.top-box-right {
+			.top-box-left {
 				display: flex;
 				align-items: center;
 			}
