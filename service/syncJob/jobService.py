@@ -2,6 +2,8 @@
 @Author：dr34m
 @Date  ：2024/7/9 17:17 
 """
+import logging
+
 from common.LNG import G
 from mapper import jobMapper
 from service.syncJob import jobClient
@@ -15,10 +17,16 @@ def initJob():
     用于启动后寻找任务，修改异常终止状态，启动启用的任务
     :return:
     """
+    logger = logging.getLogger()
     jobMapper.updateJobTaskStatusByStatus()
     jobList = jobMapper.getJobList()
     for item in jobList:
-        addJobClient(item)
+        try:
+            logger.info(f"正在添加jobId为{item['id']}的任务")
+            addJobClient(item)
+        except Exception as e:
+            logger.error(f"添加任务过程中报错")
+            logger.exception(e)
 
 
 def getJobClientById(jobId):

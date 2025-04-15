@@ -2,6 +2,7 @@
 @Author：dr34m
 @Date  ：2024/7/11 12:14 
 """
+import json
 import logging
 import threading
 import time
@@ -157,7 +158,13 @@ class JobClient:
         self.scheduledJob = None
         self.jobDoing = False
         self.currentTaskId = None
-        self.doByTime()
+        try:
+            self.doByTime()
+        except Exception as e:
+            logger = logging.getLogger()
+            logger.error(f"任务启动过程中报错，将自动删除任务，任务为{json.dumps(self.job)}")
+            jobMapper.deleteJob(self.jobId)
+            raise e
 
     def doJob(self):
         """
