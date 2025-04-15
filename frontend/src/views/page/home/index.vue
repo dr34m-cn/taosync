@@ -489,7 +489,7 @@
 					speed: 0,
 					method: 0,
 					interval: 1440,
-					isCron: 1,
+					isCron: 0,
 					exclude: []
 				}
 				this.cronList.forEach(item => {
