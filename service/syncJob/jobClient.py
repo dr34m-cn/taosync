@@ -138,11 +138,12 @@ class JobTask:
 
 
 class JobClient:
-    def __init__(self, job):
+    def __init__(self, job, isInit=False):
         """
         初始化job
         :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, speed, method, interval, exclude, cron相关}
         """
+        addJobId = 0
         if 'enable' not in job:
             job['enable'] = 1
         if 'speed' not in job:
@@ -150,8 +151,8 @@ class JobClient:
         if 'method' not in job:
             job['method'] = 0
         if 'id' not in job:
-            jobId = jobMapper.addJob(job)
-            job = jobMapper.getJobById(jobId)
+            addJobId = jobMapper.addJob(job)
+            job = jobMapper.getJobById(addJobId)
         self.jobId = job['id']
         self.job = job
         self.scheduled = None
@@ -161,9 +162,11 @@ class JobClient:
         try:
             self.doByTime()
         except Exception as e:
-            logger = logging.getLogger()
-            logger.error(f"任务启动过程中报错，将自动删除任务，任务为{json.dumps(self.job)}")
-            jobMapper.deleteJob(self.jobId)
+            if isInit or addJobId != 0:
+                # 仅在初始化和新增任务时删除错误的任务
+                logger = logging.getLogger()
+                logger.error(f"任务启动过程中报错，将自动删除任务，任务为{json.dumps(self.job)}")
+                jobMapper.deleteJob(self.jobId)
             raise e
 
     def doJob(self):

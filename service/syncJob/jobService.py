@@ -23,7 +23,7 @@ def initJob():
     for item in jobList:
         try:
             logger.info(f"正在添加jobId为{item['id']}的任务")
-            addJobClient(item)
+            addJobClient(item, True)
         except Exception as e:
             logger.error(f"添加任务过程中报错")
             logger.exception(e)
@@ -62,9 +62,10 @@ def cleanJobInput(job):
         job['exclude'] = ":".join([item.strip() for item in job['exclude'].split(':')])
 
 
-def addJobClient(job):
+def addJobClient(job, isInit=False):
     """
     新增作业客户端
+    :param isInit: 是否是初始化过程
     :param job: {
         enable: 1,
         srcPath: '',
@@ -77,7 +78,7 @@ def addJobClient(job):
     :return:
     """
     cleanJobInput(job)
-    client = jobClient.JobClient(job)
+    client = jobClient.JobClient(job, isInit)
     global jobClientList
     jobClientList[client.jobId] = client
 
@@ -104,8 +105,8 @@ def editJobClient(job):
     client.stopJob(remove=True)
     global jobClientList
     del jobClientList[jobId]
-    jobMapper.updateJob(job)
     client = jobClient.JobClient(job)
+    jobMapper.updateJob(job)
     jobClientList[jobId] = client
 
 
