@@ -227,6 +227,27 @@ class AlistClient:
         else:
             return None
 
+    def moveFile(self, srcDir, dstDir, name):
+        """
+        移动文件
+        :param srcDir: 源目录
+        :param dstDir: 目标目录
+        :param name: 文件名
+        :return: 任务id
+        """
+        tasks = self.post('/api/fs/move', data={
+            'src_dir': srcDir,
+            'dst_dir': dstDir,
+            'overwrite': True,
+            'names': [
+                name
+            ]
+        })['tasks']
+        if tasks:
+            return tasks[0]['id']
+        else:
+            return None
+
     def taskInfo(self, taskId):
         """
         任务详情

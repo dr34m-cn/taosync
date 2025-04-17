@@ -33,7 +33,7 @@ def getSrcMore(src, dst, sizeCheck=True):
     return moreFile
 
 
-def copyFiles(srcPath, dstPath, client, files, copyHook=None, job=None):
+def copyFiles(srcPath, dstPath, client, files, copyHook=None, job=None, isMove=False):
     """
     复制文件
     :param srcPath: 来源路径
@@ -42,6 +42,7 @@ def copyFiles(srcPath, dstPath, client, files, copyHook=None, job=None):
     :param files: 文件
     :param copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None）
     :param job: 作业
+    :param isMove: 是否是移动
     """
     for key in files.keys():
         if job is not None and job['enable'] == 0:
@@ -50,9 +51,12 @@ def copyFiles(srcPath, dstPath, client, files, copyHook=None, job=None):
             copyFiles(f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
         else:
             try:
-                #解决复制文件时多层目标路径出错的问题
+                # 解决复制文件时多层目标路径出错的问题
                 client.mkdir(dstPath)
-                alistTaskId = client.copyFile(srcPath, dstPath, key)
+                if isMove:
+                    alistTaskId = client.moveFile(srcPath, dstPath, key)
+                else:
+                    alistTaskId = client.copyFile(srcPath, dstPath, key)
                 if copyHook is not None:
                     if alistTaskId:
                         copyHook(srcPath, dstPath, key, files[key], alistTaskId=alistTaskId)
@@ -97,7 +101,7 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     :param dstPath: 目标路径，多个以英文冒号[:]分隔
     :param alistId: 客户端id
     :param speed: 速度，0-标准，1-快速，2-低速
-    :param method: 0-仅新增，1-全同步
+    :param method: 0-仅新增，1-全同步，2-移动模式
     :param copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None）
     :param delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None）
     :param job: 作业
@@ -120,7 +124,7 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
         needCopy = getSrcMore(srcFiles, dstFiles)
         if job is not None and job['enable'] == 0:
             return
-        copyFiles(srcPath, dstItem, client, needCopy, copyHook)
+        copyFiles(srcPath, dstItem, client, needCopy, copyHook, isMove=method == 2)
         if method == 1:
             needDel = getSrcMore(dstFiles, srcFiles, False)
             delFiles(dstItem, client, needDel, delHook, job)
