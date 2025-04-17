@@ -91,6 +91,19 @@ class AlistClient:
         """
         return self.req('post', url, data, params)
 
+    def mkdir(self,  path):
+        """
+        发送post请求
+        :param url: 请求地址，/api/xxx
+        :param data: 需要放在请求体中用json传的数据
+        :param params: 放在url中的请求参数
+        :return: 200返回res['data']，401自动登录后重试，失败抛出异常
+        """
+        return self.req('post', '/api/fs/mkdir', data={
+            'path': path
+        })
+
+
     def get(self, url, params=None):
         """
         发送get请求

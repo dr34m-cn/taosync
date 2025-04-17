@@ -50,6 +50,8 @@ def copyFiles(srcPath, dstPath, client, files, copyHook=None, job=None):
             copyFiles(f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
         else:
             try:
+                #解决复制文件时多层目标路径出错的问题
+                client.mkdir(dstPath)
                 alistTaskId = client.copyFile(srcPath, dstPath, key)
                 if copyHook is not None:
                     if alistTaskId:
