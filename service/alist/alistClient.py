@@ -186,6 +186,15 @@ class AlistClient:
                 fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, parser, rootPath)
         return fList
 
+    def mkdir(self, path):
+        """
+        创建目录
+        :param path: 路径
+        """
+        return self.post('/api/fs/mkdir', data={
+            'path': path
+        })
+
     def deleteFile(self, path, names=None):
         """
         删除文件或目录
