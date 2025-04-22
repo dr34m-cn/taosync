@@ -177,6 +177,34 @@
 								</div>
 							</div>
 						</el-form-item>
+						<el-form-item prop="encryptFlag" label="加密选项">
+							<el-select v-model="editData.encryptFlag" class="label_width">
+								<el-option label="不加密" :value="0">
+									<span style="float: left;margin-right: 16px;">不加密</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">默认选项</span>
+								</el-option>
+								<el-option label="加密" :value="1">
+									<span style="float: left;margin-right: 16px;">加密</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">仅支持来源路径在本地，且挂载到/tmp下</span>
+								</el-option>
+								<el-option label="解密" :value="2">
+									<span style="float: left;margin-right: 16px;">解密</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">仅支持目标路径在本地，且挂载在到/tmp下</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+            <el-form-item prop="encryptKey" label="加密密码">
+              <el-input v-model.number="editData.encryptKey" placeholder="请输入加密密码" class="label_width" :disabled = editData.isReadonly>
+              </el-input>
+            </el-form-item>
+            <el-form-item prop="localSrcPath" label="本地目录">
+							<div v-if="editData.encryptFlag == 0" class="label_width">仅加密/解密时候需要填写</div>
+							<div v-else class="label_width">
+								{{editData.localSrcPath}}
+								<el-button type="primary" size="mini" :style="`margin-left: ${editData.localSrcPath == '' ? 0 : 12}px;`"
+									@click="selectLocalPath()">{{editData.localSrcPath == '' ? '选择' : '更换'}}目录</el-button>
+							</div>
+						</el-form-item>
 						<el-form-item prop="exclude" label="排除项语法">
 							<div class="label_width">类gitignore，不支持[非]与先后顺序
 								<span @click="toIgnore" class="to-link">
@@ -289,6 +317,7 @@
 			</span>
 		</el-dialog>
 		<pathSelect v-if="editData" :alistId="editData.alistId" ref="pathSelect" @submit="submitPath"></pathSelect>
+    <localPathSelect v-if="editData" :localRootDir="localRootDir" ref="localPathSelect" @submit="submitLocalPath"></localPathSelect>
 	</div>
 </template>
 
@@ -301,11 +330,14 @@
 		alistGet
 	} from "@/api/job";
 	import pathSelect from './components/pathSelect.vue';
+  import localPathSelect from './components/localPathSelect.vue';
 	import menuRefresh from './components/menuRefresh';
+  import {isReadonly} from "vue";
 	export default {
 		name: 'Home',
 		components: {
 			pathSelect,
+      localPathSelect,
 			menuRefresh
 		},
 		data() {
@@ -351,10 +383,12 @@
 					palce: '2040-12-31'
 				}],
 				cuIsSrc: false,
+        cuIsLocal: false,
 				loading: false,
 				btnLoading: false,
 				editLoading: false,
 				editData: null,
+        localRootDir: '/tmp',
 				excludeTmp: '',
 				editShow: false,
 				disableShow: false,
@@ -390,6 +424,7 @@
 		},
 		beforeDestroy() {},
 		methods: {
+      isReadonly,
 			runAllJob() {
 				this.$confirm("确认执行所有未禁用的作业吗？", '提示', {
 					confirmButtonText: '确定',
@@ -422,6 +457,9 @@
 			selectPath(isSrc) {
 				this.cuIsSrc = isSrc;
 				this.$refs.pathSelect.show();
+			},
+      selectLocalPath() {
+				this.$refs.localPathSelect.show();
 			},
 			getAlistList() {
 				alistGet().then(res => {
@@ -470,6 +508,7 @@
 				this.excludeTmp = '';
 				this.editData = JSON.parse(JSON.stringify(row));
 				this.editData.dstPath = this.editData.dstPath.split(':');
+        this.editData.isReadonly = true;
 				if (this.editData.exclude) {
 					this.editData.exclude = this.editData.exclude.split(':');
 				} else {
@@ -483,7 +522,11 @@
 				}
 				let editData = {
 					enable: 1,
+          isReadonly: false,
+          encryptFlag: 0,
+          encryptKey: '',
 					srcPath: '',
+          localSrcPath: '',
 					dstPath: [],
 					alistId: null,
 					speed: 0,
@@ -605,6 +648,9 @@
 						this.editData.dstPath.push(path);
 					}
 				}
+			},
+      submitLocalPath(path) {
+					this.editData.localSrcPath = path;
 			},
 			detail(jobId) {
 				this.$router.push({

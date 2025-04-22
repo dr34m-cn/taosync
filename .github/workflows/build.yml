@@ -53,7 +53,7 @@ jobs:
 
       - name: 安装依赖并构建前端
         run: |
-          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
+          sed -i "s/__version_placeholder__/$VERSION/g" frontend/views/page/setting/index.vue
           cd frontend
           npm install
           npm run build

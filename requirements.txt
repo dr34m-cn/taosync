@@ -3,3 +3,4 @@ requests==2.32.3
 APScheduler==3.10.4
 configparser==7.1.0
 igittigitt==2.1.4
+gmssl >=3.2.1

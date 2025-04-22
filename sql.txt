@@ -1,0 +1,6 @@
+alter table job
+    add localSrcPath TEXT;
+alter table job
+    add encryptFlag integer;
+alter table job
+    add encryptKey TEXT;
