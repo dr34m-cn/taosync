@@ -91,19 +91,6 @@ class AlistClient:
         """
         return self.req('post', url, data, params)
 
-    def mkdir(self,  path):
-        """
-        发送post请求
-        :param url: 请求地址，/api/xxx
-        :param data: 需要放在请求体中用json传的数据
-        :param params: 放在url中的请求参数
-        :return: 200返回res['data']，401自动登录后重试，失败抛出异常
-        """
-        return self.req('post', '/api/fs/mkdir', data={
-            'path': path
-        })
-
-
     def get(self, url, params=None):
         """
         发送get请求
@@ -216,6 +203,15 @@ class AlistClient:
                 fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, parser, rootPath)
         return fList
 
+    def mkdir(self, path):
+        """
+        创建目录
+        :param path: 路径
+        """
+        return self.post('/api/fs/mkdir', data={
+            'path': path
+        })
+
     def deleteFile(self, path, names=None):
         """
         删除文件或目录
@@ -236,6 +232,27 @@ class AlistClient:
         :return: 任务id
         """
         tasks = self.post('/api/fs/copy', data={
+            'src_dir': srcDir,
+            'dst_dir': dstDir,
+            'overwrite': True,
+            'names': [
+                name
+            ]
+        })['tasks']
+        if tasks:
+            return tasks[0]['id']
+        else:
+            return None
+
+    def moveFile(self, srcDir, dstDir, name):
+        """
+        移动文件
+        :param srcDir: 源目录
+        :param dstDir: 目标目录
+        :param name: 文件名
+        :return: 任务id
+        """
+        tasks = self.post('/api/fs/move', data={
             'src_dir': srcDir,
             'dst_dir': dstDir,
             'overwrite': True,

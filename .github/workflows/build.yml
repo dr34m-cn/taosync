@@ -267,7 +267,7 @@ jobs:
     needs: [get-version, build-windows-amd64, build-darwin, build-docker]
     env:
       VERSION: ${{needs.get-version.outputs.VERSION}}
-
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
     steps:
       - name: 检出仓库代码
         uses: actions/checkout@v4

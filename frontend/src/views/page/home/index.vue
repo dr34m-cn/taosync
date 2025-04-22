@@ -3,7 +3,7 @@
 		<div class="top-box">
 			<div class="top-box-left">
 				<el-button type="success" icon="el-icon-plus" @click="addShow">新建作业</el-button>
-				<el-button @click="runAllJob" icon="el-icon-caret-right" :loading="btnLoading" type="primary">执行全部</el-button>
+				<el-button @click="runAllJob" v-if="jobData.dataList.length > 1" icon="el-icon-caret-right" :loading="btnLoading" type="primary">执行全部</el-button>
 			</div>
 			<div class="top-box-title">作业管理</div>
 			<menuRefresh :autoRefresh="false" :freshInterval="5273" :loading="loading" @getData="getJobList"></menuRefresh>
@@ -17,7 +17,7 @@
 								同步方式
 							</div>
 							<div class="form-box-item-value">
-								{{props.row.method == 0 ? '仅新增' : '全同步'}}
+								{{props.row.method == 0 ? '仅新增' : (props.row.method == 1 ? '全同步': '移动模式')}}
 							</div>
 						</div>
 						<div class="form-box-item">
@@ -253,8 +253,13 @@
 									<span style="float: left;margin-right: 16px;">全同步</span>
 									<span style="float: right; color: #7b9dad; font-size: 13px;">目标目录比源目录多的文件将被删除</span>
 								</el-option>
+								<el-option label="移动模式" :value="2">
+									<span style="float: left;margin-right: 16px;">移动模式</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">同步完成后删除源目录所有文件</span>
+								</el-option>
 							</el-select>
 						</el-form-item>
+						<span v-if="editData.method == 2" style="margin-top: -12px;margin-left: 410px;margin-bottom: 18px;color: #f56c6c;font-weight: bold;">移动模式存在风险，可能导致文件丢失（因为会删除源目录文件），该方法应仅用于不重要的文件或有多重备份的文件！希望你知道自己在做什么！</span>
 						<el-form-item prop="isCron" label="调用方式">
 							<el-select v-model="editData.isCron" class="label_width">
 								<el-option label="间隔" :value="0">
