@@ -4,8 +4,10 @@
 """
 import logging
 import os
+import time
 
 import igittigitt
+from gmssl.sm4 import SM4_ENCRYPT, SM4_DECRYPT
 
 from service.alist.alistService import getClientById
 from service.encrypt.encrypt import SM4FileCrypto
@@ -35,7 +37,7 @@ def getSrcMore(src, dst, sizeCheck=True):
     return moreFile
 
 #pavel 20250422 增加是否加密和本地路径用于本地加密
-def copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,srcPath, dstPath, client, files, copyHook=None, job=None):
+def copyFiles(encryptFlag,encryptKey,iv,localRootPath,srcRootPath,dstRootPath,srcPath, dstPath, client, files, copyHook=None, job=None):
     """
     复制文件
     :param encryptFlag: 是否加密
@@ -57,7 +59,7 @@ def copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,srcPa
         if job is not None and job['enable'] == 0:
             return
         if key.endswith('/'):
-            copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
+            copyFiles(encryptFlag,encryptKey,iv,localRootPath,srcRootPath,dstRootPath,f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
         else:
             try:
                 if(encryptFlag == 1):
@@ -79,8 +81,10 @@ def copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,srcPa
                     if os.path.exists(localFile):
                         if os.path.exists(tempFile):
                             os.remove(tempFile)
-                        cipher = SM4FileCrypto(encryptKey)
+                        print(f'开始加密：{localFile}{time.asctime()}')
+                        cipher = SM4FileCrypto(encryptKey,iv)
                         cipher.encrypt_file(localFile,tempFile)
+                        print(f'完成加密：{localFile}{time.asctime()}')
                     #在asist中查询加密文件是否存在 todo 是否能省略？
                         res = client.filePathList(srcPath+tempRootFix)
                         if res is None:
@@ -93,7 +97,6 @@ def copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,srcPa
                     originalDstPath = dstPath
                     # alist目标路径临时文件夹
                     dstPath = dstPath + tempRootFix
-                    print(f'dstPath:{dstPath}')
 
                 #解决复制文件时多层目标路径出错的问题
                 client.mkdir(dstPath)
@@ -111,28 +114,23 @@ def copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,srcPa
                     tempPath = dstPath.replace(dstRootPath, localRootPath)
                     # alist目标路径 对应的本地文件夹
                     localDstPath = originalDstPath.replace(dstRootPath, localRootPath)
-                    print(f'tempPath:{tempPath}')
-                    print(f'localDstPath:{localDstPath}')
                     if not os.path.exists(localDstPath):
                         os.mkdir(localDstPath)
-                        print(f'创建目的文件夹：{localDstPath}')
                     tempFile = tempPath + key
                     dstFile = localDstPath+key
-                    print(f'tempFile:{tempFile}')
-                    print(f'dstFile:{dstFile}')
 
                     #删除未处理完成的目标文件
                     if os.path.exists(dstFile):
                         os.remove(dstFile)
-                    cipher = SM4FileCrypto(encryptKey)
+                    cipher = SM4FileCrypto(encryptKey,iv)
+                    print(f'开始解密：{tempFile}')
                     cipher.decrypt_file(tempFile, dstFile)
+                    print(f'完成解密：{tempFile}')
 
                 #删除临时文件和临时文件夹
                 if os.path.exists(tempFile):
-                    print(f'删除临时文件：{tempFile}')
                     os.remove(tempFile)
                 if os.path.exists(tempPath):
-                    print(f'删除临时文件夹：{tempPath}')
                     os.removedirs(tempPath)
 
             except Exception as e:
@@ -182,6 +180,14 @@ def sync(encryptFlag,encryptKey,localRootPath,srcPath, dstPath, alistId, speed=0
     :param delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None）
     :param job: 作业
     """
+
+    if encryptFlag != 0:
+        if len(encryptKey) != 32:
+            raise ValueError("密码格式不对")
+        encodeKey = encryptKey[6:22].upper().encode('utf-8')
+        iv = encryptKey[16:32].upper().encode('utf-8')
+
+
     jobExclude = job['exclude']
     parser = None
     if jobExclude is not None:
@@ -200,7 +206,7 @@ def sync(encryptFlag,encryptKey,localRootPath,srcPath, dstPath, alistId, speed=0
         needCopy = getSrcMore(srcFiles, dstFiles)
         if job is not None and job['enable'] == 0:
             return
-        copyFiles(encryptFlag,encryptKey,localRootPath,srcPath,dstPath,srcPath, dstItem, client, needCopy, copyHook)
+        copyFiles(encryptFlag,encodeKey,iv,localRootPath,srcPath,dstPath,srcPath, dstItem, client, needCopy, copyHook)
         if method == 1:
             needDel = getSrcMore(dstFiles, srcFiles, False)
             delFiles(dstItem, client, needDel, delHook, job)

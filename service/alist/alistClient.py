@@ -184,22 +184,14 @@ class AlistClient:
         """
         if rootPath is None:
             rootPath = path
-        print(f'查询路径:{path}')
         fList = self.fileListApi(path, speed, parser, rootPath)
         tempRootFix = '#TEMP_ENPT/'
-        if fList is not None:
-            for e in fList.keys():
-                print(f'e:{e}')
-        else:
-            print(f'路径:{path}下无内容')
 
         for key in fList.keys():
             #pavel 20250422 跳过临时文件夹
             if key.endswith(tempRootFix):
-                print(f'查询路径:{path}，临时文件夹，跳过:{key}')
                 continue
             elif key.endswith('/'):
-                print(f'/结尾，继续查询:{key}')
                 fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, parser, rootPath)
         return fList
 

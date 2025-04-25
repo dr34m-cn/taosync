@@ -3,10 +3,14 @@
 @Date  ：2024/7/9 17:17 
 """
 import logging
+import os
+from hashlib import md5
 
 from common.LNG import G
 from mapper import jobMapper
+from service.alist.alistService import getClientById
 from service.syncJob import jobClient
+from service.syncJob.jobUtills import alistAndLocalPathMatch
 
 # alist客户端列表，key为jobId,value为jobClient
 jobClientList = {}
@@ -105,9 +109,17 @@ def editJobClient(job):
     client.stopJob(remove=True)
     global jobClientList
     del jobClientList[jobId]
+
+
+    if job['encryptFlag'] != 0:
+        client = getClientById(job['alistId'])
+        # 加密和解密场景下，通过创建文件夹在另一端是否能能找到判断配置是否正确
+        alistAndLocalPathMatch(job,client)
+
     client = jobClient.JobClient(job)
     jobMapper.updateJob(job)
     jobClientList[jobId] = client
+
 
 
 def doAllJobManual():
