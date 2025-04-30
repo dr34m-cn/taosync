@@ -44,17 +44,17 @@ def getJobByTaskId(taskId):
 
 def addJob(job):
     # 新增作业
-    return sqlBase.execute_insert("insert into job (enable, encryptFlag, localSrcPath, encryptKey, srcPath, dstPath, alistId, speed, method, interval"
+    return sqlBase.execute_insert("insert into job (enable, encryptFlag, localPath, encryptKey, srcPath, dstPath, alistId, speed, method, interval"
                                   ",isCron, year, month, day, week, day_of_week, hour, minute, second, "
                                   "start_date, end_date, exclude) "
-                                  "VALUES (:enable, :encryptFlag, :localSrcPath, :encryptKey, :srcPath, :dstPath, :alistId, :speed, :method, :interval, "
+                                  "VALUES (:enable, :encryptFlag, :localPath, :encryptKey, :srcPath, :dstPath, :alistId, :speed, :method, :interval, "
                                   ":isCron, :year, :month, :day, :week, :day_of_week, :hour, :minute, :second, "
                                   ":start_date, :end_date, :exclude)", job)
 
 
 def updateJob(job):
     # 更新作业
-    sqlBase.execute_update("update job set enable=:enable, encryptFlag=:encryptFlag, localSrcPath=:localSrcPath, encryptKey=:encryptKey, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
+    sqlBase.execute_update("update job set enable=:enable, encryptFlag=:encryptFlag, localPath=:localPath, encryptKey=:encryptKey, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
                            "speed=:speed, method=:method, interval=:interval, isCron=:isCron, year=:year, "
                            "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
                            "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude where id=:id",
@@ -94,6 +94,11 @@ def getJobTaskList(req):
 def getJobTaskCountByStatus(taskId, status):
     return sqlBase.fetch_first_val("select count(id) from job_task_item where status=? "
                                    "and taskId=?", (status, taskId))
+
+def countItem(srcPath, dstPath, fileName, srcModified, dstModified):
+    return sqlBase.fetch_first_val("select count(id) from job_task_item where srcPath=? "
+                                   "and dstPath=? and fileName=? and srcModified=? and dstModified=?", (srcPath, dstPath, fileName, srcModified, dstModified))
+
 
 
 def getJobTaskCountByOther(taskId):
@@ -145,8 +150,8 @@ def deleteJobTaskByRunTime(runTime):
 
 def addJobTaskItemMany(jobTaskItemList):
     sqlBase.execute_manny(
-        "insert into job_task_item (taskId, srcPath, dstPath, fileName, fileSize, type, alistTaskId, status, errMsg) "
-        "VALUES (:taskId, :srcPath, :dstPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg)",
+        "insert into job_task_item (taskId, srcPath, dstPath, fileName, fileSize, srcModified, type, alistTaskId, status, errMsg, alistID, jobID, encryptFlag) "
+        "VALUES (:taskId, :srcPath, :dstPath, :fileName, :fileSize, :srcModified, :type, :alistTaskId, :status, :errMsg, :alistID, :jobID, :encryptFlag)",
         jobTaskItemList)
 
 
@@ -168,7 +173,7 @@ def getUnSuccessJobTaskItemList(taskId):
 
 
 def updateJobTaskItemStatusByIdMany(taskList):
-    sqlBase.execute_manny("update job_task_item set status=:status, progress=:progress, errMsg=:errMsg "
+    sqlBase.execute_manny("update job_task_item set status=:status, dstModified=:dstModified, progress=:progress, errMsg=:errMsg "
                           "where id=:id", taskList)
 
 

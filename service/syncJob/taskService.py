@@ -86,6 +86,8 @@ def getCuTaskNum(taskId):
         'otherNum': jobMapper.getJobTaskCountByOther(taskId),
         'allNum': jobMapper.getJobTaskCountByAll(taskId)
     }
+def countItem(srcPath, dstPath, fileName, srcModified, dstModified):
+    return jobMapper.countItem(srcPath, dstPath, fileName, srcModified, dstModified)
 
 
 def removeTask(taskId):

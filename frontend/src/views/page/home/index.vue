@@ -197,12 +197,12 @@
               <el-input v-model.number="editData.encryptKey" placeholder="请输入加密密码" class="label_width" :disabled = editData.isReadonly>
               </el-input>
             </el-form-item>
-            <el-form-item prop="localSrcPath" label="本地目录">
+            <el-form-item prop="localPath" label="本地目录">
 							<div v-if="editData.encryptFlag == 0" class="label_width">仅加密/解密时候需要填写</div>
 							<div v-else class="label_width">
-								{{editData.localSrcPath}}
-								<el-button type="primary" size="mini" :style="`margin-left: ${editData.localSrcPath == '' ? 0 : 12}px;`"
-									@click="selectLocalPath()">{{editData.localSrcPath == '' ? '选择' : '更换'}}目录</el-button>
+								{{editData.localPath}}
+								<el-button type="primary" size="mini" :style="`margin-left: ${editData.localPath == '' ? 0 : 12}px;`"
+									@click="selectLocalPath()">{{editData.localPath == '' ? '选择' : '更换'}}目录</el-button>
 							</div>
 						</el-form-item>
 						<el-form-item prop="exclude" label="排除项语法">
@@ -531,7 +531,7 @@
           encryptFlag: 0,
           encryptKey: '',
 					srcPath: '',
-          localSrcPath: '',
+          localPath: '',
 					dstPath: [],
 					alistId: null,
 					speed: 0,
@@ -655,7 +655,7 @@
 				}
 			},
       submitLocalPath(path) {
-					this.editData.localSrcPath = path;
+					this.editData.localPath = path;
 			},
 			detail(jobId) {
 				this.$router.push({

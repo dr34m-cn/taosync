@@ -4,16 +4,15 @@
 """
 import logging
 import os
-import time
 
 import igittigitt
-from gmssl.sm4 import SM4_ENCRYPT, SM4_DECRYPT
 
+from mapper.jobMapper import countItem
 from service.alist.alistService import getClientById
-from service.encrypt.encrypt import SM4FileCrypto
+from service.encrypt.encryptUtills import SM4FileHelper
 
 
-def getSrcMore(src, dst, sizeCheck=True):
+def getSrcMore(srcPath,dstPath,src, dst, sizeCheck=True, modifedCheck=True):
     """
     获取来源比目标多的文件
     :param src: 来源
@@ -28,16 +27,23 @@ def getSrcMore(src, dst, sizeCheck=True):
         if key not in dst:
             moreFile[key] = src[key]
         elif not key.endswith('/'):
-            if sizeCheck and src[key] != dst[key]:
+            srcEs = src[key].split(',')
+            dstEs = dst[key].split(',')
+            if modifedCheck:
+                count = countItem(srcPath,dstPath,key,srcEs[1],dstEs[1])
+                if count == 0:
+                    moreFile[key] = src[key]
+                    sizeCheck = False
+            if sizeCheck and srcEs[0] != dstEs[0]:
                 moreFile[key] = src[key]
         else:
-            moreChild = getSrcMore(src[key], dst[key], sizeCheck)
+            moreChild = getSrcMore(srcPath+key,dstPath+key,src[key], dst[key], sizeCheck)
             if moreChild:
                 moreFile[key] = moreChild
     return moreFile
 
 #pavel 20250422 增加是否加密和本地路径用于本地加密
-def copyFiles(encryptFlag,encryptKey,iv,localRootPath,srcRootPath,dstRootPath,srcPath, dstPath, client, files, copyHook=None, job=None):
+def copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,srcPath, dstPath, client, files, copyHook=None, job=None):
     """
     复制文件
     :param encryptFlag: 是否加密
@@ -54,25 +60,29 @@ def copyFiles(encryptFlag,encryptKey,iv,localRootPath,srcRootPath,dstRootPath,sr
     """
     #临时文件夹
     tempRootFix = '#TEMP_ENPT/'
+    originalSrcPath = srcPath
+    originalDstPath = dstPath
+    localPath = ''
 
     for key in files.keys():
         if job is not None and job['enable'] == 0:
             return
+
         if key.endswith('/'):
-            copyFiles(encryptFlag,encryptKey,iv,localRootPath,srcRootPath,dstRootPath,f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
+            copyFiles(encryptFlag,encryptKey,localRootPath,srcRootPath,dstRootPath,f'{srcPath}{key}', f'{dstPath}{key}', client, files[key], copyHook, job)
         else:
             try:
                 if(encryptFlag == 1):
                     #来源文件对应的本地文件夹
-                    localSrcPath = srcPath.replace(srcRootPath,localRootPath)
+                    localPath = srcPath.replace(srcRootPath,localRootPath)
 
                     #加密文件临时文件夹
-                    tempPath = localSrcPath + tempRootFix
+                    tempPath = localPath + tempRootFix
                     if not os.path.exists(tempPath):
                         os.mkdir(tempPath)
 
                     #来源文件对应的本地文件路径
-                    localFile = localSrcPath+key
+                    localFile = localPath+key
 
                     #加密文件临时路径
                     tempFile = tempPath + key
@@ -81,63 +91,38 @@ def copyFiles(encryptFlag,encryptKey,iv,localRootPath,srcRootPath,dstRootPath,sr
                     if os.path.exists(localFile):
                         if os.path.exists(tempFile):
                             os.remove(tempFile)
-                        print(f'开始加密：{localFile}{time.asctime()}')
-                        cipher = SM4FileCrypto(encryptKey,iv)
-                        cipher.encrypt_file(localFile,tempFile)
-                        print(f'完成加密：{localFile}{time.asctime()}')
-                    #在asist中查询加密文件是否存在 todo 是否能省略？
-                        res = client.filePathList(srcPath+tempRootFix)
-                        if res is None:
+                        cipher = SM4FileHelper(encryptKey)
+                        success = cipher.encrypt_file(localFile,tempFile)
+                        if not success :
                             continue
+
                     #将alist来源文件路径替换成加密临时文件路径
                     if os.path.exists(tempFile):
-                        srcPath = srcPath + tempRootFix
+                        srcPath2 = srcPath + tempRootFix
+                        dstPath2 = dstPath
 
-                if(encryptFlag == 2):
-                    originalDstPath = dstPath
+                elif(encryptFlag == 2):
+                    srcPath2 = srcPath
                     # alist目标路径临时文件夹
-                    dstPath = dstPath + tempRootFix
+                    dstPath2 = originalDstPath + tempRootFix
 
                 #解决复制文件时多层目标路径出错的问题
-                client.mkdir(dstPath)
+                client.mkdir(dstPath2)
                 #执行复制
-                alistTaskId = client.copyFile(srcPath, dstPath, key)
+                alistTaskId = client.copyFile(srcPath2, dstPath2, key)
+
                 if copyHook is not None:
                     if alistTaskId:
-                        copyHook(srcPath, dstPath, key, files[key], alistTaskId=alistTaskId)
+                        copyHook(client.alistId,job['id'],encryptFlag,originalSrcPath,originalDstPath, key, files[key], alistTaskId=alistTaskId)
                     else:
                         # 本地对本地的任务，不会产生alistTaskId，直接认为其成功
-                        copyHook(srcPath, dstPath, key, files[key], status=2)
-
-                if (encryptFlag == 2):
-                    # alist目标路径临时文件夹 对应的本地文件夹
-                    tempPath = dstPath.replace(dstRootPath, localRootPath)
-                    # alist目标路径 对应的本地文件夹
-                    localDstPath = originalDstPath.replace(dstRootPath, localRootPath)
-                    if not os.path.exists(localDstPath):
-                        os.mkdir(localDstPath)
-                    tempFile = tempPath + key
-                    dstFile = localDstPath+key
-
-                    #删除未处理完成的目标文件
-                    if os.path.exists(dstFile):
-                        os.remove(dstFile)
-                    cipher = SM4FileCrypto(encryptKey,iv)
-                    print(f'开始解密：{tempFile}')
-                    cipher.decrypt_file(tempFile, dstFile)
-                    print(f'完成解密：{tempFile}')
-
-                #删除临时文件和临时文件夹
-                if os.path.exists(tempFile):
-                    os.remove(tempFile)
-                if os.path.exists(tempPath):
-                    os.removedirs(tempPath)
+                        copyHook(client.alistId,job['id'],encryptFlag,originalSrcPath, originalDstPath, key, files[key], status=2)
 
             except Exception as e:
                 logger = logging.getLogger()
                 logger.exception(e)
                 if copyHook is not None:
-                    copyHook(srcPath, dstPath, key, files[key], status=7, errMsg=str(e))
+                    copyHook(client.alistId,job['id'],encryptFlag,srcPath, dstPath, key, files[key], status=7, errMsg=str(e))
 
 
 def delFiles(dstPath, client, files, delHook=None, job=None):
@@ -181,12 +166,6 @@ def sync(encryptFlag,encryptKey,localRootPath,srcPath, dstPath, alistId, speed=0
     :param job: 作业
     """
 
-    if encryptFlag != 0:
-        if len(encryptKey) != 32:
-            raise ValueError("密码格式不对")
-        encodeKey = encryptKey[6:22].upper().encode('utf-8')
-        iv = encryptKey[16:32].upper().encode('utf-8')
-
 
     jobExclude = job['exclude']
     parser = None
@@ -203,10 +182,10 @@ def sync(encryptFlag,encryptKey,localRootPath,srcPath, dstPath, alistId, speed=0
         if not dstItem.endswith('/'):
             dstItem = dstItem + '/'
         dstFiles = client.allFileList(dstItem, speed, parser=parser)
-        needCopy = getSrcMore(srcFiles, dstFiles)
+        needCopy = getSrcMore(srcPath,dstPath,srcFiles, dstFiles,False,True)
         if job is not None and job['enable'] == 0:
             return
-        copyFiles(encryptFlag,encodeKey,iv,localRootPath,srcPath,dstPath,srcPath, dstItem, client, needCopy, copyHook)
+        copyFiles(encryptFlag,encryptKey,localRootPath,srcPath,dstPath,srcPath, dstItem, client, needCopy, copyHook,job)
         if method == 1:
-            needDel = getSrcMore(dstFiles, srcFiles, False)
+            needDel = getSrcMore(srcPath,dstPath,dstFiles, srcFiles, False,False)
             delFiles(dstItem, client, needDel, delHook, job)

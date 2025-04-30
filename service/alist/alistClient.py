@@ -135,9 +135,9 @@ class AlistClient:
             'refresh': speed != 1
         })['content']
         if res is not None:
-            rts = {
+             rts = {
                 f"{item['name']}/" if item['is_dir'] else item['name']: {} if item['is_dir']
-                else item['size'] for item in res
+                else f"{item['size']},{item['modified']}" for item in res
             }
         else:
             rts = {}
@@ -186,14 +186,30 @@ class AlistClient:
             rootPath = path
         fList = self.fileListApi(path, speed, parser, rootPath)
         tempRootFix = '#TEMP_ENPT/'
-
-        for key in fList.keys():
+        for key in list(fList.keys()):
             #pavel 20250422 跳过临时文件夹
             if key.endswith(tempRootFix):
-                continue
+                del fList[key]
             elif key.endswith('/'):
                 fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, parser, rootPath)
         return fList
+
+    def getAlistFile(self, path):
+        file = self.req('post', '/api/fs/get', data={
+            'path': path,
+            "refresh": 'true'
+        })
+        if file:
+            return file
+        else:
+            return None
+    def getLastModified(self, path):
+        file = self.getAlistFile(path)
+        if file:
+            return file['modified']
+        else:
+            return None
+
 
     def mkdir(self, path):
         """

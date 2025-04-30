@@ -20,12 +20,12 @@ def alistAndLocalPathMatch(job,client):
     elif encryptFlag == 2:
         alistPath = job['dstPath']
 
-    localSrcPath = job['localSrcPath']
+    localPath = job['localPath']
 
-    dirName = getMd5(localSrcPath)
+    dirName = getMd5(localPath)
 
     alistPath = alistPath + tempRootFix + dirName
-    locaPath = localSrcPath + tempRootFix + dirName
+    locaPath = localPath + tempRootFix + dirName
     client.mkdir(alistPath)
     flag = os.path.exists(locaPath)
     if flag:

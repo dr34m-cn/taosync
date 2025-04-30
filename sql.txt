@@ -1,6 +1,21 @@
 alter table job
-    add localSrcPath TEXT;
+    add localPath TEXT;
 alter table job
     add encryptFlag integer;
 alter table job
     add encryptKey TEXT;
+
+alter table job_task_item
+    add srcModified TEXT;
+
+alter table job_task_item
+    add dstModified TEXT;
+
+alter table job_task_item
+    add alistID interge;
+
+alter table job_task_item
+    add jobID interge;
+
+alter table job_task_item
+    add encryptFlag interge;
