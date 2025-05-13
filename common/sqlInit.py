@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 250307
+    cuVersion = 250416
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -30,11 +30,12 @@ def init_sql(conn):
         cursor.execute("create table job("
                        "id integer primary key autoincrement,"
                        "enable integer DEFAULT 1,"          # 启用，1-启用，0-停用
+                       "remark text,"                       # 备注
                        "srcPath text,"                      # 来源目录，结尾有无斜杠都可，建议有斜杠
                        "dstPath text,"                      # 目标目录，结尾有无斜杠都可，建议有斜杠，多个以英文冒号[:]分隔
                        "alistId integer,"                   # 引擎id，alist_list.id
                        "speed integer,"                     # 同步速度：0-标准，1-快速，2-低速
-                       "method integer,"                    # 同步方式，0-仅新增，1-全同步
+                       "method integer,"                    # 同步方式，0-仅新增，1-全同步，2-移动模式
                        "interval integer,"                  # 同步间隔，单位：分钟
                        "isCron integer DEFAULT 0,"          # 是否使用cron，0-使用interval, 1-使用cron，2-仅手动
                        "year text DEFAULT NULL,"            # 四位数的年份
@@ -122,6 +123,8 @@ def init_sql(conn):
                                ")")
             if sqlVersion < 250307:
                 cursor.execute("alter table job_task add column taskNum text")
+            if sqlVersion < 250416:
+                cursor.execute("alter table job add column remark text")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
     cursor.close()
