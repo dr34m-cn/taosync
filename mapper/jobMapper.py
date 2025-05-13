@@ -44,17 +44,17 @@ def getJobByTaskId(taskId):
 
 def addJob(job):
     # 新增作业
-    return sqlBase.execute_insert("insert into job (enable, srcPath, dstPath, alistId, speed, method, interval"
+    return sqlBase.execute_insert("insert into job (enable, remark, srcPath, dstPath, alistId, speed, method, interval"
                                   ",isCron, year, month, day, week, day_of_week, hour, minute, second, "
                                   "start_date, end_date, exclude) "
-                                  "VALUES (:enable, :srcPath, :dstPath, :alistId, :speed, :method, :interval, "
+                                  "VALUES (:enable, :remark, :srcPath, :dstPath, :alistId, :speed, :method, :interval, "
                                   ":isCron, :year, :month, :day, :week, :day_of_week, :hour, :minute, :second, "
                                   ":start_date, :end_date, :exclude)", job)
 
 
 def updateJob(job):
     # 更新作业
-    sqlBase.execute_update("update job set enable=:enable, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
+    sqlBase.execute_update("update job set enable=:enable, remark=:remark, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
                            "speed=:speed, method=:method, interval=:interval, isCron=:isCron, year=:year, "
                            "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
                            "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude where id=:id",

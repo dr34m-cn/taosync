@@ -65,7 +65,7 @@ def testNotify(notify):
 def sendNotify(notify, title, content, needNotSync=False):
     """
     发送通知
-    :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；待扩展更多
+    :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；2-钉钉群机器人；待扩展更多
     'params': None, 'createTime': 1732179402}
     :param title: 通知标题
     :param content: 通知内容
@@ -105,6 +105,7 @@ def sendNotify(notify, title, content, needNotSync=False):
         # server酱
         sc.send(params['sendKey'], title, timeout, content)
     elif notify['method'] == 2:
+        # 钉钉群机器人
         r = requests.post(params['url'], json={
             'msgtype': 'text',
             'text': {

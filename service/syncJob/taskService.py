@@ -30,6 +30,8 @@ def updateJobTaskStatus(taskId, status, errMsg=None):
         if status == 2 and taskNum['allNum'] == 0:
             needNotSync = True
             statusName = G('task_status')[7]
+        if job['remark']:
+            statusName = f"{job['remark']}: {statusName}"
         title = G('task_end_msg_title').format(statusName)
         content = G('task_end_msg_content').format(
             job['srcPath'], job['dstPath'].replace(':', '、'), taskNum['allNum'], taskNum['successNum'],

@@ -3,10 +3,12 @@
 		<div class="top-box">
 			<div class="top-box-left">
 				<el-button type="success" icon="el-icon-plus" @click="addShow">新建作业</el-button>
-				<el-button @click="runAllJob" v-if="jobData.dataList.length > 1" icon="el-icon-caret-right" :loading="btnLoading" type="primary">执行全部</el-button>
+				<el-button @click="runAllJob" v-if="jobData.dataList.length > 1" icon="el-icon-caret-right"
+					:loading="btnLoading" type="primary">执行全部</el-button>
 			</div>
 			<div class="top-box-title">作业管理</div>
-			<menuRefresh :autoRefresh="false" :freshInterval="5273" :loading="loading" @getData="getJobList"></menuRefresh>
+			<menuRefresh :autoRefresh="false" :freshInterval="5273" :loading="loading" @getData="getJobList">
+			</menuRefresh>
 		</div>
 		<el-table :data="jobData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading">
 			<el-table-column type="expand">
@@ -96,6 +98,11 @@
 					</div>
 				</template>
 			</el-table-column>
+			<el-table-column prop="remark" label="名称" width="120">
+				<template slot-scope="scope">
+					{{scope.row.remark || '--'}}
+				</template>
+			</el-table-column>
 			<el-table-column prop="enable" label="状态" width="80">
 				<template slot-scope="scope">
 					<div :class="`bg-status bg-${scope.row.enable ? '2' : '7'}`" style="width: 50px;">
@@ -119,8 +126,8 @@
 			</el-table-column>
 			<el-table-column label="操作" align="center" width="200">
 				<template slot-scope="scope">
-					<el-button icon="el-icon-caret-right" type="primary" @click="putJob(scope.row)" :loading="btnLoading"
-						size="small">手动执行</el-button>
+					<el-button icon="el-icon-caret-right" type="primary" @click="putJob(scope.row)"
+						:loading="btnLoading" size="small">手动执行</el-button>
 					<el-button icon="el-icon-view" type="success" @click="detail(scope.row.id)" :loading="btnLoading"
 						size="small">详情</el-button>
 				</template>
@@ -139,18 +146,25 @@
 					<div style="display: flex;flex-wrap: wrap;">
 						<el-form-item prop="enable" label="是否启用">
 							<div class="label_width">
-								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0" v-if="editData.isCron != 2">
+								<el-switch v-model="editData.enable" :active-value="1" :inactive-value="0"
+									v-if="editData.isCron != 2">
 								</el-switch>
 								<span v-else>启用</span>
 							</div>
 						</el-form-item>
+						<el-form-item prop="remark" label="作业名称">
+							<div class="label_width">
+								<el-input v-model="editData.remark" placeholder="用来标识你的作业，选填"></el-input>
+							</div>
+						</el-form-item>
 						<el-form-item prop="alistId" label="引擎">
-							<el-select v-model="editData.alistId" placeholder="请选择引擎" class="label_width"
+							<el-select v-model="editData.alistId" placeholder="请选择引擎" class="label_width label_width_2"
 								no-data-text="暂无引擎,请前往引擎管理创建">
 								<el-option v-for="item in alistList" :label="item.url" :value="item.id">
 									<span
 										style="float: left;margin-right: 16px;">{{item.url}}{{item.remark != null ? `[${item.remark}]` : ''}}</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
+									<span
+										style="float: right; color: #7b9dad; font-size: 13px;">{{item.userName}}</span>
 								</el-option>
 							</el-select>
 						</el-form-item>
@@ -158,7 +172,8 @@
 							<div v-if="editData.alistId == null" class="label_width">请先选择引擎</div>
 							<div v-else class="label_width">
 								{{editData.srcPath}}
-								<el-button type="primary" size="mini" :style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
+								<el-button type="primary" size="mini"
+									:style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`"
 									@click="selectPath(true)">{{editData.srcPath == '' ? '选择' : '更换'}}目录</el-button>
 							</div>
 						</el-form-item>
@@ -178,7 +193,7 @@
 							</div>
 						</el-form-item>
 						<el-form-item prop="exclude" label="排除项语法">
-							<div class="label_width">类gitignore，不支持[非]与先后顺序
+							<div class="label_width">类gitignore，不支持[非]与先后顺序<br />
 								<span @click="toIgnore" class="to-link">
 									点击查看排除项简易教程
 								</span>
@@ -231,7 +246,8 @@
 								</el-option>
 							</el-select>
 						</el-form-item>
-						<span v-if="editData.method == 2" style="margin-top: -12px;margin-left: 410px;margin-bottom: 18px;color: #f56c6c;font-weight: bold;">移动模式存在风险，可能导致文件丢失（因为会删除源目录文件），该方法应仅用于不重要的文件或有多重备份的文件！希望你知道自己在做什么！</span>
+						<span v-if="editData.method == 2"
+							style="margin-top: -12px;margin-left: 410px;margin-bottom: 18px;color: #f56c6c;font-weight: bold;">移动模式存在风险，可能导致文件丢失（因为会删除源目录文件），该方法应仅用于不重要的文件或有多重备份的文件！希望你知道自己在做什么！</span>
 						<el-form-item prop="isCron" label="调用方式">
 							<el-select v-model="editData.isCron" class="label_width">
 								<el-option label="间隔" :value="0">
@@ -278,8 +294,8 @@
 				<el-button type="primary" @click="submit" :loading="editLoading">确 定</el-button>
 			</span>
 		</el-dialog>
-		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告" width="460px"
-			:before-close="closeDisableShow">
+		<el-dialog :close-on-click-modal="false" :visible.sync="disableShow" :append-to-body="true" title="警告"
+			width="460px" :before-close="closeDisableShow">
 			<div style="color: #f56c6c;font-weight: bold;text-align: center;font-size: 20px;">
 				{{disableIsDel ? '此操作不可逆，将永久删除该作业' : '将禁用任务'}}，确认吗？
 			</div>
@@ -488,6 +504,7 @@
 				}
 				let editData = {
 					enable: 1,
+					remark: '',
 					srcPath: '',
 					dstPath: [],
 					alistId: null,
@@ -712,6 +729,10 @@
 			text-decoration: underline;
 			cursor: pointer;
 		}
+	}
+	
+	.label_width_2 {
+		width: 600px;
 	}
 
 	.exclude-item {
