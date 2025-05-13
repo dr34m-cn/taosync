@@ -4,6 +4,8 @@
 """
 import json
 import logging
+import os
+import shutil
 import threading
 import time
 
@@ -12,8 +14,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from common.LNG import G
 from common.config import getConfig
 from mapper import jobMapper
+from mapper.jobMapper import getJobById
 from service.alist import alistSync, alistService
+from service.alist.alistService import getClientById
+from service.encrypt.encryptUtills import SM4FileHelper
 from service.syncJob import taskService
+from service.syncJob.jobUtills import alistAndLocalPathMatch, getMd5
 
 
 class JobTask:
@@ -24,7 +30,7 @@ class JobTask:
         self.taskItemList = []
         self.sync()
 
-    def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None):
+    def copyHook(self, alistID, jobID,encryptFlag,srcPath, dstPath, name, info, alistTaskId=None, status=0, errMsg=None):
         """
         复制文件回调
         :param srcPath: 来源目录
@@ -36,16 +42,22 @@ class JobTask:
                         7-已失败，8-等待重试中，9-等待重试回调执行中
         :param errMsg: 错误信息
         """
+        es = info.split(',')
+
         self.taskItemList.append({
             'taskId': self.taskId,
             'srcPath': srcPath,
             'dstPath': dstPath,
             'fileName': name,
-            'fileSize': size,
+            'fileSize': es[0],
+            'srcModified':es[1],
             'type': 0,
             'alistTaskId': alistTaskId,
             'status': status,
-            'errMsg': errMsg
+            'errMsg': errMsg,
+            'alistID': alistID,
+            'jobID': jobID,
+            'encryptFlag': encryptFlag
         })
 
     def delHook(self, dstPath, name, size, status=2, errMsg=None):
@@ -72,8 +84,9 @@ class JobTask:
     def sync(self):
         """
         执行同步
+        pavel 20250422 增加是否加密和本地路径用于本地加密
         """
-        alistSync.sync(self.job['srcPath'], self.job['dstPath'], self.job['alistId'],
+        alistSync.sync(self.job['encryptFlag'],self.job['encryptKey'],self.job['localPath'],self.job['srcPath'], self.job['dstPath'], self.job['alistId'],
                        self.job['speed'], self.job['method'], self.copyHook, self.delHook, self.job)
         jobMapper.addJobTaskItemMany(self.taskItemList)
         self.updateItemStatus()
@@ -111,17 +124,65 @@ class JobTask:
                     }
                 if taskInfo['state'] == item['status'] and taskInfo['progress'] == item['progress']:
                     continue
+                dstModified = ''
+                # 删除成功的记录
+                if taskInfo['state'] == 2:
+                    encryptFlag = item['encryptFlag']
+                    alistClient = getClientById(item['alistID'])
+                    srcPath = item['srcPath']
+                    tempRootFix = '#TEMP_ENPT/'
+                    fileName = item['fileName']
+                    dstPath = item['dstPath']
+                    job = getJobById(item['jobID'])
+                    localRootPath = job['localPath']
+                    dstRootPath = job['dstPath']
+                    srcRootPath = job['srcPath']
+                    encryptKey = job['encryptKey']
+
+                    if encryptFlag == 1:
+                        tempPath = srcPath + tempRootFix
+                        localTempPath = tempPath.replace(srcRootPath,localRootPath)
+                        localTempFile = localTempPath+fileName
+                        if os.path.exists(localTempFile) :
+                            os.remove(localTempFile)
+                            if not os.listdir(localTempPath):
+                                os.rmdir(localTempPath)
+                        dstModified = alistClient.getLastModified(dstPath + fileName)
+                        self.client.copyTaskDelete(item['alistTaskId'])
+                    elif encryptFlag == 2:
+                        localDstPath = dstPath.replace(dstRootPath,localRootPath)
+                        tempPath = localDstPath + tempRootFix
+                        #下载文件路径
+                        tempFile = localDstPath + tempRootFix + fileName
+                        #解密文件路径
+                        tempFile2 = localDstPath + tempRootFix + fileName+'de'
+                        #目的文件路径
+                        dstFile = localDstPath + fileName
+                        if os.path.exists(dstFile):
+                            os.remove(dstFile)
+                        cipher = SM4FileHelper(encryptKey)
+                        if os.path.exists(tempFile2):
+                            os.remove(tempFile2)
+                        success = cipher.decrypt_file(tempFile, tempFile2)
+                        if success :
+                            shutil.move(tempFile2, dstFile)
+                            dstModified = alistClient.getLastModified(item['dstPath'] + item['fileName'])
+                            if os.path.exists(tempFile):
+                                os.remove(tempFile)
+                                if not os.listdir(tempPath):
+                                    os.rmdir(tempPath)
+                            self.client.copyTaskDelete(item['alistTaskId'])
+
+                if taskInfo['state'] in [2, 4, 7]:
+                    undoneTaskItem.remove(item)
+
                 needUpdate.append({
                     'id': item['id'],
+                    'dstModified': dstModified,
                     'status': taskInfo['state'],
                     'progress': taskInfo['progress'],
                     'errMsg': taskInfo['error'] if taskInfo['error'] is not None and taskInfo['error'] != '' else None
                 })
-                # 删除成功的记录
-                if taskInfo['state'] == 2:
-                    self.client.copyTaskDelete(item['alistTaskId'])
-                if taskInfo['state'] in [2, 4, 7]:
-                    undoneTaskItem.remove(item)
             if needUpdate:
                 jobMapper.updateJobTaskItemStatusByIdMany(needUpdate)
             if undoneTaskItem:
@@ -137,7 +198,12 @@ class JobTask:
         taskService.updateJobTaskStatus(self.taskId, status)
 
 
+
+
+
+
 class JobClient:
+
     def __init__(self, job, isInit=False):
         """
         初始化job
@@ -151,6 +217,13 @@ class JobClient:
         if 'method' not in job:
             job['method'] = 0
         if 'id' not in job:
+            if job['encryptFlag'] != 0:
+                client = getClientById(job['alistId'])
+                # 加密和解密场景下，通过创建文件夹在另一端是否能能找到判断配置是否正确
+                alistAndLocalPathMatch(job, client)
+            #密码加盐加密
+            job['encryptKey'] = getMd5(job['encryptKey'])
+
             addJobId = jobMapper.addJob(job)
             job = jobMapper.getJobById(addJobId)
         self.jobId = job['id']

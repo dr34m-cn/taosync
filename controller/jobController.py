@@ -8,6 +8,7 @@ from tornado.concurrent import run_on_executor
 
 from controller.baseController import BaseHandler, handle_request
 from service.alist import alistService
+from service.local import localService
 from service.syncJob import jobService, taskService
 
 
@@ -35,6 +36,33 @@ class Alist(BaseHandler):
     @handle_request
     def delete(self, req):
         alistService.removeClient(req['id'])
+
+
+class Local(BaseHandler):
+    executor = ThreadPoolExecutor(1)
+
+    @run_on_executor
+    @handle_request
+    def get(self, req):
+        if 'localRootDir' in req and 'path' in req:
+            return localService.getChildPath(req['localRootDir'], req['path'])
+        return localService.getLocalRootDir()
+
+    @run_on_executor
+    @handle_request
+    def post(self, req):
+        alistService.addClient(req)
+
+    @run_on_executor
+    @handle_request
+    def put(self, req):
+        alistService.updateClient(req)
+
+    @run_on_executor
+    @handle_request
+    def delete(self, req):
+        alistService.removeClient(req['id'])
+
 
 
 class Job(BaseHandler):

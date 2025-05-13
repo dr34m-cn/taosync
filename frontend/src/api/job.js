@@ -26,6 +26,20 @@ export function alistGetPath(alistId, path) {
 	})
 }
 
+export function localGetPath(localRootDir, path) {
+	return request({
+		url: '/local',
+		headers: {
+			isMask: false
+		},
+		method: 'get',
+		params: {
+			localRootDir,
+			path
+		}
+	})
+}
+
 // alist新增
 export function alistPost(data) {
 	return request({
