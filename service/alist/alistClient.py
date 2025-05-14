@@ -9,7 +9,7 @@ import requests
 from common.LNG import G
 
 
-def checkExs(path, rts, parser):
+def checkExs(path, rts, spec):
     """
     检查并排除排除项
     :param path: 所在路径
@@ -18,13 +18,12 @@ def checkExs(path, rts, parser):
             "test1-1/": {},  # key以/结尾表示目录
             "test1.txt": 4  # 不以/结尾，表示文件，存文件大小
         }
-    :param parser: 排除规则
+    :param spec: 排除规则
     :return: 排除后的内容列表
     """
-
     rtsNew = rts.copy()
     for rtsItem in rts.keys():
-        if parser.match(path + rtsItem):
+        if spec.match_file(path + rtsItem):
             del rtsNew[rtsItem]
     return rtsNew
 
@@ -115,12 +114,12 @@ class AlistClient:
         """
         self.alistId = alistId
 
-    def fileListApi(self, path, speed=0, parser=None, rootPath=None):
+    def fileListApi(self, path, speed=0, spec=None, rootPath=None):
         """
         目录列表
         :param path: 目录
         :param speed: 速度，0-标准，1-快速，2-低速
-        :param parser: 排除项规则
+        :param spec: 排除项规则
         :return: {
             "test1-1/": {},  # key以/结尾表示目录
             "test1.txt": 4  # 不以/结尾，表示文件，存文件大小
@@ -140,10 +139,10 @@ class AlistClient:
             }
         else:
             rts = {}
-        if parser and rts:
+        if spec and rts:
             if rootPath is None:
                 rootPath = path
-            rts = checkExs('/' + path[len(rootPath):], rts, parser)
+            rts = checkExs(path[len(rootPath):], rts, spec)
         return rts
 
     def filePathList(self, path):
@@ -161,12 +160,12 @@ class AlistClient:
         else:
             return []
 
-    def allFileList(self, path, speed=0, parser=None, rootPath=None):
+    def allFileList(self, path, speed=0, spec=None, rootPath=None):
         """
         递归获取文件列表
         :param path: 根路径
         :param speed: 速度，0-标准，1-快速，2-低速
-        :param parser: 排除项规则
+        :param spec: 排除项规则
         :param rootPath: 同步根目录
         :return: {
             "test1-1/": {
@@ -180,10 +179,10 @@ class AlistClient:
         """
         if rootPath is None:
             rootPath = path
-        fList = self.fileListApi(path, speed, parser, rootPath)
+        fList = self.fileListApi(path, speed, spec, rootPath)
         for key in fList.keys():
             if key.endswith('/'):
-                fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, parser, rootPath)
+                fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, spec, rootPath)
         return fList
 
     def mkdir(self, path):

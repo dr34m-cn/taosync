@@ -4,7 +4,8 @@
 """
 import logging
 
-import igittigitt
+from pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from service.alist.alistService import getClientById
 
@@ -107,20 +108,18 @@ def sync(srcPath, dstPath, alistId, speed=0, method=0, copyHook=None, delHook=No
     :param job: 作业
     """
     jobExclude = job['exclude']
-    parser = None
+    spec = None
     if jobExclude is not None:
-        parser = igittigitt.IgnoreParser()
-        for exItem in jobExclude.split(':'):
-            parser.add_rule(exItem, '/')
+        spec = PathSpec.from_lines(GitWildMatchPattern, jobExclude.split(':'))
     client = getClientById(alistId)
     if not srcPath.endswith('/'):
         srcPath = srcPath + '/'
-    srcFiles = client.allFileList(srcPath, parser=parser)
+    srcFiles = client.allFileList(srcPath, spec=spec)
     dstPathList = dstPath.split(':')
     for dstItem in dstPathList:
         if not dstItem.endswith('/'):
             dstItem = dstItem + '/'
-        dstFiles = client.allFileList(dstItem, speed, parser=parser)
+        dstFiles = client.allFileList(dstItem, speed, spec=spec)
         needCopy = getSrcMore(srcFiles, dstFiles)
         if job is not None and job['enable'] == 0:
             return
