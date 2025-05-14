@@ -23,7 +23,7 @@ def checkExs(path, rts, spec):
     """
     rtsNew = rts.copy()
     for rtsItem in rts.keys():
-        if spec.match_file(path + rtsItem):
+        if spec.match_file(path + '/' + rtsItem):
             del rtsNew[rtsItem]
     return rtsNew
 
