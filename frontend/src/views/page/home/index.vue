@@ -193,7 +193,7 @@
 							</div>
 						</el-form-item>
 						<el-form-item prop="exclude" label="排除项语法">
-							<div class="label_width">类gitignore，不支持[非]与先后顺序<br />
+							<div class="label_width">类gitignore<br />
 								<span @click="toIgnore" class="to-link">
 									点击查看排除项简易教程
 								</span>
