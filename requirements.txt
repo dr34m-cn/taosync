@@ -1,5 +1,5 @@
-tornado==6.4.2
+tornado==6.5
 requests==2.32.3
-APScheduler==3.10.4
-configparser==7.1.0
+APScheduler==3.11.0
+configparser==7.2.0
 pathspec==0.12.1
