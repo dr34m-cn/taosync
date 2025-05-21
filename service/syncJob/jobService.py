@@ -8,7 +8,7 @@ from common.LNG import G
 from mapper import jobMapper
 from service.syncJob import jobClient
 
-# alist客户端列表，key为jobId,value为jobClient
+# 作业客户端列表，key为jobId,value为jobClient
 jobClientList = {}
 
 
