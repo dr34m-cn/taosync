@@ -145,8 +145,8 @@ def deleteJobTaskByRunTime(runTime):
 
 def addJobTaskItemMany(jobTaskItemList):
     sqlBase.execute_manny(
-        "insert into job_task_item (taskId, srcPath, dstPath, fileName, fileSize, type, alistTaskId, status, errMsg) "
-        "VALUES (:taskId, :srcPath, :dstPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg)",
+        "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, alistTaskId, status, errMsg) "
+        "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg)",
         jobTaskItemList)
 
 

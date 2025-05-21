@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 250416
+    cuVersion = 250520
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -65,6 +65,7 @@ def init_sql(conn):
                        "taskId integer,"            # 所属任务id，job_task.id
                        "srcPath text,"              # 来源路径
                        "dstPath text,"              # 目标路径
+                       "isPath integer DEFAULT 0,"  # 是否是目录
                        "fileName text,"             # 文件名
                        "fileSize integer,"          # 文件大小
                        "type integer,"              # 操作类型，0-复制，1-删除
@@ -125,6 +126,8 @@ def init_sql(conn):
                 cursor.execute("alter table job_task add column taskNum text")
             if sqlVersion < 250416:
                 cursor.execute("alter table job add column remark text")
+            if sqlVersion < 250520:
+                cursor.execute("alter table job_task_item add column isPath integer DEFAULT 0")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
     cursor.close()

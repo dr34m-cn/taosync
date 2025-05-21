@@ -17,14 +17,20 @@ from service.syncJob import taskService
 
 
 class JobTask:
-    def __init__(self, taskId, job):
+    def __init__(self, taskId, jobClient):
+        """
+        作业任务类
+        :param taskId: 任务id
+        :param jobClient: 作业类
+        """
         self.taskId = taskId
-        self.job = job
+        self.jobClient = jobClient
+        self.job = jobClient.job
         self.client = alistService.getClientById(self.job['alistId'])
         self.taskItemList = []
         self.sync()
 
-    def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None):
+    def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0):
         """
         复制文件回调
         :param srcPath: 来源目录
@@ -35,11 +41,13 @@ class JobTask:
         :param status: 0-等待中，1-运行中，2-成功，3-取消中，4-已取消，5-出错（将重试），6-失败中，
                         7-已失败，8-等待重试中，9-等待重试回调执行中
         :param errMsg: 错误信息
+        :param isPath: 是否是目录，0-文件，1-目录
         """
         self.taskItemList.append({
             'taskId': self.taskId,
             'srcPath': srcPath,
             'dstPath': dstPath,
+            'isPath': isPath,
             'fileName': name,
             'fileSize': size,
             'type': 0,
@@ -48,7 +56,7 @@ class JobTask:
             'errMsg': errMsg
         })
 
-    def delHook(self, dstPath, name, size, status=2, errMsg=None):
+    def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0):
         """
         删除文件回调
         :param dstPath: 目标目录
@@ -56,11 +64,13 @@ class JobTask:
         :param size: 文件大小
         :param status: 2-成功、7-失败
         :param errMsg: 错误信息
+        :param isPath: 是否是目录，0-文件，1-目录
         """
         self.taskItemList.append({
             'taskId': self.taskId,
             'srcPath': None,
             'dstPath': dstPath,
+            'isPath': isPath,
             'fileName': name,
             'fileSize': size,
             'type': 1,
@@ -159,6 +169,20 @@ class JobClient:
         self.scheduledJob = None
         self.jobDoing = False
         self.currentTaskId = None
+        # 正在执行中的作业信息；仅在内存中，不入库，高速读写；执行完毕后批量入库，如果遇到异常终止，不会补偿入库
+        # 单项结构 {
+        #   'taskId':   所属任务id
+        #   'alistTaskId': alist任务id
+        #   'srcPath':  来源路径
+        #   'dstPath':  目标路径
+        #   'fileName': 文件名或者文件目录名
+        #   'fileSize': 文件大小
+        #   'status':   状态 0-等待中，1-运行中，2-成功，3-取消中，4-已取消，5-出错（将重试），
+        #               6-失败中，7-已失败，8-等待重试中，9-等待重试回调执行中
+        #   'progress': 进度
+        #   'errMsg':   失败原因
+        # }
+        self.doingTask = []
         try:
             self.doByTime()
         except Exception as e:
@@ -186,7 +210,7 @@ class JobClient:
                 'runTime': int(time.time())
             })
             self.currentTaskId = taskId
-            JobTask(taskId, self.job)
+            JobTask(taskId, self)
         except Exception as e:
             logger = logging.getLogger()
             errMsg = G('do_job_err').format(str(e))
