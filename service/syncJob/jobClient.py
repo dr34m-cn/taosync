@@ -8,29 +8,140 @@ import threading
 import time
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from common.LNG import G
-from common.config import getConfig
 from mapper import jobMapper
-from service.alist import alistSync, alistService
+from service.alist import alistService
 from service.syncJob import taskService
 
 
+class CopyItem:
+    def __init__(self, srcPath, dstPath, fileName, fileSize, method, jobTask):
+        self.jobTask = jobTask
+        self.alistClient = self.jobTask.alistClient
+        self.taskId = self.jobTask.taskId
+        self.srcPath = srcPath
+        self.dstPath = dstPath
+        self.fileName = fileName
+        self.fileSize = fileSize
+        self.copyType = 0 if method < 2 else 2
+        self.alistTaskId = None
+        self.status = 0
+        self.progress = 0.0
+        self.errMsg = None
+        self.createTime = int(time.time())
+        self.doingKey = None
+
+    def doIt(self):
+        try:
+            self.alistTaskId = self.alistClient.copyFile(self.srcPath, self.dstPath, self.fileName)
+        except Exception as e:
+            self.errMsg = str(e)
+            self.status = 7
+        else:
+            if self.alistTaskId is None:
+                self.status = 2
+            else:
+                self.checkAndGetStatus()
+        self.endIt()
+
+    def checkAndGetStatus(self):
+        """
+        不断检查状态并更新
+        :return:
+        """
+        while True:
+            time.sleep(1)
+            try:
+                taskInfo = self.alistClient.taskInfo(self.alistTaskId)
+            except Exception as e:
+                logger = logging.getLogger()
+                logger.exception(e)
+                eMsg = str(e)
+                if '404' in eMsg:
+                    eMsg = (G('task_may_delete'))
+                taskInfo = {
+                    'state': 7,
+                    'progress': None,
+                    'error': eMsg
+                }
+            if taskInfo['state'] == self.status and taskInfo['progress'] == self.progress:
+                continue
+            self.status = taskInfo['state']
+            self.progress = taskInfo['progress']
+            self.errMsg = taskInfo['error'] if taskInfo['error'] else None
+            # 删除结束的任务
+            if taskInfo['state'] in [2, 4, 7]:
+                try:
+                    self.alistClient.copyTaskDelete(self.alistTaskId)
+                    break
+                except Exception:
+                    break
+
+    def endIt(self):
+        if self.copyType == 2 and self.status == 2:
+            try:
+                self.alistClient.deleteFile(self.srcPath, [self.fileName])
+            except Exception as e:
+                self.status = 7
+                self.errMsg = G('copy_success_but_delete_fail').format(str(e))
+        self.jobTask.copyHook(self.srcPath, self.dstPath, self.fileName, self.fileSize, self.alistTaskId, self.status,
+                              errMsg=self.errMsg, copyType=self.copyType, createTime=self.createTime)
+        del self.jobTask.doing[self.doingKey]
+
+
 class JobTask:
-    def __init__(self, taskId, jobClient):
+    def __init__(self, taskId, job):
         """
         作业任务类
         :param taskId: 任务id
-        :param jobClient: 作业类
+        :param job: 作业信息
         """
         self.taskId = taskId
-        self.jobClient = jobClient
-        self.job = jobClient.job
-        self.client = alistService.getClientById(self.job['alistId'])
-        self.taskItemList = []
-        self.sync()
+        self.job = job
+        self.alistClient = alistService.getClientById(self.job['alistId'])
+        # 已完成（包含成功或者失败）
+        self.finish = []
+        # 已经提交到alist的任务
+        self.doing = {}
+        # 等待提交到alist的任务
+        self.waiting = []
+        # 队列序号，用作复制任务的doingKey
+        self.queueNum = 0
+        # sync全部任务加入队列标识
+        self.endFlag = False
+        syncThread = threading.Thread(target=self.sync)
+        syncThread.start()
+        self.taskSubmit()
+        jobMapper.addJobTaskItemMany(self.finish)
+        self.updateTaskStatus()
 
-    def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0):
+    def taskSubmit(self):
+        """
+        队列检验与提交
+        :return:
+        """
+        while True:
+            doingNums = len(self.doing.keys())
+            waitingNums = len(self.waiting)
+            if not self.endFlag or doingNums != 0 or waitingNums != 0:
+                while doingNums < 10:
+                    if waitingNums == 0:
+                        break
+                    else:
+                        self.queueNum += 1
+                        self.doing[self.queueNum] = self.waiting.pop(0)
+                        self.doing[self.queueNum].doingKey = self.queueNum
+                        self.doing[self.queueNum].doIt()
+                        doingNums = len(self.doing.keys())
+                        waitingNums = len(self.waiting)
+            else:
+                break
+
+    def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0,
+                 copyType=0, createTime=int(time.time())):
         """
         复制文件回调
         :param srcPath: 来源目录
@@ -39,21 +150,24 @@ class JobTask:
         :param size: 文件大小
         :param alistTaskId: alist任务id
         :param status: 0-等待中，1-运行中，2-成功，3-取消中，4-已取消，5-出错（将重试），6-失败中，
-                        7-已失败，8-等待重试中，9-等待重试回调执行中
+                        7-已失败，8-等待重试中，9-等待重试回调执行中，10-目录扫描失败，11-目录创建失败
         :param errMsg: 错误信息
         :param isPath: 是否是目录，0-文件，1-目录
+        :param copyType: 0-复制，2-移动
+        :param createTime:
         """
-        self.taskItemList.append({
+        self.finish.append({
             'taskId': self.taskId,
             'srcPath': srcPath,
             'dstPath': dstPath,
             'isPath': isPath,
             'fileName': name,
             'fileSize': size,
-            'type': 0,
+            'type': copyType,
             'alistTaskId': alistTaskId,
             'status': status,
-            'errMsg': errMsg
+            'errMsg': errMsg,
+            'createTime': createTime
         })
 
     def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0):
@@ -66,7 +180,7 @@ class JobTask:
         :param errMsg: 错误信息
         :param isPath: 是否是目录，0-文件，1-目录
         """
-        self.taskItemList.append({
+        self.finish.append({
             'taskId': self.taskId,
             'srcPath': None,
             'dstPath': dstPath,
@@ -81,62 +195,164 @@ class JobTask:
 
     def sync(self):
         """
-        执行同步
+        同步方法
         """
-        alistSync.sync(self.job['srcPath'], self.job['dstPath'], self.job['alistId'],
-                       self.job['speed'], self.job['method'], self.copyHook, self.delHook, self.job)
-        jobMapper.addJobTaskItemMany(self.taskItemList)
-        self.updateItemStatus()
+        srcPath = self.job['srcPath']
+        jobExclude = self.job['exclude']
+        spec = None
+        if jobExclude is not None:
+            spec = PathSpec.from_lines(GitWildMatchPattern, jobExclude.split(':'))
+        if not srcPath.endswith('/'):
+            srcPath = srcPath + '/'
+        dstPathList = self.job['dstPath'].split(':')
+        i = 0
+        for dstItem in dstPathList:
+            i += 1
+            self.syncWithHave(srcPath, dstItem, spec, srcPath, dstItem, i == 1)
+        self.endFlag = True
 
-    def updateItemStatus(self):
+    def copyFile(self, srcPath, dstPath, fileName, fileSize):
         """
-        更新任务子项状态
+        复制文件
+        vm.job['speed']: 速度，0-标准，1-快速，2-低速
+        vm.job['method']: 0-仅新增，1-全同步，2-移动模式
+        vm.job['copyHook']: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0）
+        vm.job['delHook']: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0）
+        :param srcPath: 源目录
+        :param dstPath: 目标目录
+        :param fileName: 文件名
+        :param fileSize: 文件大小
+        :return:
         """
-        tmStart = time.time()
-        undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.taskId)
-        cfg = getConfig()
-        timeOut = cfg['server']['timeout']
-        while undoneTaskItem:
-            if self.job['enable'] == 0:
-                return
-            if time.time() - tmStart > timeOut * 3600:
-                taskService.updateJobTaskStatus(self.taskId, 5)
-                return
-            needUpdate = []
-            for item in undoneTaskItem[:]:
-                if self.job['enable'] == 0:
-                    return
-                try:
-                    taskInfo = self.client.taskInfo(item['alistTaskId'])
-                except Exception as e:
-                    logger = logging.getLogger()
-                    logger.exception(e)
-                    eMsg = str(e)
-                    if '404' in eMsg:
-                        eMsg = (G('task_may_delete'))
-                    taskInfo = {
-                        'state': 7,
-                        'progress': None,
-                        'error': eMsg
-                    }
-                if taskInfo['state'] == item['status'] and taskInfo['progress'] == item['progress']:
-                    continue
-                needUpdate.append({
-                    'id': item['id'],
-                    'status': taskInfo['state'],
-                    'progress': taskInfo['progress'],
-                    'errMsg': taskInfo['error'] if taskInfo['error'] is not None and taskInfo['error'] != '' else None
-                })
-                # 删除成功的记录
-                if taskInfo['state'] == 2:
-                    self.client.copyTaskDelete(item['alistTaskId'])
-                if taskInfo['state'] in [2, 4, 7]:
-                    undoneTaskItem.remove(item)
-            if needUpdate:
-                jobMapper.updateJobTaskItemStatusByIdMany(needUpdate)
-            if undoneTaskItem:
-                time.sleep(10)
-        self.updateTaskStatus()
+        if self.job is None or self.job['enable'] == 0:
+            return
+        copyItem = CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self)
+        self.waiting.append(copyItem)
+
+    def delFile(self, path, fileName, size):
+        """
+        删除文件（或目录）
+        vm.job['speed']: 速度，0-标准，1-快速，2-低速
+        vm.job['method']: 0-仅新增，1-全同步，2-移动模式
+        vm.job['copyHook']: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0）
+        vm.job['delHook']: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0）
+        :param path: 所在路径
+        :param fileName: 文件名（或目录名）
+        :param size: 大小（文件）或空对象（目录）
+        :return:
+        """
+        if self.job is None or self.job['enable'] == 0:
+            return
+        isPath = fileName.endswith('/')
+        status = 2
+        errMsg = None
+        try:
+            self.alistClient.deleteFile(path, fileName if not isPath else fileName[:-1])
+        except Exception as e:
+            status = 7
+            errMsg = str(e)
+        self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath)
+
+    def listDir(self, path, firstDst, spec, rootPath, isSrc=True):
+        """
+        列出目录
+        :param path:
+        :param firstDst:
+        :param spec:
+        :param rootPath:
+        :param isSrc:
+        :return:
+        """
+        speed = self.job['speed']
+        if isSrc:
+            speed = 1 if not firstDst else (0 if self.job['speed'] < 2 else 2)
+        try:
+            return self.alistClient.fileListApi(path, speed, spec, rootPath)
+        except Exception as e:
+            logger = logging.getLogger()
+            errMsg = G('scan_error').format(G('src' if isSrc else 'dst'), str(e))
+            logger.error(errMsg)
+            logger.exception(e)
+            self.copyHook(path if isSrc else None, None if isSrc else path, None, None, status=7, errMsg=errMsg,
+                          isPath=1)
+            raise e
+
+    def syncWithHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
+        """
+        扫描并同步-目标目录存在目录（意味着要继续扫描目标目录）
+        :param vm: 上级上下文，vm.taskItemList将包含所有任务，vm.job['enable']决定是否继续
+        :param srcPath: 来源路径，以/结尾
+        :param dstPath: 目标路径，以/结尾
+        :param spec: 排除项规则
+        :param srcRootPath: 来源目录根目录，以/结尾
+        :param dstRootPath: 目标目录根目录，以/结尾
+        :param firstDst: 是否是第一个目标目录（如果是，将完整扫描源目录，否则使用缓存扫描源目录）
+        :return:
+        """
+        if self.job is None or self.job['enable'] == 0:
+            return
+        try:
+            srcFiles = self.listDir(srcPath, firstDst, spec, srcRootPath)
+            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False)
+        except Exception:
+            # 已在listDir做出日志打印等操作，此处啥都不用做
+            return
+        for key in srcFiles.keys():
+            # 如果是文件
+            if not key.endswith('/'):
+                # 目标目录没有这个文件或文件大小不匹配(即需要同步)
+                if key not in dstFiles or dstFiles[key] != srcFiles[key]:
+                    self.copyFile(srcPath, dstPath, key, srcFiles[key])
+            # 如果是目录
+            else:
+                # 目标目录没有这个目录
+                if key not in dstFiles:
+                    self.syncWithOutHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath,
+                                         firstDst)
+                # 目标目录有这个目录，继续递归
+                else:
+                    self.syncWithHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath,
+                                      firstDst)
+        if self.job['method'] == 1:
+            for dstKey in dstFiles.keys():
+                if dstKey not in srcFiles:
+                    self.delFile(dstPath, dstKey, dstFiles[dstKey])
+
+    def syncWithOutHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
+        """
+        扫描并同步-目标目录为空
+        :param vm: 上级上下文，vm.taskItemList将包含所有任务，vm.job['enable']决定是否继续
+        :param srcPath: 来源路径，以/结尾
+        :param dstPath: 目标路径，以/结尾
+        :param spec:
+        :param srcRootPath:
+        :param dstRootPath:
+        :param firstDst:
+        :return:
+        """
+        if self.job is None or self.job['enable'] == 0:
+            return
+        status = 2
+        errMsg = None
+        try:
+            self.alistClient.mkdir(dstPath)
+        except Exception as e:
+            status = 7
+            errMsg = str(e)
+        # 目录回调
+        self.copyHook(srcPath, dstPath, None, None, status=status, errMsg=errMsg, isPath=1)
+        if status != 2:
+            return
+        try:
+            srcFiles = self.listDir(srcPath, firstDst, spec, srcRootPath)
+        except Exception:
+            # 已在listDir做出日志打印等操作，此处啥都不用做
+            return
+        for key in srcFiles.keys():
+            if key.endswith('/'):
+                self.syncWithOutHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath, firstDst)
+            else:
+                self.copyFile(srcPath, dstPath, key, srcFiles[key])
 
     def updateTaskStatus(self):
         """
@@ -168,7 +384,6 @@ class JobClient:
         self.scheduled = None
         self.scheduledJob = None
         self.jobDoing = False
-        self.currentTaskId = None
         # 正在执行中的作业信息；仅在内存中，不入库，高速读写；执行完毕后批量入库，如果遇到异常终止，不会补偿入库
         # 单项结构 {
         #   'taskId':   所属任务id
@@ -182,14 +397,14 @@ class JobClient:
         #   'progress': 进度
         #   'errMsg':   失败原因
         # }
-        self.doingTask = []
+        self.currentJobTask = None
         try:
             self.doByTime()
         except Exception as e:
             if isInit or addJobId != 0:
                 # 仅在初始化和新增任务时删除错误的任务
                 logger = logging.getLogger()
-                logger.error(f"任务启动过程中报错，将自动删除任务，任务为{json.dumps(self.job)}")
+                logger.error(G('del_job_course_error').format(json.dumps(self.job)))
                 jobMapper.deleteJob(self.jobId)
             raise e
 
@@ -209,8 +424,7 @@ class JobClient:
                 'jobId': self.jobId,
                 'runTime': int(time.time())
             })
-            self.currentTaskId = taskId
-            JobTask(taskId, self)
+            self.currentJobTask = JobTask(taskId, self.job)
         except Exception as e:
             logger = logging.getLogger()
             errMsg = G('do_job_err').format(str(e))
@@ -220,7 +434,7 @@ class JobClient:
             logger.exception(e)
         finally:
             self.jobDoing = False
-            self.currentTaskId = None
+            self.currentJobTask = None
 
     def doManual(self):
         """
@@ -272,11 +486,10 @@ class JobClient:
             self.job['enable'] = 1
             self.scheduledJob.resume()
 
-    def stopJob(self, remove=False, cancel=False):
+    def stopJob(self, remove=False):
         """
         停止作业（适用于修改enable）
         :param remove: 是否删除作业，否一般用于禁用作业
-        :param cancel: 是否取消进行中的任务
         :return:
         """
         self.job['enable'] = 0
@@ -298,41 +511,6 @@ class JobClient:
                     logger.warning(G('disable_fail').format(str(e)))
                     logger.exception(e)
         self.jobDoing = False
-        if self.currentTaskId is not None and cancel:
-            undoneTaskItem = jobMapper.getUndoneJobTaskItemList(self.currentTaskId)
-            cancelThread = threading.Thread(target=self.cancelUndoneJobTaskItem, args=(undoneTaskItem, remove))
-            cancelThread.start()
         if not remove:
             jobMapper.updateJobEnable(self.jobId, 0)
             jobMapper.updateJobTaskStatusByStatusAndJobId(self.jobId)
-
-    def cancelUndoneJobTaskItem(self, undoneTaskItem, remove=False):
-        """
-        取消未完成的作业任务子项
-        """
-        needUpdateList = []
-        client = alistService.getClientById(self.job['alistId'])
-        for item in undoneTaskItem:
-            try:
-                client.copyTaskCancel(item['alistTaskId'])
-                if not remove:
-                    needUpdateList.append({
-                        'id': item['id'],
-                        'status': 4,
-                        'progress': 0,
-                        'errMsg': None
-                    })
-            except Exception as e:
-                logger = logging.getLogger()
-                errMsg = G('cancel_fail').format(str(e))
-                logger.error(errMsg + f" job_task_item.id={item['id']}")
-                logger.exception(e)
-                if not remove:
-                    needUpdateList.append({
-                        'id': item['id'],
-                        'status': 7,
-                        'progress': 0,
-                        'errMsg': errMsg
-                    })
-        if needUpdateList:
-            jobMapper.updateJobTaskItemStatusByIdMany(needUpdateList)

@@ -68,7 +68,7 @@ def init_sql(conn):
                        "isPath integer DEFAULT 0,"  # 是否是目录
                        "fileName text,"             # 文件名
                        "fileSize integer,"          # 文件大小
-                       "type integer,"              # 操作类型，0-复制，1-删除
+                       "type integer,"              # 操作类型，0-复制，1-删除，2-移动
                        "alistTaskId text,"          # alist任务id，仅限复制任务，否则为空
                        "status integer DEFAULT 0,"  # 状态，0-等待中，1-运行中，2-成功，3-取消中，4-已取消，5-出错（将重试），6-失败中
                                                     # ，7-已失败，8-等待重试中，9-等待重试回调执行中
