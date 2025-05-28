@@ -299,11 +299,6 @@
 			<div style="color: #f56c6c;font-weight: bold;text-align: center;font-size: 20px;">
 				{{disableIsDel ? '此操作不可逆，将永久删除该作业' : '将禁用任务'}}，确认吗？
 			</div>
-			<div style="display: flex;margin-top: 24px; align-items: center;justify-content: center;">
-				<div style="margin-right: 6px;">是否取消执行中的任务（如有，不保证成功）</div>
-				<el-switch v-model="disableCu.cancel">
-				</el-switch>
-			</div>
 			<span slot="footer" class="dialog-footer">
 				<el-button @click="closeDisableShow">取 消</el-button>
 				<el-button type="primary" @click="submitDisable" :loading="editLoading">确 定</el-button>
@@ -382,8 +377,7 @@
 				disableIsDel: false,
 				disableCu: {
 					id: null,
-					pause: true,
-					cancel: false
+					pause: true
 				},
 				addRule: {
 					srcPath: [{
@@ -528,8 +522,7 @@
 				this.disableShow = false;
 				this.disableCu = {
 					id: null,
-					pause: true,
-					cancel: false
+					pause: true
 				};
 			},
 			addExclude() {
