@@ -34,6 +34,12 @@
 
 **如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
+## 移动模式问题提示
+
+目前v0.2.8【移动模式】存在问题，不支持跨盘移动，正在重做该功能，请勿在跨盘场景使用【移动模式】
+
+感谢[@Lyzd1](https://github.com/Lyzd1)同学在[#113](https://github.com/dr34m-cn/taosync/issues/113)对本问题的反馈
+
 <details>
 
 <summary>点击展开截图</summary>
