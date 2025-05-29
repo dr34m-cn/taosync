@@ -65,7 +65,7 @@ def init_sql(conn):
                        "taskId integer,"            # 所属任务id，job_task.id
                        "srcPath text,"              # 来源路径
                        "dstPath text,"              # 目标路径
-                       "isPath integer DEFAULT 0,"  # 是否是目录
+                       "isPath integer DEFAULT 0,"  # 是否是目录，0-文件，1-目录
                        "fileName text,"             # 文件名
                        "fileSize integer,"          # 文件大小
                        "type integer,"              # 操作类型，0-复制，1-删除，2-移动
