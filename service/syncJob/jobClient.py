@@ -2,10 +2,12 @@
 @Author：dr34m
 @Date  ：2024/7/11 12:14 
 """
+import itertools
 import json
 import logging
 import threading
 import time
+from collections import defaultdict
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from pathspec import PathSpec
@@ -53,7 +55,8 @@ class CopyItem:
         :return:
         """
         while True:
-            time.sleep(1)
+            cuTime = time.time()
+            time.sleep(0.19 if cuTime - self.jobTask.lastWatching < 2 else 1.9)
             try:
                 taskInfo = self.alistClient.taskInfo(self.alistTaskId)
             except Exception as e:
@@ -108,15 +111,75 @@ class JobTask:
         self.doing = {}
         # 等待提交到alist的任务
         self.waiting = []
+        # 上次查看详情的时间戳，低于2秒表示正在看，在看则快速检查状态，否则低速检查以节约开销
+        self.lastWatching = 0.0
         # 队列序号，用作复制任务的doingKey
         self.queueNum = 0
         # sync全部任务加入队列标识
-        self.endFlag = False
+        self.scanFinish = False
         syncThread = threading.Thread(target=self.sync)
         syncThread.start()
         self.taskSubmit()
         jobMapper.addJobTaskItemMany(self.finish)
         self.updateTaskStatus()
+
+    def getCurrent(self):
+        """
+        总结并返回详情（高实时性）
+        {
+            'srcPath': 来源目录,
+            'dstPath': 目标目录,
+            'fileName': 文件名,
+            'fileSize': 文件大小,
+            'status': 状态,
+            'type': 方式，0-复制（对于目录则是创建），1-删除，2-移动,
+            'progress': 进度,
+            'errMsg': 错误信息,
+            'createTime': 创建时间
+        }
+        :return: {
+            0: [],
+            1: [],
+            ...
+        }
+        """
+        self.lastWatching = time.time()
+        waits = [{
+            'srcPath': waitItem.srcPath,
+            'dstPath': waitItem.dstPath,
+            'isPath': 0,
+            'fileName': waitItem.fileName,
+            'fileSize': waitItem.fileSize,
+            'status': waitItem.status,
+            'type': waitItem.copyType,
+            'progress': waitItem.progress,
+            'errMsg': waitItem.errMsg,
+            'createTime': waitItem.createTime
+        } for waitItem in self.waiting]
+        dos = [{
+            'srcPath': doItem.srcPath,
+            'dstPath': doItem.dstPath,
+            'isPath': 0,
+            'fileName': doItem.fileName,
+            'fileSize': doItem.fileSize,
+            'status': doItem.status,
+            'type': doItem.copyType,
+            'progress': doItem.progress,
+            'errMsg': doItem.errMsg,
+            'createTime': doItem.createTime
+        } for doItem in self.doing.values()]
+        allTask = list(itertools.chain(waits, dos, self.doing))
+        rst = {i: [] for i in range(10)}
+        grouped = defaultdict(list)
+        for taskItem in allTask:
+            grouped[taskItem['status']].append(taskItem)
+        for status, tasks in grouped.items():
+            tasks.sort(key=lambda x: x['createTime'])
+            rst[status] = tasks
+        return {
+            'scanFinish': self.scanFinish,
+            'allTask': rst
+        }
 
     def taskSubmit(self):
         """
@@ -124,10 +187,11 @@ class JobTask:
         :return:
         """
         while True:
+            time.sleep(0.5)
             doingNums = len(self.doing.keys())
             waitingNums = len(self.waiting)
-            if not self.endFlag or doingNums != 0 or waitingNums != 0:
-                while doingNums < 10:
+            if not self.scanFinish or doingNums != 0 or waitingNums != 0:
+                while doingNums < 20:
                     if waitingNums == 0:
                         break
                     else:
@@ -209,7 +273,7 @@ class JobTask:
         for dstItem in dstPathList:
             i += 1
             self.syncWithHave(srcPath, dstItem, spec, srcPath, dstItem, i == 1)
-        self.endFlag = True
+        self.scanFinish = True
 
     def copyFile(self, srcPath, dstPath, fileName, fileSize):
         """

@@ -38,12 +38,14 @@ class Alist(BaseHandler):
 
 
 class Job(BaseHandler):
-    executor = ThreadPoolExecutor(1)
+    executor = ThreadPoolExecutor(4)
 
     @run_on_executor
     @handle_request
     def get(self, req):
         if 'id' in req:
+            if 'current' in req:
+                return jobService.getJobCurrent(req['id'])
             return taskService.getTaskList(req)
         elif 'taskId' in req:
             return taskService.getTaskItemList(req)

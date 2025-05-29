@@ -179,3 +179,16 @@ def getJobList(req):
     :return:
     """
     return jobMapper.getJobList(req)
+
+
+def getJobCurrent(jobId):
+    """
+    获取当前作业正在执行中的任务的详情
+    :param jobId:
+    :return:
+    """
+    client = getJobClientById(jobId)
+    taskClient = client.currentJobTask
+    if taskClient is not None:
+        return taskClient.getCurrent()
+    return None
