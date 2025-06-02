@@ -56,7 +56,7 @@ class CopyItem:
         """
         while True:
             cuTime = time.time()
-            time.sleep(0.19 if cuTime - self.jobTask.lastWatching < 2 else 1.9)
+            time.sleep(0.29 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
             try:
                 taskInfo = self.alistClient.taskInfo(self.alistTaskId)
             except Exception as e:
@@ -119,11 +119,12 @@ class JobTask:
         self.scanFinish = False
         syncThread = threading.Thread(target=self.sync)
         syncThread.start()
+        self.currentTasks = {}
         self.taskSubmit()
         jobMapper.addJobTaskItemMany(self.finish)
         self.updateTaskStatus()
 
-    def getCurrent(self):
+    def getCurrent(self, status):
         """
         总结并返回详情（高实时性）
         {
@@ -169,17 +170,42 @@ class JobTask:
             'createTime': doItem.createTime
         } for doItem in self.doing.values()]
         allTask = list(itertools.chain(waits, dos, self.doing))
-        rst = {i: [] for i in range(10)}
+        keyValSpace = {
+            'wait': 0,
+            'running': 1,
+            'success': 2,
+            'fail': 7,
+            'other': -1
+        }
+        currentTasks = {}
+        for val in keyValSpace.values():
+            currentTasks[val] = []
+        # 其他类型数组
+        otk = []
+        otkStatus = [3, 4, 5, 6, 8, 9]
         grouped = defaultdict(list)
         for taskItem in allTask:
             grouped[taskItem['status']].append(taskItem)
         for status, tasks in grouped.items():
             tasks.sort(key=lambda x: x['createTime'])
-            rst[status] = tasks
-        return {
+            if status in otkStatus:
+                otk.extend(tasks)
+            else:
+                currentTasks[status] = tasks
+        currentTasks[-1] = otk
+        self.currentTasks = currentTasks
+        result = {
             'scanFinish': self.scanFinish,
-            'allTask': rst
+            'doingTask': currentTasks[1]
         }
+        for key, val in keyValSpace.items():
+            result[key + 'Num'] = len(currentTasks[val])
+            result[key + 'Size'] = sum(
+                item['fileSize'] for item in currentTasks[val] if item['fileSize'] is not None and item['type'] != 1)
+        return result
+
+    def getCurrentByStatus(self, status):
+        return self.currentTasks[status]
 
     def taskSubmit(self):
         """

@@ -181,14 +181,18 @@ def getJobList(req):
     return jobMapper.getJobList(req)
 
 
-def getJobCurrent(jobId):
+def getJobCurrent(jobId, status=None):
     """
     获取当前作业正在执行中的任务的详情
     :param jobId:
+    :param status: 状态
     :return:
     """
     client = getJobClientById(jobId)
     taskClient = client.currentJobTask
     if taskClient is not None:
-        return taskClient.getCurrent()
+        if status is None:
+            return taskClient.getCurrent()
+        else:
+            taskClient.getCurrentByStatus(status)
     return None
