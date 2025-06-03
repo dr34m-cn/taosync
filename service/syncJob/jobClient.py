@@ -105,6 +105,7 @@ class JobTask:
         self.taskId = taskId
         self.job = job
         self.alistClient = alistService.getClientById(self.job['alistId'])
+        self.createTime = int(time.time())
         # 已完成（包含成功或者失败）
         self.finish = []
         # 已经提交到alist的任务
@@ -197,6 +198,7 @@ class JobTask:
         result = {
             'scanFinish': self.scanFinish,
             'doingTask': currentTasks[1],
+            'createTime': self.createTime,
             'num': {},
             'size': {}
         }
