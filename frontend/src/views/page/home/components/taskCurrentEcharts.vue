@@ -1,5 +1,5 @@
 <template>
-	<div class="dlEcharts" ref="dlEcharts"></div>
+	<div class="taskCurrentEcharts" ref="taskCurrentEcharts"></div>
 </template>
 
 <script>
@@ -7,7 +7,7 @@
 	export default {
 		name: 'DlEcharts',
 		props: {
-			dlData: {
+			taskCurrent: {
 				type: Array,
 				default: []
 			}
@@ -18,7 +18,7 @@
 			};
 		},
 		watch: {
-			dlData(newVal, oldVal) {
+			taskCurrent(newVal, oldVal) {
 				if (JSON.stringify(oldVal) != JSON.stringify(newVal)) {
 					this.$nextTick(() => {
 						this.initChart();
@@ -28,9 +28,7 @@
 		},
 		created() {
 			this.$nextTick(() => {
-				if (!this.chart) {
-					this.initChart();
-				}
+				this.initChart();
 			});
 		},
 		beforeDestroy() {
@@ -43,25 +41,30 @@
 					this.chart = null;
 				}
 			},
+			coventtypeToName(key) {
+				const keyVal = {
+					num: '数量',
+					size: '大小'
+				}
+				return keyVal[key];
+			},
+			coventStatusToName(key) {
+				const keyVal = {
+					wait: '等待中',
+					doing: '进行中',
+					success: '成功',
+					fail: '失败',
+					other: '其他'
+				}
+				return keyVal[key];
+			},
 			initChart() {
 				// 原始数据
 				const rawData = {
-					'数量': {
-						A: 10,
-						B: 20,
-						C: 30,
-						D: 40,
-						E: 50
-					},
-					'大小': {
-						A: 1000000,
-						B: 3000000,
-						C: 2000000,
-						D: 5000000,
-						E: 4000000
-					}
+					num: this.taskCurrent.num,
+					size: this.taskCurrent.size
 				};
-
+				const vm = this;
 				// 归一化数据
 				function normalize(data) {
 					const max = Math.max(...Object.values(data));
@@ -71,16 +74,15 @@
 				}
 
 				const normalizedData = {
-					'数量': normalize(rawData['数量']),
-					'大小': normalize(rawData['大小'])
+					num: normalize(rawData['num']),
+					size: normalize(rawData['size'])
 				};
-
-				const categories = ['数量', '大小'];
-				const types = ['A', 'B', 'C', 'D', 'E'];
+				const categories = ['num', 'size'];
+				const types = ['wait', 'doing', 'success', 'fail', 'other'];
 
 				// 构造 series
 				const series = types.map(type => ({
-					name: `类别${type}`,
+					name: `${type}`,
 					type: 'bar',
 					stack: 'total',
 					emphasis: {
@@ -89,16 +91,16 @@
 					label: {
 						show: true,
 						formatter: (params) => {
-							const category = params.name; // 数量 or 大小
-							const type = params.seriesName.replace('类别', '');
-							return rawData[category][type]; // 显示真实值
+							const category = params.name;
+							const type = params.seriesName;
+							return rawData[category][type];
 						}
 					},
 					data: categories.map(cat => normalizedData[cat][type])
 				}));
 
 				// ECharts 配置
-				option = {
+				const option = {
 					color: ['rgb(79, 89, 104)', 'rgb(64, 158, 255)', 'rgb(103, 194, 58)', 'rgb(245, 108, 108)',
 						'rgb(230, 162, 60)'
 					],
@@ -109,19 +111,22 @@
 						},
 						formatter: params => {
 							const category = params[0].name;
-							let result = `<b>${category}</b><br/>`;
+							let result = `<b>${vm.coventtypeToName(category)}</b><br/>`;
 							params.forEach(item => {
-								const trueVal = rawData[category][item.seriesName.replace('类别', '')];
-								result += `${item.marker}${item.seriesName}: ${trueVal}<br/>`;
+								const trueVal = rawData[category][item.seriesName];
+								result += `${item.marker}${vm.coventStatusToName(item.seriesName)}: ${trueVal}<br/>`;
 							});
 							return result;
 						}
 					},
-					legend: {},
+					legend: {
+						show: false,
+					},
 					grid: {
-						left: '5%',
-						right: '5%',
+						left: '2%',
+						right: '2%',
 						bottom: '3%',
+						top: '25%',
 						containLabel: true
 					},
 					xAxis: {
@@ -138,7 +143,7 @@
 					series
 				};
 				if (!this.chart) {
-					this.chart = echarts.init(this.$refs.dlEcharts, 'dark');
+					this.chart = echarts.init(this.$refs.taskCurrentEcharts, 'dark');
 				}
 				this.chart.setOption(option);
 			},
@@ -152,5 +157,5 @@
 </script>
 
 <style lang="scss" scoped>
-	.dlEcharts {}
+	.taskCurrentEcharts {}
 </style>
