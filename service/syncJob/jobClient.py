@@ -196,11 +196,13 @@ class JobTask:
         self.currentTasks = currentTasks
         result = {
             'scanFinish': self.scanFinish,
-            'doingTask': currentTasks[1]
+            'doingTask': currentTasks[1],
+            'num': {},
+            'size': {}
         }
         for key, val in keyValSpace.items():
-            result[key + 'Num'] = len(currentTasks[val])
-            result[key + 'Size'] = sum(
+            result['num'][key] = len(currentTasks[val])
+            result['size'][key] = sum(
                 item['fileSize'] for item in currentTasks[val] if item['fileSize'] is not None and item['type'] != 1)
         return result
 
