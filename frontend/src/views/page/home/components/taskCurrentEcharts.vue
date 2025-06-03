@@ -8,8 +8,8 @@
 		name: 'DlEcharts',
 		props: {
 			taskCurrent: {
-				type: Array,
-				default: []
+				type: Object,
+				default: {}
 			}
 		},
 		data() {
@@ -41,106 +41,65 @@
 					this.chart = null;
 				}
 			},
-			coventtypeToName(key) {
-				const keyVal = {
-					num: '数量',
-					size: '大小'
-				}
-				return keyVal[key];
-			},
-			coventStatusToName(key) {
-				const keyVal = {
-					wait: '等待中',
-					doing: '进行中',
-					success: '成功',
-					fail: '失败',
-					other: '其他'
-				}
-				return keyVal[key];
-			},
 			initChart() {
 				// 原始数据
 				const rawData = {
 					num: this.taskCurrent.num,
 					size: this.taskCurrent.size
 				};
-				const vm = this;
-				// 归一化数据
-				function normalize(data) {
-					const max = Math.max(...Object.values(data));
-					return Object.fromEntries(
-						Object.entries(data).map(([k, v]) => [k, v / max])
-					);
-				}
-
-				const normalizedData = {
-					num: normalize(rawData['num']),
-					size: normalize(rawData['size'])
+				const keyVal = {
+					wait: '等待中',
+					doing: '进行中',
+					success: '成功',
+					fail: '失败',
+					other: '其他'
 				};
-				const categories = ['num', 'size'];
-				const types = ['wait', 'doing', 'success', 'fail', 'other'];
-
-				// 构造 series
-				const series = types.map(type => ({
-					name: `${type}`,
-					type: 'bar',
-					stack: 'total',
-					emphasis: {
-						focus: 'series'
-					},
-					label: {
-						show: true,
-						formatter: (params) => {
-							const category = params.name;
-							const type = params.seriesName;
-							return rawData[category][type];
-						}
-					},
-					data: categories.map(cat => normalizedData[cat][type])
-				}));
-
+				let d0 = [];
+				Object.entries(keyVal).forEach(([key, val]) => {
+					d0.push({
+						name: val,
+						value: this.taskCurrent.num[key]
+					})
+				})
+				let d1 = [];
+				Object.entries(keyVal).forEach(([key, val]) => {
+					d1.push({
+						name: val,
+						value: this.taskCurrent.size[key]
+					})
+				})
 				// ECharts 配置
 				const option = {
 					color: ['rgb(79, 89, 104)', 'rgb(64, 158, 255)', 'rgb(103, 194, 58)', 'rgb(245, 108, 108)',
 						'rgb(230, 162, 60)'
 					],
 					tooltip: {
-						trigger: 'axis',
-						axisPointer: {
-							type: 'shadow'
-						},
-						formatter: params => {
-							const category = params[0].name;
-							let result = `<b>${vm.coventtypeToName(category)}</b><br/>`;
-							params.forEach(item => {
-								const trueVal = rawData[category][item.seriesName];
-								result += `${item.marker}${vm.coventStatusToName(item.seriesName)}: ${trueVal}<br/>`;
-							});
-							return result;
-						}
+						trigger: 'item'
 					},
 					legend: {
-						show: false,
+						top: '5%',
+						left: 'center'
 					},
-					grid: {
-						left: '2%',
-						right: '2%',
-						bottom: '3%',
-						top: '25%',
-						containLabel: true
-					},
-					xAxis: {
-						type: 'value',
-						show: false,
-						splitLine: {
-							show: false
-						}
-					},
-					yAxis: {
-						type: 'category',
-						data: categories
-					},
-					series
+					series: [{
+						name: '文件及目录数量',
+						type: 'pie',
+						radius: ['75%', '90%'],
+						center: ['50%', '80%'],
+						startAngle: 180,
+						endAngle: 360,
+						data: d0
+					}, {
+						name: '文件大小',
+						type: 'pie',
+						radius: [0, '65%'],
+						center: ['50%', '80%'],
+						startAngle: 180,
+						endAngle: 360,
+						label: {
+							position: 'inside'
+						},
+						data: d1
+					}]
 				};
 				if (!this.chart) {
 					this.chart = echarts.init(this.$refs.taskCurrentEcharts, 'dark');

@@ -4,11 +4,9 @@
 			{{loading ? '加载中' : '作业未在进行中'}}
 		</div>
 		<div class="current-box" v-else>
-			<div class="current-box-top">
-				<div class="current-center-box"></div>
-				<div class="current-task-box"></div>
-			</div>
 			<taskCurrentEcharts class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
+			<div class="current-center-box"></div>
+			<div class="current-task-box"></div>
 		</div>
 	</div>
 </template>
@@ -23,7 +21,7 @@
 		name: 'Task',
 		props: {
 			jobId: {
-				type: Number,
+				type: String,
 				default: null
 			}
 		},
@@ -89,16 +87,12 @@
 			height: calc(100% - 12px);
 			width: 100%;
 			box-sizing: border-box;
-			
-			.current-box-top {
-				height: 60%;
-				width: 100%;
-				box-sizing: border-box;
-			}
-			
+			display: flex;
+
 			.current-echart-box {
-				height: 40%;
-				width: 100%;
+				height: 100%;
+				width: 390px;
+				// min-weight: 420px;
 				box-sizing: border-box;
 			}
 		}

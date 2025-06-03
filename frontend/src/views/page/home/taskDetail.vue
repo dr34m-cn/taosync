@@ -9,12 +9,13 @@
 					<el-option :label="item" :value="index" v-for="(item, index) in taskItemStatusList"></el-option>
 				</el-select>
 				<el-select v-model="params.type" placeholder="筛选操作类型" @change="getTaskItemList" clearable style="width: 140px;">
-					<el-option label="复制" :value="0"></el-option>
+					<el-option label="复制/创建" :value="0"></el-option>
 					<el-option label="删除" :value="1"></el-option>
+					<el-option label="移动" :value="2"></el-option>
 				</el-select>
 			</div>
 			<div class="top-box-title">任务详情</div>
-			<menuRefresh :freshInterval="9973" :loading="loading" @getData="getTaskItemList"></menuRefresh>
+			<menuRefresh :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1" @getData="getTaskItemList"></menuRefresh>
 			<!-- <el-button :loading="loading" type="primary" icon="el-icon-refresh" circle @click="getTaskItemList"></el-button> -->
 		</div>
 		<el-table :data="taskItemData.dataList" class="table-data" height="calc(100% - 117px)" v-loading="loading"
@@ -22,7 +23,7 @@
 			<el-table-column type="expand">
 				<template slot-scope="props">
 					<div class="form-box">
-						<div class="form-box-item" v-if="props.row.type == 0">
+						<div class="form-box-item" v-if="props.row.type != 1">
 							<div class="form-box-item-label">
 								来源目录
 							</div>
@@ -49,7 +50,11 @@
 					</div>
 				</template>
 			</el-table-column>
-			<el-table-column prop="fileName" label="文件名"></el-table-column>
+			<el-table-column prop="fileName" label="文件名/目录">
+				<template slot-scope="scope">
+					{{scope.row.isPath ? scope.row.dstPath : scope.row.fileName}}
+				</template>
+			</el-table-column>
 			<el-table-column prop="fileSize" label="文件大小" width="120">
 				<template slot-scope="scope">
 					{{scope.row.fileSize | sizeFilter}}
@@ -58,7 +63,7 @@
 			<el-table-column prop="type" label="操作类型" width="90">
 				<template slot-scope="scope">
 					<div :class="`bg-status bg-${scope.row.type ? '3' : '8'}`" style="width: 50px;">
-						{{scope.row.type == 0 ? '复制' : '删除'}}
+						{{scope.row.type == 0 ? (scope.row.isPath ? '创建' : '复制') : (scope.row.type == 1 ? '删除' : '移动')}}
 					</div>
 				</template>
 			</el-table-column>

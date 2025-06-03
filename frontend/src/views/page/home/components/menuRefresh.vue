@@ -1,7 +1,7 @@
 <template>
 	<div class="menuRefresh">
 		&nbsp;
-		<div class="refreshLabel" v-show="needShow > 1">自动刷新</div>
+		<div class="refreshLabel" v-show="needShow > 1">{{refreshText}}</div>
 		<el-switch v-model="refreshStatus" v-show="needShow > 1" @change="refreshChange"></el-switch>
 		<i :class="`${loading ? 'el-icon-loading' : 'el-icon-refresh-right'} icon-btn`" @click="refreshData" v-show="needShow > 0"></i>
 	</div>
@@ -26,6 +26,10 @@
 			needShow: {
 				type: Number,
 				default: 2 // 0-不显示，1-只显示刷新按钮，2-显示全部
+			},
+			refreshText: {
+				type: String,
+				default: '自动刷新'
 			}
 		},
 		data() {
