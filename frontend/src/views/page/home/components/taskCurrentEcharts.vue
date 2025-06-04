@@ -14,7 +14,8 @@
 		},
 		data() {
 			return {
-				chart: null
+				chart: null,
+				observer: null
 			};
 		},
 		watch: {
@@ -29,17 +30,30 @@
 		created() {
 			this.$nextTick(() => {
 				this.initChart();
+				this.initResizeObserver();
 			});
 		},
 		beforeDestroy() {
-			this.destroyChart();
+			this.destroy();
 		},
 		methods: {
-			destroyChart() {
+			destroy() {
 				if (this.chart) {
 					this.chart.dispose();
 					this.chart = null;
 				}
+				if (this.observer) {
+					this.observer.disconnect();
+				}
+			},
+			initResizeObserver() {
+				const element = this.$refs.taskCurrentEcharts;
+				this.observer = new ResizeObserver(entries => {
+					for (const entry of entries) {
+						this.resize();
+					}
+				});
+				this.observer.observe(element);
 			},
 			initChart() {
 				// 原始数据
@@ -84,7 +98,7 @@
 						name: '文件及目录数量',
 						type: 'pie',
 						radius: ['75%', '90%'],
-						center: ['50%', '80%'],
+						center: ['50%', '86%'],
 						startAngle: 180,
 						endAngle: 360,
 						data: d0
@@ -92,7 +106,7 @@
 						name: '文件大小',
 						type: 'pie',
 						radius: [0, '65%'],
-						center: ['50%', '80%'],
+						center: ['50%', '86%'],
 						startAngle: 180,
 						endAngle: 360,
 						label: {
