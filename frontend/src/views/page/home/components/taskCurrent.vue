@@ -6,8 +6,8 @@
 		<div class="current-box" v-else>
 			<div class="current-box-top">
 				<div>当前状态：扫描{{current.scanFinish ? '完成，' : ''}}同步中</div>
-				<div>平均同步速度(估算)：{{calcSpeedAvg() | sizeFilter}}/s</div>
-				<div>持续时间：{{formatSeconds(current.duration)}}</div>
+				<div>平均同步速度(估算)：{{speedAvg | sizeFilter}}/s</div>
+				<div>持续时间：{{durationText}}</div>
 				<div>开始时间：{{current.createTime | timeStampFilter}}</div>
 			</div>
 			<div class="current-box-bottom">
@@ -22,11 +22,11 @@
 							成功</div>
 						<div @click="changeTaskCu(7)" :class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
 							失败</div>
-						<div @click="changeTaskCu(-1)"
-							:class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(-1)" :class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
 							其他
 						</div>
 					</div>
+					<div class="current-box-task-right"></div>
 				</div>
 			</div>
 		</div>
@@ -54,6 +54,8 @@
 		data() {
 			return {
 				loading: false,
+				loadingTask: false,
+				timer: null,
 				cuTaskSelect: 1, // 0 1 2 7 -1
 				cuTaskList: [],
 				current: {
@@ -74,6 +76,8 @@
 					},
 					'createTime': 1749042892,
 					'duration': 661,
+					'durationText': '1天',
+					'speedAvg': 86400,
 					'doingTask': [{
 						'srcPath': '/A/',
 						'dstPath': '/B/',
@@ -90,23 +94,87 @@
 			};
 		},
 		created() {
-			this.getCurrent();
+			// this.startRefresh();
 		},
-		beforeDestroy() {},
+		beforeDestroy() {
+			this.endRefresh();
+		},
 		methods: {
-			getCurrent() {
-
+			startRefresh() {
+				this.timer = setInterval(() => {
+					this.getCurrent();
+				}, 290);
 			},
-			calcSpeedAvg() {
-				let doingSize = this.current.doingTask.reduce((sum, obj) => {
+			endRefresh() {
+				if (this.timer) {
+					clearInterval(this.timer);
+				}
+			},
+			getCurrent() {
+				if (this.loading) {
+					return
+				}
+				this.loading = true;
+				jobGetTaskCurrent({
+					id: this.jobId
+				}).then(res => {
+					this.dealWithCurrent(res.data);
+				}).catch(err => {
+					this.loading = false;
+				})
+			},
+			dealWithCurrent(current) {
+				if (current === null) {
+					if (this.current !== null) {
+						this.hide();
+					}
+					setTimeout(() => {
+						this.loading = false;
+					}, 9973);
+				} else {
+					if (this.current === null) {
+						this.show();
+					}
+					current.durationText = this.formatSeconds(current.duration);
+					current.speedAvg = this.calcSpeedAvg(current);
+					if (this.cuTaskSelect === 1) {
+						this.cuTaskList = current.doingTask;
+					}
+					this.current = current;
+					this.loading = false;
+					this.getTaskList();
+				}
+			},
+			getTaskList() {
+				if (this.current === null || this.loadingTask || this.cuTaskSelect === 1) {
+					return
+				}
+				this.loadingTask = true;
+				jobGetTaskCurrent({
+					id: this.jobId,
+					status: this.cuTaskSelect
+				}).then(res => {
+					this.cuTaskList = res.data;
+					this.loadingTask = false;
+				}).catch(err => {
+					this.loadingTask = false;
+				})
+			},
+			calcSpeedAvg(current) {
+				let doingSize = current.doingTask.reduce((sum, obj) => {
 					return sum + (sum, obj.fileSize * obj.progress);
 				}, 0);
-				return (this.current.size.success + doingSize) / this.current.duration;
+				return (current.size.success + doingSize) / current.duration;
 			},
 			changeTaskCu(status) {
+				if (this.cuTaskSelect === status) {
+					return
+				}
 				this.cuTaskSelect = status;
 				if (status == 1) {
 					this.cuTaskList = this.current.doingTask;
+				} else {
+					this.cuTaskList = [];
 				}
 			},
 			formatSeconds(seconds) {
@@ -181,13 +249,15 @@
 
 				.current-box-task {
 					width: 60%;
+					height: 100%;
 					box-sizing: border-box;
 					padding: 8px 12px;
 					display: flex;
 
 					.current-box-task-left {
 						width: 60px;
-						.task-left-item {
+
+						height: 100% .task-left-item {
 							cursor: pointer;
 							width: 60px;
 							margin: 14px 0;
@@ -196,12 +266,17 @@
 							text-align: right;
 							box-sizing: border-box;
 						}
-						
+
 						.is-current {
 							color: #409eff;
 							border-right: 3px solid #409eff;
 							background-color: rgba(64, 158, 255, 0.4);
 						}
+					}
+
+					.current-box-task-right {
+						width: calc(100% - 60px);
+						height: 100%
 					}
 				}
 			}
