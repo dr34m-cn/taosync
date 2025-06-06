@@ -112,7 +112,7 @@ class JobTask:
         self.doing = {}
         # 等待提交到alist的任务
         self.waiting = []
-        # 上次查看详情的时间戳，低于2秒表示正在看，在看则快速检查状态，否则低速检查以节约开销
+        # 上次查看详情的时间戳，低于3秒表示正在看，在看则快速检查状态，否则低速检查以节约开销
         self.lastWatching = 0.0
         # 队列序号，用作复制任务的doingKey
         self.queueNum = 0
