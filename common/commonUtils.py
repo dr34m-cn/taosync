@@ -15,6 +15,29 @@ def generatePasswd(length=8):
     return ''.join(random.choices(characters, k=length))
 
 
+def convertSeconds(seconds):
+    hours = int(seconds // 3600)
+    remaining_seconds = seconds % 3600
+    minutes = int(remaining_seconds // 60)
+    seconds = int(remaining_seconds % 60)
+    return hours, minutes, seconds
+
+def convertBytes(val):
+    """
+    把字节转为易读
+    :param val:
+    :return:
+    """
+    unitList = ['B', 'KB', 'MB', 'GB', 'TB']
+    i = 0
+    while i < len(unitList):
+        i = i + 1
+        if val < 1024 ** (i + 1):
+            return f"{val / (1024 ** i):.2f} {unitList[i]}"
+    # 如果超出最大单位，显示为最大单位
+    return f"{val / (1024 ** (i - 1)):.2f} {unitList[i - 1]}"
+
+
 def passwd2md5(passwd):
     """
     密码加密（不可解密）

@@ -461,9 +461,10 @@ class JobTask:
         """
         所有任务完成后，最终更新任务状态
         """
-        unSuccessTaskItem = jobMapper.getUnSuccessJobTaskItemList(self.taskId)
-        status = 2 if not unSuccessTaskItem else 3
-        taskService.updateJobTaskStatus(self.taskId, status)
+        self.getCurrent()
+        failOrOtherNum = len(self.currentTasks[7]) + len(self.currentTasks[-1])
+        status = 2 if failOrOtherNum == 0 else 3
+        taskService.updateJobTaskStatus(self.taskId, status, taskList=self.currentTasks, createTime=self.createTime)
 
 
 class JobClient:

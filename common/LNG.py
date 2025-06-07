@@ -53,6 +53,8 @@ allLng = {
         'task_status': ['等待中', '进行中', '成功', '完成（部分失败）', '因重启而中止', '超时', '失败', '无需同步'],
         'task_end_msg_title': '{} - TaoSync',
         'task_end_msg_content': '来源目录为 {} 、目标目录为 {} 的作业执行结束。\n\n共 {} 个需要同步的文件，成功 {} 个，失败 {} 个。',
+        'task_end_msg_content_ext': '\n\n本次同步共耗时：{}，成功同步 {} 文件。',
+        'hms': '{} 小时 {} 分 {} 秒',
         'task_end_msg_error': '失败原因为：{}',
         'notify_error': '发送通知过程中失败，原因为：{}',
         'notify_test_msg': '这是一条由您自己发送的TaoSync测试消息，当你看到这条消息，说明你的配置是正确可用的。'
@@ -106,6 +108,8 @@ allLng = {
         'task_end_msg_title': '{} - TaoSync',
         'task_end_msg_content': 'The job with source directory {} and target directory {} has completed execution.\n\n'
                                 'There are {} files that need to be synchronized, {} of them succeeded and {} failed.',
+        'task_end_msg_content_ext': '\n\nThis synchronization took a total of {} and successfully synchronized {} of files.',
+        'hms': '{} hours {} minutes {} seconds',
         'task_end_msg_error': 'Failed due to {}',
         'notify_error': 'Failed to send notification due to: {}',
         'notify_test_msg': 'This is a TaoSync test message sent by yourself. '
