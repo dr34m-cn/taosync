@@ -8,7 +8,7 @@ from common.LNG import G
 from mapper.alistMapper import getAlistById, addAlist, removeAlist, getAlistList, updateAlist
 from service.alist.alistClient import AlistClient
 
-# alist客户端列表，key为aId-{alistId},value为AlistClient
+# alist客户端列表，key为alistId,value为AlistClient
 alistClientList = {}
 
 
@@ -29,14 +29,11 @@ def getClientById(alistId):
     :param alistId:
     :return:
     """
-    key = f'aId-{alistId}'
     global alistClientList
-    if key in alistClientList:
-        return alistClientList[key]
-    alist = getAlistById(alistId)
-    client = AlistClient(alist['url'], alist['token'], alistId)
-    alistClientList[key] = client
-    return client
+    if alistId not in alistClientList:
+        alist = getAlistById(alistId)
+        alistClientList[alistId] = AlistClient(alist['url'], alist['token'], alistId)
+    return alistClientList[alistId]
 
 
 def updateClient(alist):
@@ -68,7 +65,7 @@ def updateClient(alist):
             # 令牌必填，防止通过修改地址为钓鱼地址的方式窃取令牌
             raise Exception(G('without_token'))
         client = AlistClient(alist['url'], alist['token'], alistId)
-        alistClientList[f'aId-{alistId}'] = client
+        alistClientList[alistId] = client
     updateAlist(alist)
 
 
@@ -100,8 +97,7 @@ def addClient(alist):
         raise Exception(e)
     else:
         global alistClientList
-        key = f'aId-{alistId}'
-        alistClientList[key] = client
+        alistClientList[alistId] = client
 
 
 def removeClient(alistId):
@@ -109,10 +105,9 @@ def removeClient(alistId):
     删除客户端
     :param alistId:
     """
-    key = f'aId-{alistId}'
     global alistClientList
-    if key in alistClientList:
-        del alistClientList[key]
+    if alistId in alistClientList:
+        del alistClientList[alistId]
     removeAlist(alistId)
 
 

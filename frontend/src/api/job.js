@@ -112,6 +112,21 @@ export function jobDelete(data) {
 	})
 }
 
+// 正在执行的任务详情
+export function jobGetTaskCurrent(data) {
+	return request({
+		url: '/job',
+		headers: {
+			isMask: false
+		},
+		method: 'get',
+		params: {
+			...data,
+			current: 1
+		}
+	})
+}
+
 // 任务列表
 export function jobGetTask(params) {
 	return request({

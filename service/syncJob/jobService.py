@@ -136,15 +136,14 @@ def doJobManual(jobId):
     client.doManual()
 
 
-def removeJobClient(jobId, cancel=False):
+def removeJobClient(jobId):
     """
     删除作业
     :param jobId:
-    :param cancel: 是否取消进行中的任务
     :return:
     """
     client = getJobClientById(jobId)
-    client.stopJob(remove=True, cancel=cancel)
+    client.stopJob(remove=True)
     jobMapper.deleteJob(jobId)
     global jobClientList
     del jobClientList[jobId]
@@ -159,16 +158,15 @@ def continueJob(jobId):
     client.resumeJob()
 
 
-def pauseJob(jobId, cancel=False):
+def pauseJob(jobId):
     """
     禁用作业
     :param jobId:
-    :param cancel: 是否取消进行中的任务
     """
     client = getJobClientById(jobId)
     if client.job['isCron'] == 2:
         raise Exception(G('cannot_disable_manual_job'))
-    client.stopJob(cancel=cancel)
+    client.stopJob()
 
 
 def getJobList(req):
@@ -181,3 +179,20 @@ def getJobList(req):
     :return:
     """
     return jobMapper.getJobList(req)
+
+
+def getJobCurrent(jobId, status=None):
+    """
+    获取当前作业正在执行中的任务的详情
+    :param jobId:
+    :param status: 状态
+    :return:
+    """
+    client = getJobClientById(int(jobId))
+    taskClient = client.currentJobTask
+    if taskClient is not None:
+        if status is None:
+            return taskClient.getCurrent()
+        else:
+            return taskClient.getCurrentByStatus(int(status))
+    return None

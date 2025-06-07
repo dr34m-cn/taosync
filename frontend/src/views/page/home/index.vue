@@ -2,7 +2,8 @@
 	<div class="home">
 		<div class="top-box">
 			<div class="top-box-left">
-				<el-button type="success" icon="el-icon-plus" @click="addShow">新建作业</el-button>
+				<el-button type="success" icon="el-icon-plus" @click="addShow"
+					style="margin-right: 58px;" size="small">新建作业</el-button>
 				<el-button @click="runAllJob" v-if="jobData.dataList.length > 1" icon="el-icon-caret-right"
 					:loading="btnLoading" type="primary">执行全部</el-button>
 			</div>
@@ -83,14 +84,14 @@
 							</div>
 							<div class="form-box-item-value">
 								<template v-if="props.row.isCron != 2">
-									<el-button type="warning" :loading="btnLoading" size="small" v-if="props.row.enable"
+									<el-button type="warning" :loading="btnLoading" size="mini" v-if="props.row.enable"
 										@click="disableJobShow(props.row, false)">禁用</el-button>
-									<el-button type="success" :loading="btnLoading" size="small" v-else
+									<el-button type="success" :loading="btnLoading" size="mini" v-else
 										@click="putJob(props.row, false)">启用</el-button>
 								</template>
-								<el-button type="danger" :loading="btnLoading" size="small"
+								<el-button type="danger" :loading="btnLoading" size="mini"
 									@click="disableJobShow(props.row, true)">删除</el-button>
-								<el-button type="primary" :loading="btnLoading" size="small"
+								<el-button type="primary" :loading="btnLoading" size="mini"
 									@click="editJobShow(props.row)">编辑</el-button>
 								<!-- <el-button type="success" :loading="btnLoading" size="small" @click="putJob(props.row)">手动执行</el-button> -->
 							</div>
@@ -127,9 +128,9 @@
 			<el-table-column label="操作" align="center" width="200">
 				<template slot-scope="scope">
 					<el-button icon="el-icon-caret-right" type="primary" @click="putJob(scope.row)"
-						:loading="btnLoading" size="small">手动执行</el-button>
+						:loading="btnLoading" size="mini">手动执行</el-button>
 					<el-button icon="el-icon-view" type="success" @click="detail(scope.row.id)" :loading="btnLoading"
-						size="small">详情</el-button>
+						size="mini">详情</el-button>
 				</template>
 			</el-table-column>
 		</el-table>
@@ -299,11 +300,6 @@
 			<div style="color: #f56c6c;font-weight: bold;text-align: center;font-size: 20px;">
 				{{disableIsDel ? '此操作不可逆，将永久删除该作业' : '将禁用任务'}}，确认吗？
 			</div>
-			<div style="display: flex;margin-top: 24px; align-items: center;justify-content: center;">
-				<div style="margin-right: 6px;">是否取消执行中的任务（如有，不保证成功）</div>
-				<el-switch v-model="disableCu.cancel">
-				</el-switch>
-			</div>
 			<span slot="footer" class="dialog-footer">
 				<el-button @click="closeDisableShow">取 消</el-button>
 				<el-button type="primary" @click="submitDisable" :loading="editLoading">确 定</el-button>
@@ -382,8 +378,7 @@
 				disableIsDel: false,
 				disableCu: {
 					id: null,
-					pause: true,
-					cancel: false
+					pause: true
 				},
 				addRule: {
 					srcPath: [{
@@ -528,8 +523,7 @@
 				this.disableShow = false;
 				this.disableCu = {
 					id: null,
-					pause: true,
-					cancel: false
+					pause: true
 				};
 			},
 			addExclude() {
@@ -677,7 +671,8 @@
 			flex-shrink: 0;
 
 			.pathBox {
-				padding: 4px 10px;
+				font-size: 14px;
+				padding: 2px 6px;
 				margin: 2px 0;
 				margin-right: 6px;
 				border-radius: 3px;
@@ -730,7 +725,7 @@
 			cursor: pointer;
 		}
 	}
-	
+
 	.label_width_2 {
 		width: 600px;
 	}
