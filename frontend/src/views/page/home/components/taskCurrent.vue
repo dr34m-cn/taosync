@@ -5,10 +5,23 @@
 		</div>
 		<div class="current-box" v-else>
 			<div class="current-box-top">
-				<div>当前状态：扫描{{current.scanFinish ? '完成，' : ''}}同步中</div>
-				<div>平均同步速度(估算)：{{current.speedAvg | sizeFilter}}/s</div>
-				<div>持续时间：{{current.durationText}}</div>
-				<div>开始时间：{{current.createTime | timeStampFilter}}</div>
+				<div class="top-line">
+					<div style="display: flex;align-items: center;">
+						整体进度：
+						<el-progress :stroke-width="20" :text-inside="true" style="width: 160px;"
+							color="rgba(64, 158, 255, .8)" text-color="#fff" define-back-color="rgba(64, 158, 255, .3)"
+							:percentage="Number(current.allProgress.toFixed(4))"></el-progress>
+					</div>
+					<div>当前状态：扫描{{current.scanFinish ? '完成，' : '并'}}同步中</div>
+					<div>平均速度：{{current.speedAvg | sizeFilter}}/s</div>
+					<div>瞬时速度：{{current.speed | sizeFilter}}/s</div>
+				</div>
+				<div class="top-line">
+					<div>持续时间：{{current.durationText}}</div>
+					<div>预计还要：{{current.remainTimeText}}</div>
+					<div>开始时间：{{current.createTime | timeStampFilter}}</div>
+					<div>预计完成：{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</div>
+				</div>
 			</div>
 			<div class="current-box-bottom">
 				<taskCurrentEcharts class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
@@ -153,11 +166,14 @@
 						this.show();
 					}
 					current.durationText = this.formatSeconds(current.duration);
-					current.speedAvg = this.calcSpeedAvg(current);
+					let calcs = this.calcSpeedAndSize(current);
 					if (this.cuTaskSelect === 1) {
 						this.cuTaskList = current.doingTask;
 					}
-					this.current = current;
+					this.current = {
+						...current,
+						...calcs
+					};
 					this.loading = false;
 					this.getTaskList();
 				}
@@ -179,11 +195,31 @@
 					}, 9973);
 				})
 			},
-			calcSpeedAvg(current) {
+			calcSpeedAndSize(current) {
 				let doingSize = current.doingTask.reduce((sum, obj) => {
 					return sum + obj.fileSize * obj.progress / 100.0;
 				}, 0);
-				return (current.size.success + doingSize) / current.duration;
+				// 执行中-未完成的文件大小
+				let remainSize = current.size.running - doingSize + current.size.wait;
+				let doneSize = current.size.success + doingSize;
+				let speed = 0;
+				if (this.current !== null) {
+					speed = this.current.speed;
+					if (current.duration - this.current.duration != 0 && doneSize - this.current.doneSize != 0) {
+						speed = (doneSize - this.current.doneSize) / (current.duration - this.current.duration);
+					}
+				}
+				let speedAvg = (doneSize) / current.duration;
+				let remainTime = parseInt(remainSize / speedAvg);
+				return {
+					remainSize,
+					doneSize,
+					speedAvg,
+					speed,
+					remainTime,
+					remainTimeText: this.formatSeconds(remainTime),
+					allProgress: doneSize / (doneSize + remainSize) * 100
+				}
 			},
 			changeTaskCu(status) {
 				if (this.cuTaskSelect === status) {
@@ -226,7 +262,7 @@
 				return nonZeroUnits.map(unit => `${unit.value}${unit.unit}`).join(' ');
 			},
 			show() {
-				this.$emit('currentChange', 300);
+				this.$emit('currentChange', 443);
 			},
 			hide() {
 				this.$emit('currentChange', 0);
@@ -240,24 +276,33 @@
 		.current-box {
 			background-color: #100c2a;
 			height: calc(100% - 12px);
-			padding: 8px 10px;
+			padding: 2px 10px;
 			width: 100%;
 			box-sizing: border-box;
+			overflow-x: auto;
 
 			.current-box-top {
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				padding: 6px 0;
+				min-width: 1100px;
+				box-sizing: border-box;
+				height: 56px;
+				padding: 3px 0;
 				border-bottom: 1px dotted #fff;
 
-				div {
-					width: 268px;
+				.top-line {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+
+					div {
+						width: 268px;
+					}
 				}
 			}
 
 			.current-box-bottom {
-				height: calc(100% - 36px);
+				min-width: 1100px;
+				box-sizing: border-box;
+				height: calc(100% - 66px);
 				width: 100%;
 				display: flex;
 
@@ -299,7 +344,7 @@
 
 					.current-box-task-right {
 						margin-left: 8px;
-						width: calc(100% - 50px);
+						width: calc(100% - 68px);
 						height: 100%
 					}
 				}

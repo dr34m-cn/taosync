@@ -116,13 +116,6 @@
 
 <style lang="scss" scoped>
 	.taskDetailTable {
-		:deep(.el-progress-bar__outer) {
-			border-radius: 4px;
-			
-			.el-progress-bar__inner {
-				border-radius: 4px;
-			}
-		}
 		.page {
 			margin-top: 8px;
 			display: flex;

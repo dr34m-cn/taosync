@@ -2,9 +2,8 @@
 	<div class="home">
 		<div class="top-box">
 			<div class="top-box-left">
-				<el-button type="success" icon="el-icon-plus" @click="addShow"
-					style="margin-right: 58px;" size="small">新建作业</el-button>
-				<el-button @click="runAllJob" v-if="jobData.dataList.length > 1" icon="el-icon-caret-right"
+				<el-button type="success" icon="el-icon-plus" @click="addShow" size="small">新建作业</el-button>
+				<el-button @click="runAllJob" size="small" v-if="jobData.dataList.length > 1" icon="el-icon-caret-right"
 					:loading="btnLoading" type="primary">执行全部</el-button>
 			</div>
 			<div class="top-box-title">作业管理</div>

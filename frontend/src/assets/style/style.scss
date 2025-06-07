@@ -325,6 +325,14 @@
 	}
 }
 
+.el-progress-bar__outer {
+	border-radius: 4px;
+	
+	.el-progress-bar__inner {
+		border-radius: 4px;
+	}
+}
+
 .el-collapse {
 	border-top: #001529;
 // #292b3c
