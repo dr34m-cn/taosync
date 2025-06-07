@@ -36,6 +36,10 @@ class CopyItem:
         self.createTime = int(time.time())
         self.doingKey = None
 
+    def doByThread(self):
+        doThread = threading.Thread(target=self.doIt)
+        doThread.start()
+
     def doIt(self):
         try:
             self.alistTaskId = self.alistClient.copyFile(self.srcPath, self.dstPath, self.fileName)
@@ -229,7 +233,7 @@ class JobTask:
                         self.queueNum += 1
                         self.doing[self.queueNum] = self.waiting.pop(0)
                         self.doing[self.queueNum].doingKey = self.queueNum
-                        self.doing[self.queueNum].doIt()
+                        self.doing[self.queueNum].doByThread()
                         doingNums = len(self.doing.keys())
                         waitingNums = len(self.waiting)
             else:
