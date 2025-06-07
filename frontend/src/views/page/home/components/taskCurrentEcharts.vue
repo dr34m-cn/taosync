@@ -4,6 +4,9 @@
 
 <script>
 	import * as echarts from "echarts";
+	import {
+		parseSize
+	} from "@/utils/utils";
 	export default {
 		name: 'DlEcharts',
 		props: {
@@ -63,7 +66,7 @@
 				};
 				const keyVal = {
 					wait: '等待中',
-					doing: '进行中',
+					running: '进行中',
 					success: '成功',
 					fail: '失败',
 					other: '其他'
@@ -111,6 +114,9 @@
 						endAngle: 360,
 						label: {
 							position: 'inside'
+						},
+						tooltip: {
+							valueFormatter: (value) => parseSize(value)
 						},
 						data: d1
 					}]

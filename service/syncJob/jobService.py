@@ -188,11 +188,11 @@ def getJobCurrent(jobId, status=None):
     :param status: 状态
     :return:
     """
-    client = getJobClientById(jobId)
+    client = getJobClientById(int(jobId))
     taskClient = client.currentJobTask
     if taskClient is not None:
         if status is None:
             return taskClient.getCurrent()
         else:
-            taskClient.getCurrentByStatus(status)
+            return taskClient.getCurrentByStatus(int(status))
     return None

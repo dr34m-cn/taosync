@@ -5,7 +5,8 @@
 			<div class="top-box-title">作业详情</div>
 			<menuRefresh :loading="loading" :autoRefresh="false" :needShow="1" @getData="getTaskList"></menuRefresh>
 		</div>
-		<taskCurrent @currentChange="currentChange" class="task-current" :style="`height: ${currentHeight}px;`" :jobId="params.id"></taskCurrent>
+		<taskCurrent @currentChange="currentChange" class="task-current" :style="`height: ${currentHeight}px;`"
+			:jobId="params.id"></taskCurrent>
 		<div class="table-box" :style="`height: calc(100% - 117px - ${currentHeight}px);`">
 			<el-table :data="taskData.dataList" height="100%" class="table-data" v-loading="loading" empty-text="暂无任务">
 				<el-table-column type="index" label="序号" align="center" width="60"></el-table-column>
@@ -102,14 +103,13 @@
 				},
 				loading: false,
 				btnLoading: false,
-				currentHeight: 300
+				currentHeight: 0
 			};
 		},
 		created() {
 			if (this.$route.query.hasOwnProperty('jobId')) {
 				this.params.id = this.$route.query.jobId;
 			}
-			this.getTaskList();
 		},
 		beforeDestroy() {},
 		methods: {
@@ -164,6 +164,7 @@
 			},
 			currentChange(val) {
 				this.currentHeight = val;
+				this.getTaskList();
 			}
 		}
 	}
@@ -191,7 +192,7 @@
 		.task-current {
 			transition: height 0.5s ease;
 		}
-		
+
 		.table-box {
 			transition: height 0.5s ease;
 		}

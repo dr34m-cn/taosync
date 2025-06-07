@@ -6,27 +6,33 @@
 		<div class="current-box" v-else>
 			<div class="current-box-top">
 				<div>当前状态：扫描{{current.scanFinish ? '完成，' : ''}}同步中</div>
-				<div>平均同步速度(估算)：{{speedAvg | sizeFilter}}/s</div>
-				<div>持续时间：{{durationText}}</div>
+				<div>平均同步速度(估算)：{{current.speedAvg | sizeFilter}}/s</div>
+				<div>持续时间：{{current.durationText}}</div>
 				<div>开始时间：{{current.createTime | timeStampFilter}}</div>
 			</div>
 			<div class="current-box-bottom">
 				<taskCurrentEcharts class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">
-						<div @click="changeTaskCu(0)" :class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(0)"
+							:class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
 							等待中</div>
-						<div @click="changeTaskCu(1)" :class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(1)"
+							:class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
 							进行中</div>
-						<div @click="changeTaskCu(2)" :class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(2)"
+							:class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
 							成功</div>
-						<div @click="changeTaskCu(7)" :class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(7)"
+							:class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
 							失败</div>
-						<div @click="changeTaskCu(-1)" :class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(-1)"
+							:class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
 							其他
 						</div>
 					</div>
-					<div class="current-box-task-right"></div>
+					<taskDetailTable class="current-box-task-right" :taskItemData="toTable" @pageChange="pageChange">
+					</taskDetailTable>
 				</div>
 			</div>
 		</div>
@@ -39,6 +45,7 @@
 	} from "@/api/job";
 	import menuRefresh from './menuRefresh';
 	import taskCurrentEcharts from './taskCurrentEcharts';
+	import taskDetailTable from "./taskDetailTable";
 	export default {
 		name: 'Task',
 		props: {
@@ -49,52 +56,60 @@
 		},
 		components: {
 			menuRefresh,
-			taskCurrentEcharts
+			taskCurrentEcharts,
+			taskDetailTable
+		},
+		computed: {
+			toTable() {
+				const count = this.cuTaskList.length;
+				let dataList = [];
+				if (count != 0) {
+					const startIndex = (this.toTableParams.pageNum - 1) * this.toTableParams.pageSize;
+					dataList = this.cuTaskList.slice(startIndex, startIndex + this.toTableParams.pageSize);
+				}
+				return {
+					dataList,
+					count
+				}
+			}
 		},
 		data() {
 			return {
 				loading: false,
 				loadingTask: false,
 				timer: null,
-				cuTaskSelect: 1, // 0 1 2 7 -1
+				cuTaskSelect: 1,
 				cuTaskList: [],
-				current: {
-					'scanFinish': false,
-					'num': {
-						'wait': 400,
-						'doing': 5,
-						'success': 1200,
-						'fail': 1,
-						'other': 1
-					},
-					'size': {
-						'wait': 200 * 1024 * 8,
-						'doing': 3 * 1024 * 8,
-						'success': 2400 * 1024 * 8,
-						'fail': 1 * 1024 * 8,
-						'other': 1
-					},
-					'createTime': 1749042892,
-					'duration': 661,
-					'durationText': '1天',
-					'speedAvg': 86400,
-					'doingTask': [{
-						'srcPath': '/A/',
-						'dstPath': '/B/',
-						'isPath': 0,
-						'fileName': '1.log',
-						'fileSize': 20,
-						'status': 1,
-						'type': 0,
-						'progress': 55.7,
-						'errMsg': null,
-						'createTime': 1748785129
-					}]
-				}
+				toTableParams: {
+					pageSize: 10,
+					pageNum: 1
+				},
+				current: null
+				// current: {
+				// 	'scanFinish': false,
+				// 	num: {"wait": 0, "running": 1, "success": 0, "fail": 0, "other": 0},
+				// 	size: {"wait": 0, "running": 6972086272, "success": 0, "fail": 0, "other": 0},
+				// 	'createTime': 1749042892,
+				// 	'duration': 661,
+				// 	'durationText': '1天',
+				// 	'speedAvg': 86400,
+				// 	'doingTask': [{
+				// 		'srcPath': '/A/',
+				// 		'dstPath': '/B/',
+				// 		'isPath': 0,
+				// 		'fileName': '1.log',
+				// 		'fileSize': 20,
+				// 		'status': 1,
+				// 		'type': 0,
+				// 		'progress': 55.7,
+				// 		'errMsg': null,
+				// 		'createTime': 1748785129
+				// 	}]
+				// }
 			};
 		},
 		created() {
-			// this.startRefresh();
+			this.startRefresh();
 		},
 		beforeDestroy() {
 			this.endRefresh();
@@ -103,7 +118,7 @@
 			startRefresh() {
 				this.timer = setInterval(() => {
 					this.getCurrent();
-				}, 290);
+				}, 610);
 			},
 			endRefresh() {
 				if (this.timer) {
@@ -120,7 +135,9 @@
 				}).then(res => {
 					this.dealWithCurrent(res.data);
 				}).catch(err => {
-					this.loading = false;
+					setTimeout(() => {
+						this.loading = false;
+					}, 9973);
 				})
 			},
 			dealWithCurrent(current) {
@@ -157,12 +174,14 @@
 					this.cuTaskList = res.data;
 					this.loadingTask = false;
 				}).catch(err => {
-					this.loadingTask = false;
+					setTimeout(() => {
+						this.loadingTask = false;
+					}, 9973);
 				})
 			},
 			calcSpeedAvg(current) {
 				let doingSize = current.doingTask.reduce((sum, obj) => {
-					return sum + (sum, obj.fileSize * obj.progress);
+					return sum + obj.fileSize * obj.progress / 100.0;
 				}, 0);
 				return (current.size.success + doingSize) / current.duration;
 			},
@@ -176,6 +195,9 @@
 				} else {
 					this.cuTaskList = [];
 				}
+			},
+			pageChange(val) {
+				this.toTableParams = val;
 			},
 			formatSeconds(seconds) {
 				const days = Math.floor(seconds / (24 * 3600));
@@ -251,13 +273,14 @@
 					width: 60%;
 					height: 100%;
 					box-sizing: border-box;
-					padding: 8px 12px;
+					padding: 8px 0 8px 12px;
 					display: flex;
 
 					.current-box-task-left {
 						width: 60px;
+						height: 100%;
 
-						height: 100% .task-left-item {
+						.task-left-item {
 							cursor: pointer;
 							width: 60px;
 							margin: 14px 0;
@@ -275,7 +298,8 @@
 					}
 
 					.current-box-task-right {
-						width: calc(100% - 60px);
+						margin-left: 8px;
+						width: calc(100% - 50px);
 						height: 100%
 					}
 				}

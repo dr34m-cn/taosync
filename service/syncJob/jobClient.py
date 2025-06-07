@@ -56,7 +56,7 @@ class CopyItem:
         """
         while True:
             cuTime = time.time()
-            time.sleep(0.29 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
+            time.sleep(0.61 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
             try:
                 taskInfo = self.alistClient.taskInfo(self.alistTaskId)
             except Exception as e:
@@ -96,14 +96,15 @@ class CopyItem:
 
 
 class JobTask:
-    def __init__(self, taskId, job):
+    def __init__(self, taskId, vm):
         """
         作业任务类
         :param taskId: 任务id
         :param job: 作业信息
         """
         self.taskId = taskId
-        self.job = job
+        self.jobClient = vm
+        self.job = self.jobClient.job
         self.alistClient = alistService.getClientById(self.job['alistId'])
         self.createTime = time.time()
         # 已完成（包含成功或者失败）
@@ -121,11 +122,10 @@ class JobTask:
         syncThread = threading.Thread(target=self.sync)
         syncThread.start()
         self.currentTasks = {}
-        self.taskSubmit()
-        jobMapper.addJobTaskItemMany(self.finish)
-        self.updateTaskStatus()
+        submitThread = threading.Thread(target=self.taskSubmit)
+        submitThread.start()
 
-    def getCurrent(self, status):
+    def getCurrent(self):
         """
         总结并返回详情（高实时性）
         {
@@ -170,7 +170,7 @@ class JobTask:
             'errMsg': doItem.errMsg,
             'createTime': doItem.createTime
         } for doItem in self.doing.values()]
-        allTask = list(itertools.chain(waits, dos, self.doing))
+        allTask = list(itertools.chain(waits, dos, self.finish))
         keyValSpace = {
             'wait': 0,
             'running': 1,
@@ -234,6 +234,10 @@ class JobTask:
                         waitingNums = len(self.waiting)
             else:
                 break
+        jobMapper.addJobTaskItemMany(self.finish)
+        self.updateTaskStatus()
+        self.jobClient.jobDoing = False
+        self.jobClient.currentJobTask = None
 
     def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0,
                  copyType=0, createTime=int(time.time())):
@@ -519,7 +523,7 @@ class JobClient:
                 'jobId': self.jobId,
                 'runTime': int(time.time())
             })
-            self.currentJobTask = JobTask(taskId, self.job)
+            self.currentJobTask = JobTask(taskId, self)
         except Exception as e:
             logger = logging.getLogger()
             errMsg = G('do_job_err').format(str(e))
@@ -527,9 +531,6 @@ class JobClient:
             if taskId is not None:
                 taskService.updateJobTaskStatus(taskId, 6, errMsg)
             logger.exception(e)
-        finally:
-            self.jobDoing = False
-            self.currentJobTask = None
 
     def doManual(self):
         """
