@@ -9,6 +9,7 @@
   "dependencies": {
     "axios": "^1.5.1",
     "core-js": "^3.32.2",
+    "echarts": "^5.6.0",
     "element-ui": "^2.15.14",
     "js-cookie": "^3.0.5",
     "underscore": "^1.13.6",

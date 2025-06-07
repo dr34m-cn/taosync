@@ -38,12 +38,14 @@ class Alist(BaseHandler):
 
 
 class Job(BaseHandler):
-    executor = ThreadPoolExecutor(1)
+    executor = ThreadPoolExecutor(4)
 
     @run_on_executor
     @handle_request
     def get(self, req):
         if 'id' in req:
+            if 'current' in req:
+                return jobService.getJobCurrent(req['id'], req.get('status', None))
             return taskService.getTaskList(req)
         elif 'taskId' in req:
             return taskService.getTaskItemList(req)
@@ -66,7 +68,7 @@ class Job(BaseHandler):
             else:
                 jobService.doAllJobManual()
         elif req['pause'] is True:
-            jobService.pauseJob(req['id'], req.get('cancel', False))
+            jobService.pauseJob(req['id'])
         else:
             jobService.continueJob(req['id'])
 
@@ -74,6 +76,6 @@ class Job(BaseHandler):
     @handle_request
     def delete(self, req):
         if 'id' in req:
-            jobService.removeJobClient(req['id'], req.get('cancel', False))
+            jobService.removeJobClient(req['id'])
         elif 'taskId' in req:
             taskService.removeTask(req['taskId'])
