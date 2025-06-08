@@ -123,6 +123,8 @@ class JobTask:
         self.queueNum = 0
         # sync全部任务加入队列标识
         self.scanFinish = False
+        # 首个文件开始同步时间
+        self.firstSync = None
         syncThread = threading.Thread(target=self.sync)
         syncThread.start()
         self.currentTasks = {}
@@ -204,6 +206,7 @@ class JobTask:
             'doingTask': currentTasks[1],
             'createTime': int(self.createTime),
             'duration': int(self.lastWatching - self.createTime),
+            'firstSync': int(self.firstSync) if self.firstSync is not None else None,
             'num': {},
             'size': {}
         }
@@ -230,6 +233,8 @@ class JobTask:
                     if waitingNums == 0:
                         break
                     else:
+                        if self.firstSync is None:
+                            self.firstSync = time.time()
                         self.queueNum += 1
                         self.doing[self.queueNum] = self.waiting.pop(0)
                         self.doing[self.queueNum].doingKey = self.queueNum

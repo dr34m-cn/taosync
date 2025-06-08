@@ -7,24 +7,34 @@
 			<div class="current-box-top">
 				<div class="top-line">
 					<div style="display: flex;align-items: center;">
-						整体进度：
-						<el-progress :stroke-width="20" :text-inside="true" style="width: 160px;"
+						整体进度：<span v-if="current.firstSync === null">暂未发现需同步文件</span>
+						<el-progress v-else :stroke-width="20" :text-inside="true" style="width: 160px;"
 							color="rgba(64, 158, 255, .8)" text-color="#fff" define-back-color="rgba(64, 158, 255, .3)"
 							:percentage="Number(current.allProgress.toFixed(4))"></el-progress>
 					</div>
-					<div>当前状态：扫描{{current.scanFinish ? '完成，' : '并'}}同步中</div>
-					<div>平均速度：{{current.speedAvg | sizeFilter}}/s</div>
-					<div>瞬时速度：{{current.speed | sizeFilter}}/s</div>
+					<div>当前状态：扫描{{current.scanFinish ? '完成，同步' : (current.firstSync === null ? '' : '并同步')}}中</div>
+					<div>平均速度：
+						<span v-if="current.firstSync === null">--</span>
+						<span v-else>{{current.speedAvg | sizeFilter}}/s</span>
+					</div>
+					<div>瞬时速度：
+						<span v-if="current.firstSync === null">--</span>
+						<span v-else>{{current.speed | sizeFilter}}/s</span>
+					</div>
 				</div>
 				<div class="top-line">
 					<div>持续时间：{{current.durationText}}</div>
-					<div>预计还要：{{current.remainTimeText}}</div>
+					<div>预计还要：{{current.firstSync === null ? '--' : current.remainTimeText}}</div>
 					<div>开始时间：{{current.createTime | timeStampFilter}}</div>
-					<div>预计完成：{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</div>
+					<div>预计完成：<span v-if="current.firstSync === null">--</span>
+						<span
+							v-else>{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</span>
+					</div>
 				</div>
 			</div>
 			<div class="current-box-bottom">
-				<taskCurrentEcharts class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
+				<div class="content-none-data" v-if="current.firstSync === null">扫描中，暂无需要同步的文件，请耐心等等待</div>
+				<taskCurrentEcharts v-else class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">
 						<div @click="changeTaskCu(0)"
@@ -98,36 +108,52 @@
 					pageNum: 1
 				},
 				current: null
-				// current: {
-				// 	'scanFinish': false,
-				// 	num: {"wait": 0, "running": 1, "success": 0, "fail": 0, "other": 0},
-				// 	size: {"wait": 0, "running": 6972086272, "success": 0, "fail": 0, "other": 0},
-				// 	'createTime': 1749042892,
-				// 	'duration': 661,
-				// 	'durationText': '1天',
-				// 	'speedAvg': 86400,
-				// 	'doingTask': [{
-				// 		'srcPath': '/A/',
-				// 		'dstPath': '/B/',
-				// 		'isPath': 0,
-				// 		'fileName': '1.log',
-				// 		'fileSize': 20,
-				// 		'status': 1,
-				// 		'type': 0,
-				// 		'progress': 55.7,
-				// 		'errMsg': null,
-				// 		'createTime': 1748785129
-				// 	}]
-				// }
+
 			};
 		},
 		created() {
 			this.startRefresh();
+			// this.test();
 		},
 		beforeDestroy() {
 			this.endRefresh();
 		},
 		methods: {
+			test() {
+				let current = {
+					'scanFinish': false,
+					num: {
+						"wait": 0,
+						"running": 1,
+						"success": 0,
+						"fail": 0,
+						"other": 0
+					},
+					size: {
+						"wait": 0,
+						"running": 134678,
+						"success": 0,
+						"fail": 0,
+						"other": 0
+					},
+					'firstSync': 1749042992,
+					'createTime': 1749042892,
+					'duration': 661,
+					'doingTask': [{
+						'srcPath': '/A/',
+						'dstPath': '/B/',
+						'isPath': 0,
+						'fileName': '1.log',
+						'fileSize': 134678,
+						'status': 1,
+						'type': 0,
+						'progress': 55.7,
+						'errMsg': null,
+						'createTime': 1748785129
+					}]
+				};
+				this.dealWithCurrent(current);
+			},
 			startRefresh() {
 				this.timer = setInterval(() => {
 					this.getCurrent();
@@ -209,7 +235,7 @@
 						speed = (doneSize - this.current.doneSize) / (current.duration - this.current.duration);
 					}
 				}
-				let speedAvg = (doneSize) / current.duration;
+				let speedAvg = (doneSize) / (current.duration - current.firstSync + current.createTime);
 				let remainTime = parseInt(remainSize / speedAvg);
 				return {
 					remainSize,
@@ -312,6 +338,11 @@
 					min-width: 390px;
 					box-sizing: border-box;
 					border-right: 1px dotted #fff;
+				}
+
+				.content-none-data {
+					width: 40%;
+					box-sizing: border-box;
 				}
 
 				.current-box-task {
