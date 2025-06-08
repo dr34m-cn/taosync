@@ -4,7 +4,7 @@ from common import sqlBase
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 250520
+    cuVersion = 250608
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -34,7 +34,10 @@ def init_sql(conn):
                        "srcPath text,"                      # 来源目录，结尾有无斜杠都可，建议有斜杠
                        "dstPath text,"                      # 目标目录，结尾有无斜杠都可，建议有斜杠，多个以英文冒号[:]分隔
                        "alistId integer,"                   # 引擎id，alist_list.id
-                       "speed integer,"                     # 同步速度：0-标准，1-快速，2-低速
+                       "useCacheT integer DEFAULT 0,"       # 扫描目标目录时，是否使用缓存，0-不使用，1-使用
+                       "scanIntervalT integer DEFAULT 0,"   # 目标目录扫描间隔，单位秒
+                       "useCacheS integer DEFAULT 0,"       # 扫描源目录时，是否使用缓存，0-不使用，1-使用
+                       "scanIntervalS integer DEFAULT 0,"   # 源目录扫描间隔，单位秒
                        "method integer,"                    # 同步方式，0-仅新增，1-全同步，2-移动模式
                        "interval integer,"                  # 同步间隔，单位：分钟
                        "isCron integer DEFAULT 0,"          # 是否使用cron，0-使用interval, 1-使用cron，2-仅手动
@@ -128,6 +131,12 @@ def init_sql(conn):
                 cursor.execute("alter table job add column remark text")
             if sqlVersion < 250520:
                 cursor.execute("alter table job_task_item add column isPath integer DEFAULT 0")
+            if sqlVersion < 250608:
+                cursor.execute("alter table job rename column speed to useCacheT")
+                cursor.execute("alter table job add column scanIntervalT integer DEFAULT 0")
+                cursor.execute("alter table job add column useCacheS integer DEFAULT 0")
+                cursor.execute("alter table job add column scanIntervalS integer DEFAULT 0")
+                cursor.execute("update job set scanIntervalT = 10, useCacheT = 0 where useCacheT = 2")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
     cursor.close()

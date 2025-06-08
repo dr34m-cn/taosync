@@ -40,6 +40,8 @@ class AlistClient:
         self.user = None
         self.alistId = alistId
         self.token = token
+        # 上次扫描时间，用于间隔计算
+        self.waits = {}
         self.getUser()
 
     def req(self, method, url, data=None, params=None):
@@ -114,11 +116,12 @@ class AlistClient:
         """
         self.alistId = alistId
 
-    def fileListApi(self, path, speed=0, spec=None, rootPath=None):
+    def fileListApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """
         目录列表
-        :param path: 目录
-        :param speed: 速度，0-标准，1-快速，2-低速
+        :param path: 目录，以/开头并以/结尾
+        :param useCache: 是否使用缓存，0-不使用，1-使用
+        :param scanInterval: 目录扫描间隔，单位秒
         :param spec: 排除项规则
         :return: {
             "test1-1/": {},  # key以/结尾表示目录
@@ -126,11 +129,16 @@ class AlistClient:
         }
         :param rootPath: 同步根目录
         """
-        if speed == 2:
-            time.sleep(3)
+        if scanInterval != 0:
+            pathFirst = path.split('/', maxsplit=2)[1]
+            if pathFirst in self.waits:
+                timeC = time.time() - self.waits[pathFirst]
+                if timeC < scanInterval:
+                    time.sleep(scanInterval - timeC)
+            self.waits[pathFirst] = time.time()
         res = self.post('/api/fs/list', data={
             'path': path,
-            'refresh': speed != 1
+            'refresh': useCache != 1
         })['content']
         if res is not None:
             rts = {
@@ -160,11 +168,12 @@ class AlistClient:
         else:
             return []
 
-    def allFileList(self, path, speed=0, spec=None, rootPath=None):
+    def allFileList(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """
         递归获取文件列表
         :param path: 根路径
-        :param speed: 速度，0-标准，1-快速，2-低速
+        :param useCache: 是否使用缓存，0-不使用，1-使用
+        :param scanInterval: 目录扫描间隔，单位秒
         :param spec: 排除项规则
         :param rootPath: 同步根目录
         :return: {
@@ -179,10 +188,10 @@ class AlistClient:
         """
         if rootPath is None:
             rootPath = path
-        fList = self.fileListApi(path, speed, spec, rootPath)
+        fList = self.fileListApi(path, useCache, scanInterval, spec, rootPath)
         for key in fList.keys():
             if key.endswith('/'):
-                fList[key] = self.allFileList(f"{path}/{key[:-1]}", speed, spec, rootPath)
+                fList[key] = self.allFileList(f"{path}/{key[:-1]}", useCache, scanInterval, spec, rootPath)
         return fList
 
     def mkdir(self, path):

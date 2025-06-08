@@ -317,7 +317,6 @@ class JobTask:
     def copyFile(self, srcPath, dstPath, fileName, fileSize):
         """
         复制文件
-        vm.job['speed']: 速度，0-标准，1-快速，2-低速
         vm.job['method']: 0-仅新增，1-全同步，2-移动模式
         vm.job['copyHook']: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0）
         vm.job['delHook']: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0）
@@ -335,7 +334,6 @@ class JobTask:
     def delFile(self, path, fileName, size):
         """
         删除文件（或目录）
-        vm.job['speed']: 速度，0-标准，1-快速，2-低速
         vm.job['method']: 0-仅新增，1-全同步，2-移动模式
         vm.job['copyHook']: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0）
         vm.job['delHook']: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0）
@@ -359,18 +357,21 @@ class JobTask:
     def listDir(self, path, firstDst, spec, rootPath, isSrc=True):
         """
         列出目录
+        self.job['useCacheT']: 扫描目标目录时，是否使用缓存，0-不使用，1-使用
+        self.job['scanIntervalT']: 目标目录扫描间隔，单位秒
+        self.job['useCacheS']: 扫描源目录时，是否使用缓存，0-不使用，1-使用
+        self.job['scanIntervalS']: 源目录扫描间隔，单位秒
         :param path:
-        :param firstDst:
+        :param firstDst: 是否是第一个目标目录（如果是，将完整扫描源目录，否则使用缓存扫描源目录）
         :param spec:
         :param rootPath:
         :param isSrc:
         :return:
         """
-        speed = self.job['speed']
-        if isSrc:
-            speed = 1 if not firstDst else (0 if self.job['speed'] < 2 else 2)
+        useCache = 1 if isSrc and not firstDst else self.job[f"useCache{'S' if isSrc else 'T'}"]
+        scanInterval = self.job[f"scanInterval{'S' if isSrc else 'T'}"]
         try:
-            return self.alistClient.fileListApi(path, speed, spec, rootPath)
+            return self.alistClient.fileListApi(path, useCache, scanInterval, spec, rootPath)
         except Exception as e:
             logger = logging.getLogger()
             errMsg = G('scan_error').format(G('src' if isSrc else 'dst'), str(e))
@@ -383,7 +384,6 @@ class JobTask:
     def syncWithHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
         """
         扫描并同步-目标目录存在目录（意味着要继续扫描目标目录）
-        :param vm: 上级上下文，vm.taskItemList将包含所有任务，vm.job['enable']决定是否继续
         :param srcPath: 来源路径，以/结尾
         :param dstPath: 目标路径，以/结尾
         :param spec: 排除项规则
@@ -424,7 +424,6 @@ class JobTask:
     def syncWithOutHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
         """
         扫描并同步-目标目录为空
-        :param vm: 上级上下文，vm.taskItemList将包含所有任务，vm.job['enable']决定是否继续
         :param srcPath: 来源路径，以/结尾
         :param dstPath: 目标路径，以/结尾
         :param spec:
@@ -471,13 +470,11 @@ class JobClient:
     def __init__(self, job, isInit=False):
         """
         初始化job
-        :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, speed, method, interval, exclude, cron相关}
+        :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, useCacheT, scanIntervalT, useCacheS, scanIntervalS, method, interval, exclude, cron相关}
         """
         addJobId = 0
         if 'enable' not in job:
             job['enable'] = 1
-        if 'speed' not in job:
-            job['speed'] = 0
         if 'method' not in job:
             job['method'] = 0
         if 'id' not in job:

@@ -24,10 +24,18 @@
 						</div>
 						<div class="form-box-item">
 							<div class="form-box-item-label">
-								同步速度
+								目标目录扫描
 							</div>
 							<div class="form-box-item-value">
-								{{props.row.speed == 0 ? '标准' : (props.row.speed == 1 ? '快速' : '低速')}}
+								{{props.row.useCacheT == 0 ? '不用缓存' : '使用缓存'}}，扫描间隔为 {{props.row.scanIntervalT}} 秒
+							</div>
+						</div>
+						<div class="form-box-item">
+							<div class="form-box-item-label">
+								源目录扫描
+							</div>
+							<div class="form-box-item-value">
+								{{props.row.useCacheS == 0 ? '不用缓存' : '使用缓存'}}，扫描间隔为 {{props.row.scanIntervalS}} 秒
 							</div>
 						</div>
 						<div class="form-box-item">
@@ -92,7 +100,6 @@
 									@click="disableJobShow(props.row, true)">删除</el-button>
 								<el-button type="primary" :loading="btnLoading" size="mini"
 									@click="editJobShow(props.row)">编辑</el-button>
-								<!-- <el-button type="success" :loading="btnLoading" size="small" @click="putJob(props.row)">手动执行</el-button> -->
 							</div>
 						</div>
 					</div>
@@ -140,9 +147,9 @@
 			</el-pagination>
 		</div>
 		<el-dialog top="5vh" :close-on-click-modal="false" :visible.sync="editShow" :append-to-body="true"
-			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="760px" :before-close="closeShow">
+			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="800px" :before-close="closeShow">
 			<div class="elform-box">
-				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="120px">
+				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="140px">
 					<div style="display: flex;flex-wrap: wrap;">
 						<el-form-item prop="enable" label="是否启用">
 							<div class="label_width">
@@ -152,13 +159,8 @@
 								<span v-else>启用</span>
 							</div>
 						</el-form-item>
-						<el-form-item prop="remark" label="作业名称">
-							<div class="label_width">
-								<el-input v-model="editData.remark" placeholder="用来标识你的作业，选填"></el-input>
-							</div>
-						</el-form-item>
 						<el-form-item prop="alistId" label="引擎">
-							<el-select v-model="editData.alistId" placeholder="请选择引擎" class="label_width label_width_2"
+							<el-select v-model="editData.alistId" placeholder="请选择引擎" class="label_width"
 								no-data-text="暂无引擎,请前往引擎管理创建">
 								<el-option v-for="item in alistList" :label="item.url" :value="item.id">
 									<span
@@ -192,6 +194,63 @@
 								</div>
 							</div>
 						</el-form-item>
+						<el-form-item prop="remark" label="作业名称">
+							<div class="label_width">
+								<el-input v-model="editData.remark" placeholder="用来标识你的作业，选填"></el-input>
+							</div>
+						</el-form-item>
+						<el-form-item prop="method" label="同步方法">
+							<el-select v-model="editData.method" class="label_width">
+								<el-option label="仅新增" :value="0">
+									<span style="float: left;margin-right: 16px;">仅新增</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">仅新增目标目录没有的文件</span>
+								</el-option>
+								<el-option label="全同步" :value="1">
+									<span style="float: left;margin-right: 16px;">全同步</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">目标目录比源目录多的文件将被删除</span>
+								</el-option>
+								<el-option label="移动模式" :value="2">
+									<span style="float: left;margin-right: 16px;">移动模式</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">同步完成后删除源目录所有文件</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="useCacheT" label="目标目录扫描缓存">
+							<el-select v-model="editData.useCacheT" class="label_width">
+								<el-option label="不使用" :value="0">
+									<span style="float: left;margin-right: 16px;">不使用</span>
+									<span
+										style="float: right; color: #7b9dad; font-size: 13px;">如果会对目标目录手动操作，选这个，但更容易被网盘限制</span>
+								</el-option>
+								<el-option label="使用" :value="1">
+									<span style="float: left;margin-right: 16px;">使用</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">推荐，降低网盘风控可能</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="scanIntervalT" label="目标目录扫描间隔">
+							<el-input v-model.number="editData.scanIntervalT" placeholder="目标目录扫描间隔"
+								class="label_width">
+								<template slot="append">秒</template>
+							</el-input>
+						</el-form-item>
+						<el-form-item prop="useCacheT" label="源目录扫描缓存">
+							<el-select v-model="editData.useCacheT" class="label_width">
+								<el-option label="不使用" :value="0">
+									<span style="float: left;margin-right: 16px;">不使用</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">用这个</span>
+								</el-option>
+								<el-option label="使用" :value="1">
+									<span style="float: left;margin-right: 16px;">使用</span>
+									<span style="float: right; color: #7b9dad; font-size: 13px;">不要用，除非你知道自己在做什么</span>
+								</el-option>
+							</el-select>
+						</el-form-item>
+						<el-form-item prop="scanIntervalT" label="源目录扫描间隔">
+							<el-input v-model.number="editData.scanIntervalT" placeholder="源目录扫描间隔" class="label_width">
+								<template slot="append">秒</template>
+							</el-input>
+						</el-form-item>
 						<el-form-item prop="exclude" label="排除项语法">
 							<div class="label_width">类gitignore<br />
 								<span @click="toIgnore" class="to-link">
@@ -213,38 +272,6 @@
 									</div>
 								</div>
 							</div>
-						</el-form-item>
-						<el-form-item prop="speed" label="同步速度">
-							<el-select v-model="editData.speed" class="label_width">
-								<el-option label="标准" :value="0">
-									<span style="float: left;margin-right: 16px;">标准</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">不会选就用这个</span>
-								</el-option>
-								<el-option label="快速" :value="1">
-									<span style="float: left;margin-right: 16px;">快速</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">将使用Alist缓存扫描目标目录</span>
-								</el-option>
-								<el-option label="低速" :value="2">
-									<span style="float: left;margin-right: 16px;">低速</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">频繁被网盘限制可尝试这个选项</span>
-								</el-option>
-							</el-select>
-						</el-form-item>
-						<el-form-item prop="method" label="同步方法">
-							<el-select v-model="editData.method" class="label_width">
-								<el-option label="仅新增" :value="0">
-									<span style="float: left;margin-right: 16px;">仅新增</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">仅新增目标目录没有的文件</span>
-								</el-option>
-								<el-option label="全同步" :value="1">
-									<span style="float: left;margin-right: 16px;">全同步</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">目标目录比源目录多的文件将被删除</span>
-								</el-option>
-								<el-option label="移动模式" :value="2">
-									<span style="float: left;margin-right: 16px;">移动模式</span>
-									<span style="float: right; color: #7b9dad; font-size: 13px;">同步完成后删除源目录所有文件</span>
-								</el-option>
-							</el-select>
 						</el-form-item>
 						<span v-if="editData.method == 2"
 							style="margin-top: -12px;margin-left: 410px;margin-bottom: 18px;color: #f56c6c;font-weight: bold;">移动模式存在风险，可能导致文件丢失（因为会删除源目录文件），该方法应仅用于不重要的文件或有多重备份的文件！希望你知道自己在做什么！</span>
@@ -464,7 +491,11 @@
 						message: res.msg,
 						type: 'success'
 					});
-					this.getJobList();
+					if (pause !== false) {
+						this.detail(row.id);
+					} else {
+						this.getJobList();
+					}
 				}).catch(err => {
 					this.btnLoading = false;
 				})
@@ -502,7 +533,10 @@
 					srcPath: '',
 					dstPath: [],
 					alistId: null,
-					speed: 0,
+					useCacheT: 0,
+					scanIntervalT: 0,
+					useCacheS: 0,
+					scanIntervalS: 0,
 					method: 0,
 					interval: 1440,
 					isCron: 0,
