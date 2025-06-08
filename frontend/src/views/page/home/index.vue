@@ -234,8 +234,8 @@
 								<template slot="append">秒</template>
 							</el-input>
 						</el-form-item>
-						<el-form-item prop="useCacheT" label="源目录扫描缓存">
-							<el-select v-model="editData.useCacheT" class="label_width">
+						<el-form-item prop="useCacheS" label="源目录扫描缓存">
+							<el-select v-model="editData.useCacheS" class="label_width">
 								<el-option label="不使用" :value="0">
 									<span style="float: left;margin-right: 16px;">不使用</span>
 									<span style="float: right; color: #7b9dad; font-size: 13px;">用这个</span>
@@ -246,8 +246,8 @@
 								</el-option>
 							</el-select>
 						</el-form-item>
-						<el-form-item prop="scanIntervalT" label="源目录扫描间隔">
-							<el-input v-model.number="editData.scanIntervalT" placeholder="源目录扫描间隔" class="label_width">
+						<el-form-item prop="scanIntervalS" label="源目录扫描间隔">
+							<el-input v-model.number="editData.scanIntervalS" placeholder="源目录扫描间隔" class="label_width">
 								<template slot="append">秒</template>
 							</el-input>
 						</el-form-item>
