@@ -34,17 +34,15 @@
 
 **如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
-## 移动模式问题提示
-
-目前v0.2.8【移动模式】存在问题，不支持跨盘移动，正在重做该功能，请勿在跨盘场景使用【移动模式】
-
-感谢[@Lyzd1](https://github.com/Lyzd1)同学在[#113](https://github.com/dr34m-cn/taosync/issues/113)对本问题的反馈
-
 <details>
 
 <summary>点击展开截图</summary>
 
 由于更新频繁，截图仅供参考，以实际为准
+
+#### 作业详情
+
+![任务列表](README/作业详情.jpg)
 
 #### 引擎管理
 
@@ -56,19 +54,19 @@
 
 #### 新建作业
 
-![新建作业](README/新建作业.png)
+![新建作业](README/新建作业.jpg)
 
 #### 作业列表
 
 ![作业列表](README/作业列表.png)
 
-#### 作业详情（任务列表）
-
-![任务列表](README/任务列表.png)
-
 #### 任务详情
 
 ![任务详情](README/任务详情.png)
+
+#### 通知配置
+
+![任务详情](README/通知配置.jpg)
 
 </details>
 
@@ -115,9 +113,9 @@
 * 引擎管理，可以自由增删改查`AList`
 * 作业管理，可以新增/删除/启用/禁用/编辑/手动执行作业
 * 支持排除项规则，可以排除指定目录或文件不同步
-* 仅新增与全同步模式
-* 定时同步支持间隔、`cron`方式
-* 同步进度实时可视化查看与筛选
+* 仅新增、全同步、移动三种模式
+* 定时同步支持间隔、`cron`、手动调用
+* 同步进度、总体进度、同步速度、实时同步文件、预估时间等实时可视化查看
 * 存储可控，合理配置任务记录与日志保留天数，可以控制本程序所占用存储在可控范围内
 * 支持钉钉群机器人或server酱通知，可在任务成功或失败后发送通知
 
@@ -199,21 +197,17 @@ task_timeout=72
 
 历史记录在[这里](https://github.com/dr34m-cn/taosync/tree/main/doc/changelog)；
 
-如想体验研发中的版本，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)或[Release](https://github.com/dr34m-cn/taosync/releases)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
+如想体验研发中的版本(可能存在明显错误或严重bug，不建议小白尝试)，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)或[Release](https://github.com/dr34m-cn/taosync/releases)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
 ### 规划中（随时改变or因太难不做了，概不负责）
 
 * windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
 * Alist支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
-* 边扫描边同步，扫描失败不中断任务 [#19](https://github.com/dr34m-cn/taosync/issues/19)
 * 移动端适配（可能顺便开发个app？）
 * 支持本地引擎（不基于`AList`）
-* 任务剩余时间预估
-* 任务同步速度计算
 * 本地引擎支持加密同步
 * 保留历史N个版本（N可自定义，可无限）
 * 配置导入导出
-* 任务整体进度条展示（目前只能展示每个文件的进度条）
 * 多语言支持
 * linux一键安装、更新与卸载脚本
 
