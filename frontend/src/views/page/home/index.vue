@@ -147,9 +147,9 @@
 			</el-pagination>
 		</div>
 		<el-dialog top="5vh" :close-on-click-modal="false" :visible.sync="editShow" :append-to-body="true"
-			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="800px" :before-close="closeShow">
+			:title="`${editData && editData.id != null ? '编辑' : '新增'}作业`" width="820px" :before-close="closeShow">
 			<div class="elform-box">
-				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="140px">
+				<el-form :model="editData" :rules="addRule" ref="jobRule" v-if="editShow" label-width="150px">
 					<div style="display: flex;flex-wrap: wrap;">
 						<el-form-item prop="enable" label="是否启用">
 							<div class="label_width">
@@ -425,17 +425,15 @@
 						trgger: 'change'
 					}],
 					scanIntervalT: [{
-						type: 'number',
 						required: true,
 						pattern: /^(0|[1-9]\d*)$/,
-						message: '请输入目标目录扫描间隔，并确保为非负整数',
+						message: '必填且须为非负整数',
 						trgger: 'blur'
 					}],
 					scanIntervalS: [{
-						type: 'number',
 						required: true,
 						pattern: /^(0|[1-9]\d*)$/,
-						message: '请输入源目录扫描间隔，并确保为非负整数',
+						message: '必填且须为非负整数',
 						trgger: 'blur'
 					}]
 				}
@@ -547,8 +545,8 @@
 					srcPath: '',
 					dstPath: [],
 					alistId: null,
-					useCacheT: 0,
-					scanIntervalT: 0,
+					useCacheT: 1,
+					scanIntervalT: 3,
 					useCacheS: 0,
 					scanIntervalS: 0,
 					method: 0,
