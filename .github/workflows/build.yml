@@ -173,14 +173,29 @@ jobs:
         run: |
           docker buildx imagetools create ${{ env.TAG_LIST }}$(printf '${{ env.DOCKER_USER }}/${{ env.DOCKER_NAME }}@sha256:%s ' *)
 
-  build-windows-amd64:
-    name: 构建windows amd64
-    runs-on: windows-latest
+  build-windows:
+    name: 构建windows
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - windows-11-arm
+    runs-on: ${{ matrix.os }}
     needs: [get-version, build-frontend]
     env:
       VERSION: ${{needs.get-version.outputs.VERSION}}
 
     steps:
+      - name: 判断平台
+        run: |
+          $os = "${{ matrix.os }}"
+          if ($os -eq "windows-latest") {
+            $PLATFORM = "amd64"
+          } else {
+            $PLATFORM = "arm64"
+          }
+          "PLATFORM=$PLATFORM" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
@@ -200,14 +215,13 @@ jobs:
           python -m pip install 'pyinstaller>=6,<7'
           python -m pip install -r requirements.txt
           python -m PyInstaller ${{ env.APP_NAME }}.spec
-          cd dist && 7z a ${{ env.APP_NAME }}-${{ env.VERSION }}-windows-amd64.zip *
+          cd dist && 7z a ${{ env.APP_NAME }}-${{ env.VERSION }}-windows-${{ env.PLATFORM }}.zip *
 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist-windows-amd64
+          name: dist-windows-${{ env.PLATFORM }}
           path: dist/*.zip
-          retention-days: 1
 
   build-darwin:
     name: 构建darwin
@@ -264,7 +278,7 @@ jobs:
   create-release:
     name: 发布release
     runs-on: ubuntu-latest
-    needs: [get-version, build-windows-amd64, build-darwin, build-docker]
+    needs: [get-version, build-windows, build-darwin, build-docker]
     env:
       VERSION: ${{needs.get-version.outputs.VERSION}}
     if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
