@@ -34,7 +34,7 @@
 			</el-table-column>
 			<el-table-column prop="fileName" label="文件名/目录">
 				<template slot-scope="scope">
-					{{scope.row.isPath ? scope.row.dstPath : scope.row.fileName}}
+					{{scope.row.fileName || scope.row.dstPath}}
 				</template>
 			</el-table-column>
 			<el-table-column prop="fileSize" label="文件大小" width="120">

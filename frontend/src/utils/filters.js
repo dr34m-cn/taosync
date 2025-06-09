@@ -24,7 +24,7 @@ const taskStatusFilter = (value) => {
 }
 
 const sizeFilter = (val) => {
-	return parseSize(val);
+	return val !== null ? parseSize(val) : '--';
 }
 
 const notifyMethodFilter = (val) => {

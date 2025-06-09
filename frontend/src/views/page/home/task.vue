@@ -33,7 +33,8 @@
 				</el-table-column>
 				<el-table-column prop="successNum" label="任务进度（意义见页面底部图例，单位个）">
 					<template slot-scope="scope">
-						<div style="display: flex;align-items: center;flex-wrap: wrap;">
+						<span v-if="scope.row.status == 1">同步中的任务进度见👆</span>
+						<div style="display: flex;align-items: center;flex-wrap: wrap;" v-else>
 							<span class="prgNum bg-8">{{scope.row.allNum}}</span>
 							<span class="prgNum bg-2">{{scope.row.successNum}}</span>
 							<span class="prgNum bg-7">{{scope.row.failNum}}</span>
