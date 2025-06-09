@@ -95,6 +95,7 @@
 
 * 开源免费，几乎支持所有常用平台
   * windows-amd64
+  * windows-arm64
   * darwin-amd64
   * darwin-arm64
   * linux-amd64
