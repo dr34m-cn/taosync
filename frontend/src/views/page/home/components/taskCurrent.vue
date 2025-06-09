@@ -33,7 +33,7 @@
 				</div>
 			</div>
 			<div class="current-box-bottom">
-				<div class="content-none-data" v-if="current.firstSync === null">扫描中，暂无需要同步的文件，请耐心等等待</div>
+				<div class="content-none-data" v-if="current.firstSync === null">扫描中，暂无需要同步的文件，请耐心等待...</div>
 				<taskCurrentEcharts v-else class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">

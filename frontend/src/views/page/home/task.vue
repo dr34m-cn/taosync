@@ -36,8 +36,6 @@
 						<div style="display: flex;align-items: center;flex-wrap: wrap;">
 							<span class="prgNum bg-8">{{scope.row.allNum}}</span>
 							<span class="prgNum bg-2">{{scope.row.successNum}}</span>
-							<span class="prgNum bg-1">{{scope.row.runningNum}}</span>
-							<span class="prgNum bg-0">{{scope.row.waitNum}}</span>
 							<span class="prgNum bg-7">{{scope.row.failNum}}</span>
 							<span class="prgNum bg-3">{{scope.row.otherNum}}</span>
 						</div>
@@ -48,7 +46,7 @@
 						{{scope.row.createTime | timeStampFilter}}
 					</template>
 				</el-table-column>
-				<el-table-column label="操作" width="220">
+				<el-table-column label="操作" width="180">
 					<template slot-scope="scope">
 						<el-button type="danger" icon="el-icon-delete" @click="delTask(scope.row.id)"
 							:loading="btnLoading" :disabled="scope.row.status == 1"
@@ -64,8 +62,6 @@
 				<span style="margin-right: 12px;">进度图例：</span>
 				<span class="prgNum bg-8">需同步文件和目录总数</span>
 				<span class="prgNum bg-2">成功</span>
-				<span class="prgNum bg-1">进行中</span>
-				<span class="prgNum bg-0">等待</span>
 				<span class="prgNum bg-7">失败</span>
 				<span class="prgNum bg-3">其他</span>
 			</div>

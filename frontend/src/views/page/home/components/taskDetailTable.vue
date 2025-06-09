@@ -62,7 +62,7 @@
 					</div>
 					<el-progress :stroke-width="20" v-else :text-inside="true" style="width: 90px;"
 						color="rgba(64, 158, 255, .8)" text-color="#fff" define-back-color="rgba(64, 158, 255, .3)"
-						:percentage="Number(Number(scope.row.progress).toFixed(2))"></el-progress>
+						:percentage="Number(Number(scope.row.progress).toFixed(3))"></el-progress>
 				</template>
 			</el-table-column>
 		</el-table>

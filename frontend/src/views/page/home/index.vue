@@ -423,6 +423,20 @@
 						required: true,
 						message: '请选择引擎',
 						trgger: 'change'
+					}],
+					scanIntervalT: [{
+						type: 'number',
+						required: true,
+						pattern: /^(0|[1-9]\d*)$/,
+						message: '请输入目标目录扫描间隔，并确保为非负整数',
+						trgger: 'blur'
+					}],
+					scanIntervalS: [{
+						type: 'number',
+						required: true,
+						pattern: /^(0|[1-9]\d*)$/,
+						message: '请输入源目录扫描间隔，并确保为非负整数',
+						trgger: 'blur'
 					}]
 				}
 			};
