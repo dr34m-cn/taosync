@@ -309,4 +309,4 @@ jobs:
           tag_name: ${{ env.VERSION }}
           files: dist/*
           body_path: ${{ env.LOG_FILE }}
-          prerelease: ${{ contains(env.VERSION, 'dev') || contains(env.VERSION, 'pre') }}
+          prerelease: ${{ contains(env.VERSION, 'dev') || contains(env.VERSION, 'pre') || contains(env.VERSION, 'beta') }}
