@@ -278,7 +278,7 @@ class JobTask:
             'createTime': createTime
         })
 
-    def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0):
+    def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0, createTime=int(time.time())):
         """
         删除文件回调
         :param dstPath: 目标目录
@@ -287,6 +287,7 @@ class JobTask:
         :param status: 2-成功、7-失败
         :param errMsg: 错误信息
         :param isPath: 是否是目录，0-文件，1-目录
+        :param createTime: 创建时间
         """
         self.finish.append({
             'taskId': self.taskId,
@@ -298,7 +299,8 @@ class JobTask:
             'type': 1,
             'alistTaskId': None,
             'status': status,
-            'errMsg': errMsg
+            'errMsg': errMsg,
+            'createTime': createTime
         })
 
     def sync(self):
@@ -352,12 +354,13 @@ class JobTask:
         isPath = fileName.endswith('/')
         status = 2
         errMsg = None
+        createTime = int(time.time())
         try:
-            self.alistClient.deleteFile(path, fileName if not isPath else fileName[:-1])
+            self.alistClient.deleteFile(path, [fileName if not isPath else fileName[:-1]])
         except Exception as e:
             status = 7
             errMsg = str(e)
-        self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath)
+        self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath, createTime)
 
     def listDir(self, path, firstDst, spec, rootPath, isSrc=True):
         """
