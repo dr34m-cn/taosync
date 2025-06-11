@@ -134,21 +134,36 @@ class JobTask:
     def getCurrent(self):
         """
         总结并返回详情（高实时性）
-        {
-            'srcPath': 来源目录,
-            'dstPath': 目标目录,
-            'fileName': 文件名,
-            'fileSize': 文件大小,
-            'status': 状态,
-            'type': 方式，0-复制（对于目录则是创建），1-删除，2-移动,
-            'progress': 进度,
-            'errMsg': 错误信息,
-            'createTime': 创建时间
-        }
         :return: {
-            0: [],
-            1: [],
-            ...
+            'scanFinish': True,
+            'doingTask': [{
+                'srcPath': 来源目录,
+                'dstPath': 目标目录,
+                'fileName': 文件名,
+                'fileSize': 文件大小,
+                'status': 状态,
+                'type': 方式，0-复制（对于目录则是创建），1-删除，2-移动,
+                'progress': 进度,
+                'errMsg': 错误信息,
+                'createTime': 创建时间
+            }],
+            'createTime': int(self.createTime),
+            'duration': int(self.lastWatching - self.createTime),
+            'firstSync': int(self.firstSync) if self.firstSync is not None else None,
+            'num': {
+                'wait': 0,
+                'running': 1,
+                'success': 2,
+                'fail': 7,
+                'other': 0
+            },
+            'size': {
+                'wait': 0,
+                'running': 1,
+                'success': 2,
+                'fail': 7,
+                'other': 0
+            }
         }
         """
         self.lastWatching = time.time()
