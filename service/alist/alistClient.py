@@ -40,7 +40,7 @@ class AlistClient:
         self.user = None
         self.alistId = alistId
         self.token = token
-        # 上次扫描时间，用于间隔计算
+        # key-根目录，val-上次操作时间，或计划下次操作时间，用于间隔等待
         self.waits = {}
         self.getUser()
 
@@ -116,6 +116,23 @@ class AlistClient:
         """
         self.alistId = alistId
 
+    def checkWait(self, path, scanInterval=0):
+        """
+        检查是否等待
+        :param path: 路径
+        :param scanInterval: 间隔
+        :return:
+        """
+        if scanInterval != 0:
+            pathFirst = path.split('/', maxsplit=2)[1]
+            if pathFirst in self.waits:
+                timeC = time.time() - self.waits[pathFirst]
+                if timeC < scanInterval:
+                    self.waits[pathFirst] = time.time() + timeC
+                    time.sleep(scanInterval - timeC)
+                    return
+            self.waits[pathFirst] = time.time()
+
     def fileListApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """
         目录列表
@@ -129,13 +146,7 @@ class AlistClient:
         }
         :param rootPath: 同步根目录
         """
-        if scanInterval != 0:
-            pathFirst = path.split('/', maxsplit=2)[1]
-            if pathFirst in self.waits:
-                timeC = time.time() - self.waits[pathFirst]
-                if timeC < scanInterval:
-                    time.sleep(scanInterval - timeC)
-            self.waits[pathFirst] = time.time()
+        self.checkWait(path, scanInterval)
         res = self.post('/api/fs/list', data={
             'path': path,
             'refresh': useCache != 1
@@ -170,7 +181,7 @@ class AlistClient:
 
     def allFileList(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """
-        递归获取文件列表
+        递归获取文件列表，暂时弃用
         :param path: 根路径
         :param useCache: 是否使用缓存，0-不使用，1-使用
         :param scanInterval: 目录扫描间隔，单位秒
@@ -194,21 +205,25 @@ class AlistClient:
                 fList[key] = self.allFileList(f"{path}/{key[:-1]}", useCache, scanInterval, spec, rootPath)
         return fList
 
-    def mkdir(self, path):
+    def mkdir(self, path, scanInterval=0):
         """
         创建目录
         :param path: 路径
+        :param scanInterval:
         """
+        self.checkWait(path, scanInterval)
         return self.post('/api/fs/mkdir', data={
             'path': path
         })
 
-    def deleteFile(self, path, names=None):
+    def deleteFile(self, path, names, scanInterval=0):
         """
         删除文件或目录
         :param path: 路径
         :param names: 文件/目录名，列表
+        :param scanInterval:
         """
+        self.checkWait(path, scanInterval)
         self.post('/api/fs/remove', data={
             'names': names,
             'dir': path

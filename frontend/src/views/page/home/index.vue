@@ -27,7 +27,7 @@
 								目标目录扫描
 							</div>
 							<div class="form-box-item-value">
-								{{props.row.useCacheT == 0 ? '不用缓存' : '使用缓存'}}，扫描间隔为 {{props.row.scanIntervalT}} 秒
+								{{props.row.useCacheT == 0 ? '不用缓存' : '使用缓存'}}，操作间隔为 {{props.row.scanIntervalT}} 秒
 							</div>
 						</div>
 						<div class="form-box-item">
@@ -35,7 +35,7 @@
 								源目录扫描
 							</div>
 							<div class="form-box-item-value">
-								{{props.row.useCacheS == 0 ? '不用缓存' : '使用缓存'}}，扫描间隔为 {{props.row.scanIntervalS}} 秒
+								{{props.row.useCacheS == 0 ? '不用缓存' : '使用缓存'}}，操作间隔为 {{props.row.scanIntervalS}} 秒
 							</div>
 						</div>
 						<div class="form-box-item">
@@ -228,8 +228,8 @@
 								</el-option>
 							</el-select>
 						</el-form-item>
-						<el-form-item prop="scanIntervalT" label="目标目录扫描间隔">
-							<el-input v-model.number="editData.scanIntervalT" placeholder="目标目录扫描间隔"
+						<el-form-item prop="scanIntervalT" label="目标目录操作间隔">
+							<el-input v-model.number="editData.scanIntervalT" placeholder="目标目录操作间隔"
 								class="label_width">
 								<template slot="append">秒</template>
 							</el-input>
@@ -246,8 +246,8 @@
 								</el-option>
 							</el-select>
 						</el-form-item>
-						<el-form-item prop="scanIntervalS" label="源目录扫描间隔">
-							<el-input v-model.number="editData.scanIntervalS" placeholder="源目录扫描间隔" class="label_width">
+						<el-form-item prop="scanIntervalS" label="源目录操作间隔">
+							<el-input v-model.number="editData.scanIntervalS" placeholder="源目录操作间隔" class="label_width">
 								<template slot="append">秒</template>
 							</el-input>
 						</el-form-item>
@@ -546,7 +546,7 @@
 					dstPath: [],
 					alistId: null,
 					useCacheT: 1,
-					scanIntervalT: 3,
+					scanIntervalT: 1,
 					useCacheS: 0,
 					scanIntervalS: 0,
 					method: 0,

@@ -90,7 +90,7 @@ class CopyItem:
     def endIt(self):
         if self.copyType == 2 and self.status == 2:
             try:
-                self.alistClient.deleteFile(self.srcPath, [self.fileName])
+                self.alistClient.deleteFile(self.srcPath, [self.fileName], self.jobTask.job['scanIntervalS'])
             except Exception as e:
                 self.status = 7
                 self.errMsg = G('copy_success_but_delete_fail').format(str(e))
@@ -104,7 +104,7 @@ class JobTask:
         """
         作业任务类
         :param taskId: 任务id
-        :param job: 作业信息
+        :param vm: 作业上下文
         """
         self.taskId = taskId
         self.jobClient = vm
@@ -356,9 +356,9 @@ class JobTask:
     def delFile(self, path, fileName, size):
         """
         删除文件（或目录）
-        vm.job['method']: 0-仅新增，1-全同步，2-移动模式
-        vm.job['copyHook']: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0）
-        vm.job['delHook']: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0）
+        self.job['method']: 0-仅新增，1-全同步，2-移动模式
+        self.copyHook: 复制文件回调，（srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0, createTime）
+        self.delHook: 删除文件回调，（dstPath, name, size, status=2:2-成功、7-失败, errMsg=None, isPath=0, createTime）
         :param path: 所在路径
         :param fileName: 文件名（或目录名）
         :param size: 大小（文件）或空对象（目录）
@@ -371,7 +371,7 @@ class JobTask:
         errMsg = None
         createTime = int(time.time())
         try:
-            self.alistClient.deleteFile(path, [fileName if not isPath else fileName[:-1]])
+            self.alistClient.deleteFile(path, [fileName if not isPath else fileName[:-1]], self.job['scanIntervalT'])
         except Exception as e:
             status = 7
             errMsg = str(e)
@@ -460,7 +460,7 @@ class JobTask:
         status = 2
         errMsg = None
         try:
-            self.alistClient.mkdir(dstPath)
+            self.alistClient.mkdir(dstPath, self.job['scanIntervalT'])
         except Exception as e:
             status = 7
             errMsg = str(e)
