@@ -50,7 +50,7 @@ allLng = {
         'passwd_wrong': '密码错误',
         'key_wrong': '加密秘钥错误',
         'passwd_wrong_max_time': '5分钟内密码错误超过3次，请稍后再试',
-        'task_status': ['等待中', '进行中', '成功', '完成（部分失败）', '因重启而中止', '超时', '失败', '无需同步'],
+        'task_status': ['等待中', '进行中', '成功', '完成（部分失败）', '因重启而中止', '超时', '失败', '手动中止', '无需同步'],
         'task_end_msg_title': '{} - TaoSync',
         'task_end_msg_content': '来源目录为 {} 、目标目录为 {} 的作业执行结束。\n\n共 {} 个需要同步的文件，成功 {} 个，失败 {} 个。',
         'task_end_msg_content_ext': '\n\n本次同步共耗时：{}，成功同步 {} 文件。',
@@ -104,7 +104,7 @@ allLng = {
         'key_wrong': 'Wrong key',
         'passwd_wrong_max_time': 'The password was incorrect more than 3 times within 5 minutes. Please try again later',
         'task_status': ['waiting', 'in progress', 'success', 'complete (partially failed)',
-                        'Aborted due to reboot', 'timeout', 'failed', 'No files need sync'],
+                        'Aborted due to reboot', 'timeout', 'failed', 'Aborted by manual', 'No files need sync'],
         'task_end_msg_title': '{} - TaoSync',
         'task_end_msg_content': 'The job with source directory {} and target directory {} has completed execution.\n\n'
                                 'There are {} files that need to be synchronized, {} of them succeeded and {} failed.',

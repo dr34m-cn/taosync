@@ -64,12 +64,19 @@ class Job(BaseHandler):
     def put(self, req):
         if req['pause'] is None:
             if 'id' in req:
+                # 手动执行作业
                 jobService.doJobManual(req['id'])
             else:
+                # 手动执行所有作业
                 jobService.doAllJobManual()
         elif req['pause'] is True:
-            jobService.pauseJob(req['id'])
+            # 禁用作业
+            if 'abort' in req:
+                jobService.abortJob(req['id'])
+            else:
+                jobService.pauseJob(req['id'])
         else:
+            # 启用作业
             jobService.continueJob(req['id'])
 
     @run_on_executor

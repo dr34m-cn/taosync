@@ -88,7 +88,7 @@ export function jobGetJob(params) {
 	})
 }
 
-// 禁用/启用作业/手动执行
+// 禁用/启用/手动执行/中止 作业
 export function jobPut(data) {
 	return request({
 		url: '/job',

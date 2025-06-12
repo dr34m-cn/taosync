@@ -51,7 +51,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
         needNotSync = False
         if status == 2 and taskNum['allNum'] == 0:
             needNotSync = True
-            statusName = G('task_status')[7]
+            statusName = G('task_status')[8]
         if job['remark']:
             statusName = f"{job['remark']}: {statusName}"
         title = G('task_end_msg_title').format(statusName)
@@ -60,7 +60,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
             taskNum['failNum'])
         if createTime is not None:
             content = content + contextExt
-        if 3 < status < 6:
+        if 3 < status < 6 or status == 7:
             content += G('task_end_msg_error').format(statusName)
         elif status == 6 and errMsg is not None:
             content += G('task_end_msg_error').format(errMsg)

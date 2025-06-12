@@ -27,8 +27,7 @@
 					<div>预计还要：{{current.firstSync === null ? '--' : current.remainTimeText}}</div>
 					<div>开始时间：{{current.createTime | timeStampFilter}}</div>
 					<div>预计完成：<span v-if="current.firstSync === null">--</span>
-						<span
-							v-else>{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</span>
+						<span v-else>{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</span>
 					</div>
 				</div>
 			</div>
@@ -37,20 +36,15 @@
 				<taskCurrentEcharts v-else class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">
-						<div @click="changeTaskCu(0)"
-							:class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(0)" :class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
 							等待中</div>
-						<div @click="changeTaskCu(1)"
-							:class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(1)" :class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
 							进行中</div>
-						<div @click="changeTaskCu(2)"
-							:class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(2)" :class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
 							成功</div>
-						<div @click="changeTaskCu(7)"
-							:class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(7)" :class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
 							失败</div>
-						<div @click="changeTaskCu(-1)"
-							:class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(-1)" :class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
 							其他
 						</div>
 					</div>
@@ -64,7 +58,8 @@
 
 <script>
 	import {
-		jobGetTaskCurrent
+		jobGetTaskCurrent,
+		jobPut
 	} from "@/api/job";
 	import menuRefresh from './menuRefresh';
 	import taskCurrentEcharts from './taskCurrentEcharts';
@@ -292,6 +287,18 @@
 			},
 			hide() {
 				this.$emit('currentChange', 0);
+			},
+			abortJob() {
+				jobPut({
+					pause: true,
+					id: Number(this.jobId),
+					abort: true
+				}) then(res => {
+					this.$message({
+						message: '中止指令已发送，请等待中止完成',
+						type: 'success'
+					});
+				}).catch(err => {})
 			}
 		}
 	}

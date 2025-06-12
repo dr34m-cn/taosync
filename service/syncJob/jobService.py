@@ -35,6 +35,7 @@ def getJobClientById(jobId):
     :param jobId:
     :return:
     """
+    jobId = int(jobId)
     global jobClientList
     if jobId in jobClientList:
         return jobClientList[jobId]
@@ -80,7 +81,7 @@ def addJobClient(job, isInit=False):
     cleanJobInput(job)
     client = jobClient.JobClient(job, isInit)
     global jobClientList
-    jobClientList[client.jobId] = client
+    jobClientList[int(client.jobId)] = client
 
 
 def editJobClient(job):
@@ -97,7 +98,7 @@ def editJobClient(job):
         interval: 60
     }
     """
-    jobId = job['id']
+    jobId = int(job['id'])
     cleanJobInput(job)
     client = getJobClientById(jobId)
     if client.job['enable'] == 1 and client.job['isCron'] != 2:
@@ -142,6 +143,7 @@ def removeJobClient(jobId):
     :param jobId:
     :return:
     """
+    jobId = int(jobId)
     client = getJobClientById(jobId)
     client.stopJob(remove=True)
     jobMapper.deleteJob(jobId)
@@ -167,6 +169,16 @@ def pauseJob(jobId):
     if client.job['isCron'] == 2:
         raise Exception(G('cannot_disable_manual_job'))
     client.stopJob()
+
+
+def abortJob(jobId):
+    """
+    中止作业
+    :param jobId:
+    :return:
+    """
+    client = getJobClientById(jobId)
+    client.abortJob()
 
 
 def getJobList(req):
