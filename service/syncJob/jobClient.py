@@ -64,7 +64,7 @@ class CopyItem:
         while True:
             if self.jobTask.breakFlag:
                 self.status = 4
-                if self.alistTaskId is None:
+                if self.alistTaskId is not None:
                     try:
                         self.alistClient.copyTaskCancel(self.alistTaskId)
                     except Exception as e:
@@ -275,6 +275,12 @@ class JobTask:
                         doingNums = len(self.doing.keys())
                         waitingNums = len(self.waiting)
             else:
+                break
+        tryTime = 0
+        while len(self.doing.keys()) > 0:
+            tryTime += 1
+            time.sleep(.5)
+            if tryTime > 3:
                 break
         jobMapper.addJobTaskItemMany(self.finish)
         self.updateTaskStatus()

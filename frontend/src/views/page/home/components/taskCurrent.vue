@@ -5,30 +5,56 @@
 		</div>
 		<div class="current-box" v-else>
 			<div class="current-box-top">
-				<div class="top-line">
-					<div style="display: flex;align-items: center;">
-						整体进度：<span v-if="current.firstSync === null">暂未发现需同步文件</span>
-						<el-progress v-else :stroke-width="20" :text-inside="true" style="width: 160px;"
-							color="rgba(64, 158, 255, .8)" text-color="#fff" define-back-color="rgba(64, 158, 255, .3)"
-							:percentage="Number(current.allProgress.toFixed(4))"></el-progress>
+				<div class="current-box-top-left">
+					<div class="top-line">
+						<div style="display: flex;align-items: center;">
+							整体进度：<span v-if="current.firstSync === null">暂未发现需同步文件</span>
+							<template v-else>
+								<el-progress :stroke-width="20" :text-inside="true" style="width: 130px;"
+									color="rgba(64, 158, 255, .8)" text-color="#fff"
+									define-back-color="rgba(64, 158, 255, .3)"
+									:percentage="Number(current.allProgress.toFixed(4))"></el-progress>
+								<el-tooltip v-if="!current.scanFinish" effect="dark" content="扫描未完成前，进度不可靠仅供参考"
+									placement="top-end">
+									<i class="el-icon-question" style="margin-left: 6px;"></i>
+								</el-tooltip>
+							</template>
+						</div>
+						<div>当前状态：扫描{{current.scanFinish ? '完成，同步' : (current.firstSync === null ? '' : '并同步')}}中</div>
+						<div>平均速度：
+							<span v-if="current.firstSync === null">--</span>
+							<span v-else>{{current.speedAvg | sizeFilter}}/s
+								<el-tooltip effect="dark" placement="top-end" content="如果扫描用时太久，估算速度可能有很大误差">
+									<i class="el-icon-question" style="margin-left: 6px;"></i>
+								</el-tooltip></span>
+						</div>
+						<div>瞬时速度：
+							<span v-if="current.firstSync === null">--</span>
+							<span v-else>{{current.speed | sizeFilter}}/s</span>
+						</div>
 					</div>
-					<div>当前状态：扫描{{current.scanFinish ? '完成，同步' : (current.firstSync === null ? '' : '并同步')}}中</div>
-					<div>平均速度：
-						<span v-if="current.firstSync === null">--</span>
-						<span v-else>{{current.speedAvg | sizeFilter}}/s</span>
-					</div>
-					<div>瞬时速度：
-						<span v-if="current.firstSync === null">--</span>
-						<span v-else>{{current.speed | sizeFilter}}/s</span>
+					<div class="top-line">
+						<div>持续时间：{{current.durationText}}</div>
+						<div>预计还要：{{current.firstSync === null ? '--' : current.remainTimeText}}
+							<el-tooltip effect="dark" placement="top-end"
+								:content="`${current.scanFinish ? '' : '扫描未完成前，预计时间仅供参考；'}如果扫描用时太久，估算时间可能有很大误差`">
+								<i class="el-icon-question" style="margin-left: 6px;"></i>
+							</el-tooltip>
+						</div>
+						<div>开始时间：{{current.createTime | timeStampFilter}}</div>
+						<div>预计完成：<span v-if="current.firstSync === null">--</span>
+							<span
+								v-else>{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}
+								<el-tooltip effect="dark" placement="top-end"
+									:content="`${current.scanFinish ? '' : '扫描未完成前，预计时间仅供参考；'}如果扫描用时太久，估算时间可能有很大误差`">
+									<i class="el-icon-question" style="margin-left: 6px;"></i>
+								</el-tooltip>
+							</span>
+						</div>
 					</div>
 				</div>
-				<div class="top-line">
-					<div>持续时间：{{current.durationText}}</div>
-					<div>预计还要：{{current.firstSync === null ? '--' : current.remainTimeText}}</div>
-					<div>开始时间：{{current.createTime | timeStampFilter}}</div>
-					<div>预计完成：<span v-if="current.firstSync === null">--</span>
-						<span v-else>{{(current.createTime + current.duration + current.remainTime) | timeStampFilter}}</span>
-					</div>
+				<div class="current-box-top-right">
+					<el-button type="danger" @click="abortJob">中止任务</el-button>
 				</div>
 			</div>
 			<div class="current-box-bottom">
@@ -36,15 +62,20 @@
 				<taskCurrentEcharts v-else class="current-echart-box" :taskCurrent="current"></taskCurrentEcharts>
 				<div class="current-box-task">
 					<div class="current-box-task-left">
-						<div @click="changeTaskCu(0)" :class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(0)"
+							:class="`task-left-item${cuTaskSelect == 0 ? ' is-current' : ''}`">
 							等待中</div>
-						<div @click="changeTaskCu(1)" :class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(1)"
+							:class="`task-left-item${cuTaskSelect == 1 ? ' is-current' : ''}`">
 							进行中</div>
-						<div @click="changeTaskCu(2)" :class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(2)"
+							:class="`task-left-item${cuTaskSelect == 2 ? ' is-current' : ''}`">
 							成功</div>
-						<div @click="changeTaskCu(7)" :class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(7)"
+							:class="`task-left-item${cuTaskSelect == 7 ? ' is-current' : ''}`">
 							失败</div>
-						<div @click="changeTaskCu(-1)" :class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
+						<div @click="changeTaskCu(-1)"
+							:class="`task-left-item${cuTaskSelect == -1 ? ' is-current' : ''}`">
 							其他
 						</div>
 					</div>
@@ -289,16 +320,22 @@
 				this.$emit('currentChange', 0);
 			},
 			abortJob() {
-				jobPut({
-					pause: true,
-					id: Number(this.jobId),
-					abort: true
-				}) then(res => {
-					this.$message({
-						message: '中止指令已发送，请等待中止完成',
-						type: 'success'
-					});
-				}).catch(err => {})
+				this.$confirm("中止任务不影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？", '提示', {
+					confirmButtonText: '确定',
+					cancelButtonText: '取消',
+					type: 'warning'
+				}).then(() => {
+					jobPut({
+						pause: true,
+						id: Number(this.jobId),
+						abort: true
+					}).then(res => {
+						this.$message({
+							message: '中止指令已发送，请等待中止完成',
+							type: 'success'
+						});
+					}).catch(err => {})
+				})
 			}
 		}
 	}
@@ -320,15 +357,24 @@
 				height: 56px;
 				padding: 3px 0;
 				border-bottom: 1px dotted #fff;
+				display: flex;
+				align-items: center;
+				justify-content: center;
 
-				.top-line {
-					display: flex;
-					align-items: center;
-					justify-content: center;
+				.current-box-top-left {
+					.top-line {
+						display: flex;
+						align-items: center;
+						justify-content: center;
 
-					div {
-						width: 268px;
+						div {
+							width: 268px;
+						}
 					}
+				}
+				
+				.current-box-top-right {
+					margin-left: 16px;
 				}
 			}
 
