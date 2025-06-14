@@ -184,6 +184,7 @@ jobs:
     needs: [get-version, build-frontend]
     env:
       VERSION: ${{needs.get-version.outputs.VERSION}}
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
 
     steps:
       - name: 判断平台
@@ -234,6 +235,7 @@ jobs:
     needs: [get-version, build-frontend]
     env:
       VERSION: ${{needs.get-version.outputs.VERSION}}
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
 
     steps:
       - name: 判断平台
