@@ -67,6 +67,7 @@ class CopyItem:
                 if self.alistTaskId is not None:
                     try:
                         self.alistClient.copyTaskCancel(self.alistTaskId)
+                        self.alistClient.copyTaskDelete(self.alistTaskId)
                     except Exception as e:
                         self.status = 7
                         self.errMsg = str(e)
