@@ -1,6 +1,6 @@
 <div align="center">
   <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
-  <p><em>TaoSync是一个适用于AList v3的自动化同步工具。</em></p>
+  <p><em>TaoSync是一个适用于OpenList v3的自动化同步工具。</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
@@ -73,7 +73,7 @@
 ## 须知
 
 > [!IMPORTANT]
-> 使用本工具前你必须了解并且会使用[AList](https://github.com/alist-org/alist)；本工具没有集成`AList`，你需要额外启动`AList`
+> 使用本工具前你必须了解并且会使用[OpenList](https://openlist.team/zh/)；本工具没有集成`OpenList`，你需要额外启动`OpenList`
 
 > [!WARNING]
 > **警告！不要在外网暴露本系统，否则后果自负！**         
@@ -203,9 +203,9 @@ task_timeout=72
 ### 规划中（随时改变or因太难不做了，概不负责）
 
 * windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
-* Alist支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
+* OpenList支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
 * 移动端适配（可能顺便开发个app？）
-* 支持本地引擎（不基于`AList`）
+* 支持本地引擎（不基于`OpenList`）
 * 本地引擎支持加密同步
 * 保留历史N个版本（N可自定义，可无限）
 * 配置导入导出
