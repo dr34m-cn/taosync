@@ -1,6 +1,6 @@
 <div align="center">
   <a href=""><img width="200px" alt="logo" src="frontend/public/logo-200-64.png"/></a>
-  <p><em>TaoSync是一个适用于OpenList v3的自动化同步工具。</em></p>
+  <p><em>TaoSync是一个适用于OpenList/AList v3+的自动化同步工具。</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
@@ -73,7 +73,7 @@
 ## 须知
 
 > [!IMPORTANT]
-> 使用本工具前你必须了解并且会使用[OpenList](https://openlist.team/zh/)；本工具没有集成`OpenList`，你需要额外启动`OpenList`
+> 使用本工具前你必须了解并且会使用[OpenList](https://docs.oplist.org/zh/)；本工具没有集成`OpenList`，你需要额外启动`OpenList`
 
 > [!WARNING]
 > **警告！不要在外网暴露本系统，否则后果自负！**         
@@ -93,7 +93,7 @@
 
 ## 特性
 
-* 开源免费，几乎支持所有常用平台
+* 开源免费，接受任意审查，几乎支持所有常用平台
   * windows-amd64
   * windows-arm64
   * darwin-amd64
@@ -105,13 +105,14 @@
   * linux-arm-v7
   * linux-s390x
   * linux-ppc64le
-* [Github Actions](https://docs.github.com/zh/actions)自动打包与发布构建好的可执行程序，并支持Docker，下载即用
+* [Github Actions](https://docs.github.com/zh/actions)自动打包与发布构建好的可执行程序，过程公开透明，无投毒风险
+* 支持Docker，下载即用
 * 干净卸载，不用的时候删掉即可，无任何残留或依赖，不影响系统里其他程序
 * 密码加密不可逆，永远不会泄露您的密码，敏感信息均被加密，支持重置密码
 * 完全离线运行（仅连接AList），永不上传用户隐私
 * 完善的错误处理，稳定可靠，逻辑自洽；可能出错，但永不崩溃（我猜的）
 * 完善的日志，所有错误都会被记录
-* 引擎管理，可以自由增删改查`AList`
+* 引擎管理，可以自由增删改查`OpenList/AList`
 * 作业管理，可以新增/删除/启用/禁用/编辑/手动执行作业
 * 支持排除项规则，可以排除指定目录或文件不同步
 * 仅新增、全同步、移动三种模式
@@ -129,7 +130,7 @@
 前往[Release](https://github.com/dr34m-cn/taosync/releases)下载对应平台的可执行程序，直接执行
 
 > [!TIP]
-> 开机自启、守护进程等可以参考[AList的方式](https://alist.nn.ci/zh/guide/install/manual.html#%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B)，把其中的`alist`改为`taoSync`；注意，本程序**不需要`server`参数**
+> 开机自启、守护进程等可以参考[OpenList的方式](https://docs.oplist.org/zh/guide/install/manual.html#%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B)，把其中的`openlist`改为`taoSync`；注意，本程序**不需要`server`参数**
 
 * docker
 
