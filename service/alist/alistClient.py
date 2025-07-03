@@ -64,7 +64,7 @@ class AlistClient:
                 'Authorization': self.token
             }
         try:
-            r = requests.request(method, self.url + url, json=data, params=params, headers=headers, timeout=(10, 300))
+            r = requests.request(method, self.url + url, json=data, params=params, headers=headers, timeout=(60, 300))
             if r.status_code == 200:
                 res = r.json()
             else:
