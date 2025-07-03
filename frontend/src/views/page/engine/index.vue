@@ -127,6 +127,7 @@
 			submit() {
 				this.$refs.addRule.validate((valid) => {
 					if (valid) {
+						this.editData.url = this.ensureHttpPrefix(this.editData.ur);
 						this.editLoading = true;
 						if (this.editFlag) {
 							alistPut(this.editData).then(res => {
@@ -174,6 +175,15 @@
 						this.deleteLoading = false;
 					})
 				});
+			},
+			ensureHttpPrefix(url) {
+				if (!/^https?:\/\//i.test(url)) {
+					if (url.startsWith('//')) {
+						return 'http:' + url;
+					}
+					return 'http://' + url;
+				}
+				return url;
 			}
 		}
 	}
