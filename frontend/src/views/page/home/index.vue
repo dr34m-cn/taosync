@@ -483,10 +483,10 @@
 				})
 			},
 			toCron() {
-				window.open('https://blog.ctftools.com/2024/08/newpost-58/', '_blank');
+				window.open('https://dr34m.cn/2024/08/newpost-58/', '_blank');
 			},
 			toIgnore() {
-				window.open('https://blog.ctftools.com/2024/09/newpost-60/', '_blank');
+				window.open('https://dr34m.cn/2024/09/newpost-60/', '_blank');
 			},
 			putJob(row, pause = null) {
 				if (row.enable != 1 && pause !== false) {

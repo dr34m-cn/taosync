@@ -140,7 +140,7 @@ docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSyn
 
 把其中`/opt/data`替换为你实际的目录
 
-在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://blog.ctftools.com/2024/07/newpost-57/)，在其他支持Docker的NAS中使用大同小异
+在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://dr34m.cn/2024/07/newpost-57/)，在其他支持Docker的NAS中使用大同小异
 
 ### 再使用
 
