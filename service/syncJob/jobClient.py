@@ -600,6 +600,7 @@ class JobClient:
     def doByTime(self):
         params = {
             'func': self.doJob,
+            'misfire_grace_time': 15 * 60,
             'trigger': 'interval' if self.job['isCron'] == 0 else 'cron'
         }
         if self.job['isCron'] == 0:
