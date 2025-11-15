@@ -93,7 +93,7 @@
 						</template>
 						<template v-else-if="editData.method == 3">
 							<div class="tip-box"><a
-									href="https://work.weixin.qq.com/api/doc/90000/90136/91770"
+									href="https://sct.ftqq.com/forward"
 									target="_blank">配置指南</a> 请在企业微信管理后台获取相关参数</div>
 							<el-form-item prop="params.corpid" label="企业ID">
 								<el-input v-model="editData.params.corpid"
@@ -105,7 +105,7 @@
 							</el-form-item>
 							<el-form-item prop="params.corpsecret" label="应用Secret">
 								<el-input v-model="editData.params.corpsecret"
-									placeholder="请输入应用Secret"></el-input>
+									placeholder="请输入应用Secret" type="password"></el-input>
 							</el-form-item>
 							<el-form-item prop="params.touser" label="接收用户">
 								<el-input v-model="editData.params.touser"
