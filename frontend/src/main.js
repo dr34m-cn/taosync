@@ -22,5 +22,10 @@ Vue.use(ElementUI)
 new Vue({
 	store,
 	router,
-	render: h => h(App)
+	render: h => h(App),
+	created() {
+		// 初始化主题
+		const theme = this.$store.state.vuex_theme;
+		document.body.className = theme;
+	}
 }).$mount('#app')

@@ -19,6 +19,11 @@
 					</div>
 				</div>
 				<div class="top-right">
+					<div class="btn-item can-click" @click="toggleTheme">
+						<div class="theme-icon">
+							<i :class="vuex_theme === 'dark' ? 'el-icon-sunrise' : 'el-icon-moon'"></i>
+						</div>
+					</div>
 					<div class="btn-item can-click" @click="logout()">
 						<div class="top-icon">
 							<i class="el-icon-switch-button"></i>
@@ -47,11 +52,11 @@
 						index: '/home',
 						title: '作业管理',
 						icon: 'data-analysis'
-					},{
+					},{ 
 						index: '/engine',
 						title: '引擎管理',
 						icon: 'receiving'
-					},{
+					},{ 
 						index: '/notify',
 						title: '通知配置',
 						icon: 'bell'
@@ -63,22 +68,46 @@
 					}]
 			};
 		},
+		computed: {
+			themeValue: {
+				get() {
+					return this.vuex_theme === 'dark';
+				},
+				set(val) {
+					// 这个setter实际上不会被直接调用，因为我们使用@change事件处理
+				}
+			}
+		},
 		created() {
 			this.init();
 		},
 		beforeDestroy() {},
 		watch: {},
 		methods: {
-			init() {},
-			logout() {
-				logout().then(res => {
-					this.$router.push('/login');
-					this.$setVuex('vuex_userInfo', null);
-				})
-			},
-			toIndex() {
-				this.$router.push('/');
-			}
+		init() {},
+		logout() {
+			logout().then(res => {
+				this.$router.push('/login');
+				this.$setVuex('vuex_userInfo', null);
+			})
+		},
+		toIndex() {
+			this.$router.push('/');
+		},
+		changeTheme(value) {
+			// 切换主题：true为深色，false为浅色
+			const newTheme = value ? 'dark' : 'light';
+			this.$setVuex('vuex_theme', newTheme);
+			// 更新body类名
+			document.body.className = newTheme;
+		},
+		toggleTheme() {
+			// 点击图标切换主题
+			const newTheme = this.vuex_theme === 'dark' ? 'light' : 'dark';
+			this.$setVuex('vuex_theme', newTheme);
+			// 更新body类名
+			document.body.className = newTheme;
+		}
 		}
 	}
 </script>
@@ -90,11 +119,11 @@
 		left: 0;
 		right: 0;
 		display: flex;
-		background-color: #191b2b;
-		color: #FFFFFF;
+		background-color: var(--bg-primary);
+		color: var(--text-primary);
 
 		.lay-left {
-			background-color: #001529;
+			background-color: var(--menu-bg);
 
 			.left-top-logo {
 				height: 67px;
@@ -136,7 +165,7 @@
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
-				border-bottom: 1px solid #333333;
+				border-bottom: 1px solid var(--border-light);
 				font-size: 16px;
 
 				.top-icon {
@@ -153,8 +182,8 @@
 				}
 
 				.can-click:hover {
-					background-color: #393c4f;
-				}
+			background-color: var(--bg-tertiary);
+		}
 
 				.top-left {
 					display: flex;
@@ -162,16 +191,19 @@
 				}
 
 				.top-right {
-					display: flex;
-					align-items: center;
+							display: flex;
+							align-items: center;
 
-					.btn-item {
-						display: flex;
-						align-items: center;
-						padding-right: 20px;
-						cursor: pointer;
-					}
-				}
+							.btn-item {
+								display: flex;
+								align-items: center;
+								padding-right: 20px;
+								cursor: pointer;
+								.el-switch {
+									margin-left: 8px;
+								}
+							}
+						}
 			}
 
 			.lay-right-bottom {

@@ -11,7 +11,7 @@ try {
 }
 
 // 需要永久存储，且下次APP启动需要取出的，在state中的变量名
-let saveStateKeys = ['vuex_userInfo'];
+let saveStateKeys = ['vuex_userInfo', 'vuex_theme'];
 
 // 保存变量到本地存储中
 const saveLifeData = function(key, value) {
@@ -32,7 +32,8 @@ const store = new Vuex.Store({
 		vuex_loading: false, // 加载蒙版显示与否
 		vuex_onRequest: false, // 是否请求中
 		vuex_letfIndex: null,
-		vuex_cookieName: 'tao_sync'
+		vuex_cookieName: 'tao_sync',
+		vuex_theme: lifeData.vuex_theme ? lifeData.vuex_theme : 'dark' // 主题设置：dark或light
 	},
 	mutations: {
 		$uStore(state, payload) {

@@ -1,6 +1,9 @@
 <template>
-	<div class="login">
-		<div class="loginArea">
+	<div class="login" :style="{ backgroundImage: `url(${vuex_theme === 'dark' ? require('@/assets/img/login-bg.jpg') : require('@/assets/img/login-bg-light.svg')})` }">
+		<div class="theme-toggle" @click="toggleTheme">
+			<i :class="vuex_theme === 'dark' ? 'el-icon-sunrise' : 'el-icon-moon'"></i>
+		</div>
+		<div class="loginArea" :style="{ background: vuex_theme === 'dark' ? 'rgba(16, 30, 65, 0.95)' : 'rgba(255, 255, 255, 0.95)' }">
 			<div class="logo">桃桃的自动同步工具</div>
 			<div class="title">密码登录</div>
 			<el-form :model="loginForm" :rules="rules" ref="loginForm" label-width="0">
@@ -109,7 +112,15 @@
 				}
 			};
 		},
-		created() {},
+		computed: {
+			vuex_theme() {
+				return this.$store.state.vuex_theme;
+			}
+		},
+		created() {
+			// 应用主题到body
+			document.body.className = this.vuex_theme;
+		},
 		methods: {
 			login() {
 				this.$refs.loginForm.validate((valid) => {
@@ -128,6 +139,13 @@
 						return false;
 					}
 				});
+			},
+			toggleTheme() {
+				// 切换主题
+				const newTheme = this.vuex_theme === 'dark' ? 'light' : 'dark';
+				this.$setVuex('vuex_theme', newTheme);
+				// 更新body类名
+				document.body.className = newTheme;
 			},
 			fogetPwd() {
 				this.showPwd = true;
@@ -172,8 +190,24 @@
 		bottom: 0;
 		left: 0;
 		right: 0;
-		background: url(~@/assets/img/login-bg.jpg) no-repeat center;
 		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		
+		.theme-toggle {
+			position: absolute;
+			top: 20px;
+			right: 20px;
+			font-size: 28px;
+			cursor: pointer;
+			color: #409eff;
+			transition: all 0.3s ease;
+			z-index: 1000;
+			
+			&:hover {
+				transform: scale(1.2);
+			}
+		}
 
 		.loginArea {
 			background: rgba(16, 30, 65, 0.95);
@@ -182,17 +216,18 @@
 			padding: 30px 60px;
 			border-radius: 4px;
 			margin-left: 5%;
-			color: #FFF;
+			color: var(--text-primary);
+			position: relative;
 
 			:deep(.el-input) {
 				font-size: 20px;
 
 				.el-input__inner {
 					background-color: transparent;
-					color: #FFF;
+					color: var(--text-primary);
 					height: 60px;
 					font-size: 20px;
-					border: 1px solid #FFF;
+					border: 1px solid var(--border-light);
 				}
 
 				.el-input__inner:focus {
@@ -213,6 +248,7 @@
 
 				.el-form-item__error {
 					font-size: 16px;
+					color: #F56C6C;
 				}
 			}
 
@@ -236,7 +272,7 @@
 				margin-top: 60px;
 				font-size: 24px;
 				font-weight: 500;
-				color: #ffffff;
+				color: var(--text-primary);
 				line-height: 28px;
 				text-align: center;
 				padding-bottom: 13px;
@@ -267,6 +303,18 @@
 				text-align: right;
 				cursor: pointer;
 				color: #409eff;
+			}
+
+			.theme-toggle {
+				position: absolute;
+				top: 20px;
+				right: 20px;
+				cursor: pointer;
+				padding: 10px;
+				
+				i {
+					font-size: 28px;
+				}
 			}
 		}
 	}
