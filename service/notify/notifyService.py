@@ -65,7 +65,7 @@ def testNotify(notify):
 def sendNotify(notify, title, content, needNotSync=False):
     """
     发送通知
-    :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；2-钉钉群机器人；待扩展更多
+    :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；2-钉钉群机器人；3-企业微信应用消息；待扩展更多
     'params': None, 'createTime': 1732179402}
     :param title: 通知标题
     :param content: 通知内容
@@ -76,6 +76,7 @@ def sendNotify(notify, title, content, needNotSync=False):
             'needContent': True, 'titleName': 'title', 'contentName': 'content', 'notSendNull': False}
         1: {'sendKey': 'xxx', 'notSendNull': False}
         2: {'url': '', 'notSendNull': False}
+        3: {'corpid': '', 'agentid': '', 'corpsecret': '', 'notSendNull': False}
     """
     timeout = (10, 30)
     params = json.loads(notify['params'])
@@ -115,5 +116,35 @@ def sendNotify(notify, title, content, needNotSync=False):
         rst = r.json()
         if rst['errcode'] != 0:
             raise Exception(rst['errmsg'])
+    elif notify['method'] == 3:
+        # 企业微信应用消息
+        # 获取access_token
+        token_url = f"https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid={params['corpid']}&corpsecret={params['corpsecret']}"
+        token_response = requests.get(token_url, timeout=timeout)
+        token_data = token_response.json()
+        
+        if token_data['errcode'] != 0:
+            raise Exception(f"获取企业微信access_token失败: {token_data['errmsg']}")
+            
+        access_token = token_data['access_token']
+        
+        # 发送消息
+        send_url = f"https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token={access_token}"
+        message_data = {
+            "touser": params.get('touser', '@all'),
+            "msgtype": "text",
+            "agentid": params['agentid'],
+            "text": {
+                "content": f"{title}\n-------------------\n{content}"
+            },
+            "safe": 0,
+            "enable_id_trans": 0,
+            "enable_duplicate_check": 0
+        }
+        
+        r = requests.post(send_url, json=message_data, timeout=timeout)
+        rst = r.json()
+        if rst['errcode'] != 0:
+            raise Exception(f"发送企业微信消息失败: {rst['errmsg']}")
     else:
         raise Exception("Wrong method")

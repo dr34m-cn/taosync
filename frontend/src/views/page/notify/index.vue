@@ -39,7 +39,7 @@
 						<el-form-item prop="method" label="方式">
 							<el-select v-model="editData.method" @change="methodChange" style="width: 100%;">
 								<el-option :key="meItem - 1" :value="meItem - 1" :label="meItem - 1 | notifyMethodFilter"
-									v-for="meItem in 3"></el-option>
+									v-for="meItem in notifyMethodLength"></el-option>
 								<!-- <el-option :key="1" :value="1" label="server酱"></el-option>
 							<el-option :key="2" :value="2" label="钉钉机器人"></el-option> -->
 							</el-select>
@@ -91,7 +91,28 @@
 									placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxxx"></el-input>
 							</el-form-item>
 						</template>
-						<el-form-item prop="notSendNull" label="忽略无同步">
+						<template v-else-if="editData.method == 3">
+							<div class="tip-box"><a
+									href="https://sct.ftqq.com/forward"
+									target="_blank">配置指南</a> 请在企业微信管理后台获取相关参数</div>
+							<el-form-item prop="params.corpid" label="企业ID">
+								<el-input v-model="editData.params.corpid"
+									placeholder="请输入企业ID"></el-input>
+							</el-form-item>
+							<el-form-item prop="params.agentid" label="应用ID">
+								<el-input v-model="editData.params.agentid"
+									placeholder="请输入应用ID/AgentId"></el-input>
+							</el-form-item>
+							<el-form-item prop="params.corpsecret" label="应用Secret">
+								<el-input v-model="editData.params.corpsecret"
+									placeholder="请输入应用Secret" type="password"></el-input>
+							</el-form-item>
+							<el-form-item prop="params.touser" label="接收用户">
+								<el-input v-model="editData.params.touser"
+									placeholder="请输入接收用户ID，多个用|分隔，@all表示全部"></el-input>
+							</el-form-item>
+						</template>
+						<el-form-item prop="params.notSendNull" label="忽略无同步">
 							<el-switch v-model="editData.params.notSendNull" :active-value="1" :inactive-value="0">
 							</el-switch>
 						</el-form-item>
@@ -115,11 +136,13 @@
 		postAddNotify,
 		putEditNotify
 	} from '@/api/notify';
+	import notifyMethod from '@/utils/notifyMethod';
 	export default {
 		name: 'Notify',
 		components: {},
 		data() {
 			return {
+				notifyMethodLength: notifyMethod.length,
 				dataList: [],
 				loading: false,
 				deleteLoading: false,
@@ -161,6 +184,28 @@
 							type: 'string',
 							required: true,
 							message: '请输入WebHook地址'
+						}]
+					}
+				}, {
+					params: {
+						corpid: [{
+							type: 'string',
+							required: true,
+							message: '请输入企业ID'
+						}],
+						agentid: [{
+							type: 'string',
+							required: true,
+							message: '请输入应用ID/AgentId'
+						}],
+						corpsecret: [{
+							type: 'string',
+							required: true,
+							message: '请输入应用Secret'
+						}],
+						touser: [{
+							type: 'string',
+							required: false
 						}]
 					}
 				}]
@@ -221,6 +266,14 @@
 				} else if (val === 2) {
 					this.editData.params = {
 						url: '',
+						notSendNull: false
+					}
+				} else if (val === 3) {
+					this.editData.params = {
+						corpid: '',
+						agentid: '',
+						corpsecret: '',
+						touser: '@all',
 						notSendNull: false
 					}
 				}
