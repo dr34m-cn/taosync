@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0f4f8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e2e8f0;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="15" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- 主背景渐变 -->
+  <rect width="1920" height="1080" fill="url(#bgGradient)"/>
+  
+  <!-- 装饰性圆形元素 -->
+  <circle cx="300" cy="200" r="150" fill="#60a5fa" opacity="0.2" filter="url(#glow)"/>
+  <circle cx="1600" cy="300" r="200" fill="#34d399" opacity="0.2" filter="url(#glow)"/>
+  <circle cx="400" cy="800" r="180" fill="#a78bfa" opacity="0.2" filter="url(#glow)"/>
+  <circle cx="1400" cy="700" r="120" fill="#fbbf24" opacity="0.2" filter="url(#glow)"/>
+  
+  <!-- 装饰性线条元素 -->
+  <path d="M0,300 Q600,100 1200,400 T1920,500" stroke="#93c5fd" stroke-width="3" fill="none" opacity="0.3"/>
+  <path d="M0,700 Q800,900 1400,600 T1920,800" stroke="#86efac" stroke-width="2" fill="none" opacity="0.3"/>
+  
+  <!-- 网格纹理 -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#cbd5e1" stroke-width="0.5" opacity="0.2"/>
+  </pattern>
+  <rect width="1920" height="1080" fill="url(#grid)"/>
+</svg>
