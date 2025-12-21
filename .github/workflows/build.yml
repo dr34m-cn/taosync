@@ -229,7 +229,7 @@ jobs:
     strategy:
       matrix:
         os:
-          - macos-13
+          - macos-15-intel
           - macos-14
     runs-on: ${{ matrix.os }}
     needs: [get-version, build-frontend]
@@ -241,7 +241,7 @@ jobs:
       - name: 判断平台
         run: |
           os=${{ matrix.os }}
-          if [ "$os" = "macos-13" ]; then
+          if [ "$os" = "macos-15-intel" ]; then
             PLATFORM="amd64"
           else
             PLATFORM="arm64"
