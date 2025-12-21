@@ -112,6 +112,15 @@
 									placeholder="请输入接收用户ID，多个用|分隔，@all表示全部"></el-input>
 							</el-form-item>
 						</template>
+						<template v-else-if="editData.method == 4">
+							<div class="tip-box"><a
+									href="https://open.larksuite.com/document/client-docs/bot-v3/add-custom-bot"
+									target="_blank">配置指南</a> 安全设置请采用[自定义关键字]，关键字内容为[TaoSync]，不含中括号</div>
+							<el-form-item prop="params.url" label="WebHook">
+								<el-input v-model="editData.params.url"
+									placeholder="https://open.larksuite.com/open-apis/bot/v2/hook/xxxxxxxxxx"></el-input>
+							</el-form-item>
+						</template>
 						<el-form-item prop="params.notSendNull" label="忽略无同步">
 							<el-switch v-model="editData.params.notSendNull" :active-value="1" :inactive-value="0">
 							</el-switch>
@@ -208,6 +217,14 @@
 							required: false
 						}]
 					}
+				}, {
+					params: {
+						url: [{
+							type: 'string',
+							required: true,
+							message: '请输入WebHook地址'
+						}]
+					}
 				}]
 			};
 		},
@@ -274,6 +291,11 @@
 						agentid: '',
 						corpsecret: '',
 						touser: '@all',
+						notSendNull: false
+					}
+				} else if (val === 4) {
+					this.editData.params = {
+						url: '',
 						notSendNull: false
 					}
 				}

@@ -65,7 +65,7 @@ def testNotify(notify):
 def sendNotify(notify, title, content, needNotSync=False):
     """
     发送通知
-    :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；2-钉钉群机器人；3-企业微信应用消息；待扩展更多
+    :param notify: 通知配置 {'id': 1, 'enable': 1, 'method': 0, // 0-自定义；1-server酱；2-钉钉群机器人；3-企业微信应用消息；4-Lark群机器人；待扩展更多
     'params': None, 'createTime': 1732179402}
     :param title: 通知标题
     :param content: 通知内容
@@ -77,6 +77,7 @@ def sendNotify(notify, title, content, needNotSync=False):
         1: {'sendKey': 'xxx', 'notSendNull': False}
         2: {'url': '', 'notSendNull': False}
         3: {'corpid': '', 'agentid': '', 'corpsecret': '', 'notSendNull': False}
+        4: {'url': '', 'notSendNull': False}
     """
     timeout = (10, 30)
     params = json.loads(notify['params'])
@@ -146,5 +147,29 @@ def sendNotify(notify, title, content, needNotSync=False):
         rst = r.json()
         if rst['errcode'] != 0:
             raise Exception(f"发送企业微信消息失败: {rst['errmsg']}")
+    elif notify['method'] == 4:
+        # Lark群机器人
+        r = requests.post(params['url'], json={
+            'msg_type': 'interactive',
+            'card': {
+                'config': {
+                    'wide_screen_mode': True
+                },
+                'elements': [{
+                    'tag': 'markdown',
+                    'content': content
+                }],
+                'header': {
+                    'template': 'blue',
+                    'title': {
+                        'content': title,
+                        'tag': 'plain_text'
+                    }
+                }
+            }
+        }, timeout=timeout)
+        rst = r.json()
+        if rst['code'] != 0:
+            raise Exception(f"Lark群机器人发送消息失败: {rst['msg']}")
     else:
         raise Exception("Wrong method")
