@@ -84,8 +84,8 @@ jobs:
 
               # Termux 无 ldd 命令，而 PyInstaller 的 compat.py 在 import 阶段会无条件调用 ldd 检测 musl libc，
               # 导致 FileNotFoundError。此处下载 sdist 后用 sed 打补丁将 is_musl 直接设为 False，绕过 ldd 调用。
-              # Termux 的 /tmp 不可写，使用 /app 下的临时目录。
-              PYI_SRC=/app/.pyi_src
+              # Termux 的 /tmp 与 /app 可能均不可写，用 Python 的 tempfile 自动选择可写临时目录。
+              PYI_SRC=$(python -c "import tempfile; print(tempfile.gettempdir())")/pyi_src
               mkdir -p "$PYI_SRC"
               python -m pip download --no-binary pyinstaller --no-deps "pyinstaller>=6,<7" -d "$PYI_SRC"
               tar xf "$PYI_SRC"/pyinstaller-*.tar.gz -C "$PYI_SRC"
