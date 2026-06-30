@@ -170,7 +170,7 @@ jobs:
               apt update -y
               apt install -yq python clang binutils
 
-              python -m pip install --upgrade pip setuptools wheel packaging
+              python -m pip install --upgrade pip setuptools wheel packaging hatchling
               # 强制从 sdist 构建以编译 bionic 版 bootloader（manylinux wheel 无法在 Termux 运行）
               python -m pip install --no-build-isolation --no-binary pyinstaller "pyinstaller>=6,<7"
 
