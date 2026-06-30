@@ -82,7 +82,12 @@ jobs:
               export TMPDIR="$HOME/tmp"
               mkdir -p "$TMPDIR"
 
-              apt update -y
+              # Termux 镜像同步中偶发 Packages.bz2 大小不一致，重试 apt update。
+              for i in 1 2 3 4 5; do
+                apt update -y && break
+                echo "apt update 第 $i 次失败，5 秒后重试..."
+                sleep 5
+              done
               apt install -yq python clang binutils
 
               python -m pip install --upgrade pip setuptools wheel packaging hatchling
