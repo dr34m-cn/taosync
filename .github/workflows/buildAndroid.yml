@@ -74,16 +74,21 @@ jobs:
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
-            -e PYINSTALLER_COMPILE_BOOTLOADER=1 \
             termux/termux-docker:aarch64 \
             bash -c '
               set -e
               apt update -y
               apt install -yq python clang binutils
 
+              # Termux 无 ldd 命令，而 PyInstaller 的 compat.py 在 import 阶段会调用 ldd 检测 musl libc，
+              # 缺失会抛 FileNotFoundError 导致 sdist 构建失败。此处创建一个 stub 让检测正常返回
+              # （compat.py 只读 stderr 判断是否含 "musl"，输出任意非 musl 内容即可）。
+              LDD_DIR=$(dirname "$(command -v python)")
+              printf "#!/bin/sh\necho \"ldd: missing file arguments\" >&2\nexit 1\n" > "$LDD_DIR/ldd"
+              chmod +x "$LDD_DIR/ldd"
+
               python -m pip install --upgrade pip setuptools wheel packaging hatchling
               # 强制从 sdist 构建以编译 bionic 版 bootloader（manylinux wheel 无法在 Termux 运行）
-              # PYINSTALLER_COMPILE_BOOTLOADER=1 跳过 bootloader 预检，避免调用 Termux 不存在的 ldd
               python -m pip install --no-build-isolation --no-binary pyinstaller "pyinstaller>=6,<7"
 
               if [ -f requirements.txt ]; then
