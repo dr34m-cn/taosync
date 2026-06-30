@@ -93,23 +93,12 @@ jobs:
               python -m pip install --upgrade pip setuptools wheel packaging hatchling
 
               # Termux 无 ldd 命令，而 PyInstaller 的 compat.py 在 import 阶段会无条件调用 ldd 检测 musl libc，
-              # 导致 FileNotFoundError。注意：pip download/install 处理 sdist 时会调用 hatchling 准备元数据，
-              # 触发 ldd 调用，因此必须绕过 pip 直接下载 sdist，打补丁后再安装。
+              # 导致 FileNotFoundError。此处下载 sdist 后用 sed 打补丁将 is_musl 直接设为 False，绕过 ldd 调用。
               PYI_SRC="$HOME/pyi_src"
               mkdir -p "$PYI_SRC"
-              # 直接从 PyPI 下载 sdist tarball（绕过 pip 的元数据准备）
-              PYI_SRC_DIR="$PYI_SRC" python -c "
-import urllib.request, json, os
-data = json.loads(urllib.request.urlopen('https://pypi.org/pypi/pyinstaller/json').read())
-v = [r for r in data['releases'] if r.startswith('6.')][-1]
-url = [u['url'] for u in data['releases'][v] if u['packagetype'] == 'sdist'][0]
-dest = os.path.join(os.environ['PYI_SRC_DIR'], 'pyinstaller.tar.gz')
-urllib.request.urlretrieve(url, dest)
-print('Downloaded PyInstaller', v, 'sdist ->', dest)
-"
-              tar xf "$PYI_SRC"/pyinstaller.tar.gz -C "$PYI_SRC"
+              python -m pip download --no-binary pyinstaller --no-deps "pyinstaller>=6,<7" -d "$PYI_SRC"
+              tar xf "$PYI_SRC"/pyinstaller-*.tar.gz -C "$PYI_SRC"
               PYI_DIR=$(ls -d "$PYI_SRC"/pyinstaller-*/)
-              # 打补丁：将 is_musl 设为 False，跳过 ldd 检测
               sed -i "/is_musl = is_linux and/c\\is_musl = False" "${PYI_DIR}PyInstaller/compat.py"
               # 从打补丁后的源码构建，编译 bionic 版 bootloader（manylinux wheel 无法在 Termux 运行）
               python -m pip install --no-build-isolation "$PYI_DIR"
