@@ -1,0 +1,171 @@
+name: buildStaticX
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_NAME: taoSync
+
+jobs:
+  get-version:
+    name: 获取版本号
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.getVersion.outputs.VERSION }}
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+      - id: getVersion
+        name: 获取版本号
+        run: |
+          versions=$(head -n 1 version.txt)
+          IFS=',' read -ra versionList <<< "$versions"
+          cuVersion="${versionList[0]}"
+          echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+
+  build-frontend:
+    name: 构建前端
+    runs-on: ubuntu-latest
+    needs: [ get-version ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "14.x"
+      - run: |
+          sed -i "s/__version_placeholder__/${{ needs.get-version.outputs.VERSION }}/g" frontend/src/views/page/setting/index.vue
+          cd frontend && npm install && npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  build-linux:
+    name: 构建Linux多平台StaticX
+    runs-on: ubuntu-latest
+    needs: [ get-version, build-frontend ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    strategy:
+      matrix:
+        platform: [ "amd64", "arm64", "arm32" ]
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端产物
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: 设置构建变量
+        run: |
+          case "${{ matrix.platform }}" in
+            amd64) echo "T_ARCH=amd64" >> $GITHUB_ENV ;;
+            arm64) echo "T_ARCH=arm64" >> $GITHUB_ENV ;;
+            arm32) echo "T_ARCH=arm/v7" >> $GITHUB_ENV ;;
+          esac
+
+      - name: 在 Docker 中进行静态打包
+        run: |
+          case "${{ matrix.platform }}" in
+            amd64)   IMG="python:3.11-slim-bullseye" ; LIB="/usr/lib/x86_64-linux-gnu" ;;
+            arm64)   IMG="arm64v8/python:3.11-slim-bullseye" ; LIB="/usr/lib/aarch64-linux-gnu" ;;
+            arm32)   IMG="arm32v7/python:3.11-slim-bullseye" ; LIB="/usr/lib/arm-linux-gnueabihf" ;;
+          esac
+
+          docker run --rm \
+            --platform linux/${{ env.T_ARCH }} \
+            -v "$(pwd):/app" \
+            -w /app \
+            -e APP_NAME=${{ env.APP_NAME }} \
+            -e LIB_PATH=$LIB \
+            $IMG \
+            sh -c '
+              set -e
+              apt-get update && apt-get install -y --no-install-recommends \
+                build-essential \
+                zlib1g-dev \
+                patchelf \
+                binutils \
+                zip \
+                && rm -rf /var/lib/apt/lists/*
+              
+              python -m pip install --upgrade pip
+              python -m pip install setuptools wheel scons hatchling
+              python -m pip install --no-build-isolation "pyinstaller>=6,<7" staticx
+              
+              if [ -f requirements.txt ]; then
+                python -m pip install -r requirements.txt
+              fi
+              
+              export LD_LIBRARY_PATH=/usr/local/lib:$LIB_PATH
+              python -m PyInstaller "$APP_NAME.spec" \
+                --distpath "/app/dist/${{ matrix.platform }}" \
+                --workpath "/app/build/${{ matrix.platform }}" \
+                --noconfirm
+                
+              staticx "/app/dist/${{ matrix.platform }}/$APP_NAME" "/app/dist/${{ matrix.platform }}/${APP_NAME}_StaticX"
+              
+              mv -f "/app/dist/${{ matrix.platform }}/${APP_NAME}_StaticX" "/app/dist/${{ matrix.platform }}/$APP_NAME"
+              chmod +x "/app/dist/${{ matrix.platform }}/$APP_NAME"
+
+              chown -R 1001:121 /app/dist
+              chmod -R 755 /app/dist
+            '
+
+      - name: 压缩
+        run: |
+          cd dist/${{ matrix.platform }}
+          zip -r "../../${{ env.APP_NAME }}-${{ env.VERSION }}-linux-StaticX-${{ matrix.platform }}.zip" .
+
+      - name: 上传 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-linux-StaticX-${{ matrix.platform }}
+          path: ${{ env.APP_NAME }}-${{ env.VERSION }}-linux-StaticX-${{ matrix.platform }}.zip
+          retention-days: 90
+
+  create-release:
+    name: 发布release
+    runs-on: ubuntu-latest
+    needs: [get-version, build-linux]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 检查 release 标签是否存在
+        id: checkTag
+        run: |
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${VERSION}")" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "release 标签 ${VERSION} 已存在，将更新产物"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "release 标签 ${VERSION} 不存在，跳过发布"
+          fi
+
+      - name: 下载构建结果
+        if: steps.checkTag.outputs.exists == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.APP_NAME }}-linux-StaticX-*
+          path: dist
+          merge-multiple: true
+
+      - name: 更新 StaticX 产物到 release
+        if: steps.checkTag.outputs.exists == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          files: dist/*
