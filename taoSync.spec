@@ -1,15 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_all
+
+
+charset_datas, charset_binaries, charset_hiddenimports = collect_all('charset_normalizer')
+
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=charset_binaries,
     datas=[
         ('web/dist/', 'front'),
         ('locales/', 'locales'),
-    ],
-    hiddenimports=[],
+    ] + charset_datas,
+    hiddenimports=charset_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

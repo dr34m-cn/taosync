@@ -7,6 +7,7 @@ that key style while loading text from locales/*.yaml.
 import locale
 import os
 import ast
+import sys
 
 try:
     import yaml
@@ -16,6 +17,25 @@ except Exception:
 allLang = {}
 sysLang = None
 defaultLang = 'zh_CN'
+
+
+def _get_locales_path():
+    candidates = [os.path.join(os.getcwd(), 'locales')]
+    frozen_root = getattr(sys, '_MEIPASS', None)
+    if frozen_root:
+        candidates.append(os.path.join(frozen_root, 'locales'))
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    candidates.append(os.path.join(project_root, 'locales'))
+
+    checked = set()
+    for candidate in candidates:
+        candidate = os.path.normpath(candidate)
+        if candidate in checked:
+            continue
+        checked.add(candidate)
+        if os.path.isdir(candidate):
+            return candidate
+    raise FileNotFoundError(f"No lang path found in: {', '.join(checked)}")
 
 
 def normalize_lang(lang):
@@ -54,11 +74,10 @@ def getSysLang():
 def initLang():
     global allLang
     allLang = {}
-    if not os.path.exists('locales'):
-        raise Exception("No lang path")
-    for file in os.listdir('locales'):
+    locales_path = _get_locales_path()
+    for file in os.listdir(locales_path):
         if file.endswith('.yaml'):
-            filename = os.path.join('locales', file)
+            filename = os.path.join(locales_path, file)
             langKey = file[:-5]
             with open(filename, 'r', encoding='utf-8') as f:
                 content = f.read()

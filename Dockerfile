@@ -1,7 +1,8 @@
 FROM dr34m/tao-sync:not-for-use-pip-req as builder
 WORKDIR /app
 COPY . /app
-RUN pyinstaller taoSync.spec
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pyinstaller taoSync.spec
 
 FROM dr34m/tao-sync:not-for-use-alpine
 VOLUME /app/data

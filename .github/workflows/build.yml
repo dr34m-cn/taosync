@@ -480,6 +480,7 @@ jobs:
         with:
           name: dist-android
           path: dist/*.apk
+          if-no-files-found: error
           retention-days: 1
           compression-level: 0
 
@@ -494,12 +495,21 @@ jobs:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 下载构建结果
+      - name: 下载全部平台构建结果
         uses: actions/download-artifact@v4
         with:
           pattern: dist-*
           path: dist
           merge-multiple: true
+
+      - name: 检查Android发布产物
+        run: |
+          apk_path=$(find dist -maxdepth 1 -type f -name "${APP_NAME}-${VERSION}-android-*.apk" -print -quit)
+          if [ -z "$apk_path" ]; then
+            echo "::error::Release 中缺少 Android APK"
+            exit 1
+          fi
+          echo "Android APK: $apk_path"
 
       - name: 没有版本日志文件自动创建
         run: |
