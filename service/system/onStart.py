@@ -5,7 +5,8 @@
 import logging
 import os
 
-from common import sqlInit, commonService
+from common import sqlInit, commonService, locales
+from common.LNG import G
 from service.syncJob.jobService import initJob
 from service.system import logJobService
 
@@ -15,15 +16,17 @@ def init():
         os.mkdir('data')
     if not os.path.exists('data/log'):
         os.mkdir('data/log')
+    # 读取语言包
+    locales.initLang()
     # 初始化日志
     commonService.setLogger()
     logger = logging.getLogger()
     # 初始化数据库，没有则创建
     passwd = sqlInit.init_sql()
     if passwd is not None:
-        msg = f"Password for admin_/_已为admin生成随机密码：{passwd}"
+        msg = G('admin_password_generated').format(passwd)
         logger.critical(msg)
-    logger.info("初始化数据库完成_/_Initializing the database completed")
+    logger.info(G('init_sql'))
     # 启动日志文件与任务定时清理任务
     logJobService.startJob()
     # 修改异常中止状态，启动任务

@@ -4,7 +4,7 @@ import logging
 from tornado.web import RequestHandler
 
 from common import commonService
-from common.LNG import G
+from common.LNG import G, set_context_lang
 from service.system import userService
 
 cookieName = 'tao_sync'
@@ -18,12 +18,15 @@ class BaseHandler(RequestHandler):
 def handle_request(func):
     def wrapper(self):
         uri = self.request.uri
+        lang = self.request.headers.get("Accept-Language", None)
+        set_context_lang(lang)
         user = self.get_signed_cookie(cookieName)
         trueUser = None
         if not uri.startswith('/svr/noAuth'):
             if user is None:
                 self.clear_cookie(cookieName)
                 msg = commonService.result_map(G('sign_in'), 401)
+                self.set_header('Content-Type', 'application/json; charset=UTF-8')
                 self.write(msg)
                 return
             else:
@@ -34,10 +37,13 @@ def handle_request(func):
                         or trueUser['passwd'] != cUser['passwd']
                         or trueUser['userName'] != cUser['userName']):
                     msg = commonService.result_map(G('login_expired'), 401)
+                    self.clear_cookie(cookieName)
+                    self.set_header('Content-Type', 'application/json; charset=UTF-8')
                     self.write(msg)
                     return
         try:
             req = commonService.get_post_data(self)
+            req['__lang'] = set_context_lang(lang)
             if trueUser:
                 req['__user'] = trueUser.copy()
                 del req['__user']['passwd']
@@ -47,6 +53,7 @@ def handle_request(func):
             msg = commonService.result_map(str(e), 500)
             logger = logging.getLogger()
             logger.exception(e)
+        self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(msg)
 
     return wrapper

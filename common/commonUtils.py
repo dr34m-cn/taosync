@@ -79,10 +79,10 @@ def readOrSet(fileName, default, force=False):
     :return: 结果
     """
     if os.path.exists(fileName) and force is False:
-        with open(fileName, 'r') as file:
+        with open(fileName, 'r', encoding='utf-8') as file:
             fnData = file.read()
     else:
         fnData = default
-        with open(fileName, 'w') as file:
+        with open(fileName, 'w', encoding='utf-8') as file:
             file.write(default)
     return fnData

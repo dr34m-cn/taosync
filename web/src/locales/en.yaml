@@ -1,0 +1,309 @@
+title: TaoSync
+error: Load failed
+retry: Retry
+loading: Loading
+empty: No data
+common:
+  add: Add
+  edit: Edit
+  delete: Delete
+  cancel: Cancel
+  confirm: Confirm
+  operate: Actions
+  back: Back
+  warning: Warning
+  tips: Tips
+  success: Success
+  enabled: Enabled
+  disabled: Disabled
+  enable: Enable
+  disable: Disable
+  select: Select
+  change: Change
+  test: Test
+  save: Save
+  reason: Reason
+  noData: No data
+  createdAt: Created at
+  irreversible: This action cannot be undone. Continue?
+network:
+  timeout: Request timed out
+  loginExpired: Session expired
+  loginExpiredMessage: Your session has expired. You can stay on this page or log in again.
+  relogin: Log in again
+  networkErr: Backend connection failed
+  codeErr: API error {code}
+  unauthorized: Authentication failed
+  forbidden: Permission denied
+  notFound: Resource not found
+  unknown: Unknown system error
+login:
+  title: Password Login
+  loginBtn: Login
+  userName: Please enter username
+  userNameLabel: Username
+  userNameRule: Please enter username
+  passwd: Please enter password
+  passwdRule: Please enter password
+  forgot: Forgot password?
+  resetTitle: Reset Password
+  key: Secret Key
+  keyPlaceholder: Copy all content from data/secret.key beside the program or Docker mount
+  keyRule: Please enter the secret key
+  newPasswd: Please enter new password
+  newPasswd2: Please confirm new password
+  newPasswd2Rule: Please enter the new password again
+  newPasswd2Error: The two passwords do not match
+  resetSuccess: Password reset. Please log in with the new password.
+user:
+  oldPasswd: Please enter old password
+  oldPasswdLabel: Old Password
+  oldPasswdRule: Please enter old password
+  newPasswd: Please enter new password
+  newPasswdLabel: New Password
+  newPasswdRule: Please enter new password
+  newPasswd2: Please enter new password again
+  newPasswd2Label: Confirm
+  newPasswd2Rule: Please enter new password again
+  newPasswd2Error: Passwords do not match
+  success: Updated
+header:
+  setPwd: Change Password
+  logout: Log out
+menu:
+  home: Jobs
+  engine: Engines
+  notify: Notifications
+  setting: Settings
+home:
+  jobManagement: Job Management
+  mobileJobCount: "{count} jobs"
+  mobileEmpty: No jobs yet. Create your first sync job.
+  mobileBasic: Basic Information
+  mobilePaths: Directory Settings
+  mobileNoTargets: No target directory selected
+  mobileScan: Scan Settings
+  mobileExclude: Exclude Settings
+  mobileTrigger: Trigger Settings
+  newJob: New Job
+  runAll: Run All
+  runAllConfirm: Run all enabled jobs?
+  jobName: Name
+  status: Status
+  sourcePath: Source Path
+  targetPath: Target Path
+  more: More Actions
+  manualRun: Run
+  detail: Details
+  addJob: Add Job
+  editJob: Edit Job
+  deleteJobConfirm: This job will be permanently deleted. Continue?
+  disableJobConfirm: This job will be disabled. Continue?
+  disabledRunTip: Enable the job before running it manually
+  editDisabledTip: Disable the job before editing
+  method: Sync Method
+  methodView: Sync Method
+  onlyAdd: Add only
+  onlyAddTip: Copy files that do not exist in the target path
+  fullSync: Full sync
+  fullSyncTip: Extra files in the target path will be deleted
+  moveMode: Move mode
+  moveModeTip: Delete source files after syncing
+  moveWarning: Move mode may cause file loss. Use it only for unimportant or well-backed-up files.
+  targetScan: Target Scan
+  sourceScan: Source Scan
+  noCache: No cache
+  useCache: Use cache
+  cacheDisabled: Disabled
+  cacheEnabled: Enabled
+  targetCache: Target Scan Cache
+  sourceCache: Source Scan Cache
+  targetInterval: Target Operation Interval
+  sourceInterval: Source Operation Interval
+  operateInterval: Operation interval {seconds}s
+  engine: Engine
+  noEngine: No engine yet. Create one in Engine Management.
+  selectEngineFirst: Select an engine first
+  srcPath: Source Path
+  dstPath: Target Path
+  selectDir: Select Directory
+  addDir: Add Directory
+  deleteDir: Delete
+  jobRemark: Job Name
+  jobRemarkPlaceholder: Optional name for this job
+  excludeSyntax: Exclude Syntax
+  excludeSyntaxTip: gitignore-like
+  excludeGuide: View exclude rule guide
+  excludeRules: Exclude Rules
+  excludePlaceholder: Enter a rule and click Add
+  excludeExists: This directory already exists
+  callType: Trigger
+  intervalCall: Interval
+  intervalCallTip: Sync every n minutes
+  cronCall: cron
+  cronCallTip: Recommended, guide available
+  manualOnly: Manual only
+  manualOnlyTip: No automatic trigger
+  syncInterval: Sync Interval
+  intervalTip: Interval jobs do not run immediately. You can run it manually after creation.
+  cronGuide: View cron guide
+  minute: minutes
+  second: seconds
+  intervalRequired: Interval is required for interval jobs
+  cronRequired: At least one cron field is required
+  requiredSource: Please select a source path
+  requiredTarget: Please select target paths
+  requiredEngine: Please select an engine
+  nonNegativeInt: Required and must be a non-negative integer
+task:
+  jobDetail: Job Details
+  mobileTaskCount: "{count} task records"
+  mobileHistory: Task History
+  mobileRecord: Task
+  noTask: No tasks
+  serial: No.
+  status: Status
+  progress: Task progress (see legend below, count)
+  syncingProgress: Current task progress is shown above
+  scanning: Scanning and syncing
+  noNeedSync: No sync needed
+  deleteUnavailable: Cannot delete
+  deleteConfirm: This record will be permanently deleted. Continue?
+  legend: Legend
+  total: Total files and folders
+  success: Success
+  fail: Failed
+  other: Other
+current:
+  notRunning: Job is not running
+  overall: Overall
+  noSyncFound: No files to sync yet
+  unreliableProgress: Progress is only an estimate before scanning completes
+  currentStatus: Current Status
+  scanDoneSyncing: Scan complete, syncing
+  scanningSyncing: Scanning and syncing
+  scanningOnly: Scanning
+  avgSpeed: Average Speed
+  instantSpeed: Instant Speed
+  speedTip: Speed estimates can be inaccurate when scanning takes too long
+  duration: Duration
+  remaining: Remaining
+  startAt: Started
+  finishAt: ETA
+  timeTip: Time is only an estimate before scanning completes and may be inaccurate if scanning takes too long
+  abort: Abort Task
+  noFilesYet: Scanning. No files need syncing yet...
+  wait: Waiting
+  running: Running
+  success: Success
+  fail: Failed
+  other: Other
+  abortConfirm: Running or waiting items will be canceled. Completed items are not affected. Continue?
+  abortSent: Abort command sent. Please wait.
+taskDetail:
+  mobileItemCount: "{count} file tasks"
+  mobileNoItems: No matching file tasks
+  title: Task Details
+  filterStatus: Status
+  filterType: Operation Type
+  copyCreate: Copy/Create
+  delete: Delete
+  move: Move
+  fileName: File/Folder
+  fileSize: Size
+  operateType: Operation
+  sourcePath: Source Path
+  targetPath: Target Path
+  create: Create
+  copy: Copy
+  failedReason: Failed, reason
+engine:
+  loading: Loading
+  empty: No engines yet. Add one.
+  add: Add
+  edit: Edit
+  address: URL
+  addressPlaceholder: Enter URL, such as http://127.0.0.1:5244
+  remark: Remark
+  remarkPlaceholder: Optional remark for this engine
+  token: Token
+  tokenPlaceholderAdd: Enter token copied from AList admin settings. Do not reset it after saving.
+  tokenPlaceholderEdit: Enter token. Leave blank to keep unchanged.
+  addressRule: Please enter URL
+  tokenRule: Please enter token copied from AList admin settings
+  deleteConfirm: This engine will be permanently deleted. Make sure no job is using it. Continue?
+notify:
+  loading: Loading
+  empty: No notification config yet. Add one.
+  add: Add
+  edit: Edit
+  enabled: Enabled
+  disabled: Disabled
+  method: Method
+  requestUrl: Request URL
+  requestMethod: Request Method
+  contentType: Content Type
+  titleName: Title Field
+  needContent: Need Content
+  contentName: Content Field
+  sendKey: SendKey
+  webhook: WebHook
+  notSendNull: Ignore empty sync
+  need: Yes
+  notNeed: No
+  configGuide: Configuration guide
+  serverChanT: ServerChan T
+  serverChan3: ServerChan 3
+  serverChanTip: Supports {serverChanT} (5 free messages/day) and {serverChan3} (unlimited during public beta)
+  dingTalkTip: "{configGuide}: use the custom keyword security setting with TaoSync as the keyword."
+  weComTip: "{configGuide}: get these values from the WeCom admin console."
+  larkTip: "{configGuide}: use the custom keyword security setting with TaoSync as the keyword."
+  corpid: Corp ID
+  agentid: Agent ID
+  corpsecret: Secret
+  touser: Recipient
+  touserPlaceholder: User IDs separated by |, @all for everyone
+  testSent: Test message sent. Please verify delivery.
+  deleteConfirm: This notification config will be permanently deleted. Continue?
+  methods:
+    custom: Custom
+    serverChan: ServerChan
+    dingTalk: DingTalk Bot
+    weCom: WeCom App
+    lark: Lark Bot
+refresh:
+  auto: Auto refresh
+pathSelect:
+  title: Select Directory
+  selectFirst: Select a path first
+setting:
+  title: Settings
+  username: Username
+  version: "TaoSync version: __version_placeholder__"
+  github: Project (GitHub)
+  issues: Issues (GitHub)
+taskStatus:
+  waiting: Waiting
+  syncing: Syncing
+  success: Success
+  finished: Finished
+  aborted: Aborted
+  timeout: Timeout
+  createFailed: Create failed
+  manualAbort: Manually aborted
+taskItemStatus:
+  waiting: Waiting
+  running: Running
+  success: Success
+  canceling: Canceling
+  canceled: Canceled
+  retryError: Error, will retry
+  failing: Failing
+  failed: Failed
+  waitRetry: Waiting retry
+  beforeRetry: Before retry
+time:
+  day: d
+  hour: h
+  minute: m
+  second: s

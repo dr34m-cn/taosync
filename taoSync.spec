@@ -5,7 +5,10 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('frontend/dist/', 'front')],
+    datas=[
+        ('web/dist/', 'front'),
+        ('locales/', 'locales'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

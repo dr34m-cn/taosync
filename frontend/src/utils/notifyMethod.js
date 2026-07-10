@@ -1,1 +1,0 @@
-export default ['自定义', 'server酱', '钉钉群机器人', '企业微信应用消息', 'Lark群机器人']

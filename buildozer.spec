@@ -5,8 +5,8 @@ package.name = taosync
 package.domain = com.github
 
 source.dir = .
-source.include_exts = py,png,jpg,jpeg,html,js,css,ttf,otf,svg,ico,json,gif,woff,woff2,map
-source.include_patterns = front/**,common/**,controller/**,mapper/**,service/**,doc/config.ini
+source.include_exts = py,png,jpg,jpeg,html,js,css,ttf,otf,svg,ico,json,gif,woff,woff2,map,yaml
+source.include_patterns = front/**,locales/**,common/**,controller/**,mapper/**,service/**,doc/config.ini
 
 version = 0.3.2
 

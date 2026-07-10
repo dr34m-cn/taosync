@@ -1,0 +1,309 @@
+title: TaoSync
+error: 加载失败
+retry: 重试
+loading: 加载中
+empty: 无数据
+common:
+  add: 新增
+  edit: 编辑
+  delete: 删除
+  cancel: 取消
+  confirm: 确定
+  operate: 操作
+  back: 返回
+  warning: 警告
+  tips: 提示
+  success: 操作成功
+  enabled: 启用
+  disabled: 禁用
+  enable: 启用
+  disable: 禁用
+  select: 选择
+  change: 更换
+  test: 测试
+  save: 保存
+  reason: 原因
+  noData: 暂无数据
+  createdAt: 创建时间
+  irreversible: 操作不可逆，确定吗？
+network:
+  timeout: 请求超时
+  loginExpired: 登录状态已过期
+  loginExpiredMessage: 登录状态已过期，您可以继续留在该页面，或者重新登录
+  relogin: 重新登录
+  networkErr: 后端接口连接异常
+  codeErr: 系统接口 {code} 异常
+  unauthorized: 认证失败，无法访问系统资源
+  forbidden: 当前操作没有权限
+  notFound: 访问资源不存在
+  unknown: 系统未知错误，请反馈给管理员
+login:
+  title: 密码登录
+  loginBtn: 登录
+  userName: 请输入用户名
+  userNameLabel: 用户名
+  userNameRule: 请输入用户名
+  passwd: 请输入密码
+  passwdRule: 请输入密码
+  forgot: 忘记密码？
+  resetTitle: 重置密码
+  key: 加密秘钥
+  keyPlaceholder: 在程序同级或 docker 挂载目录 data/secret.key 文件中复制全部内容
+  keyRule: 请输入加密秘钥
+  newPasswd: 请输入新密码
+  newPasswd2: 请确认新密码
+  newPasswd2Rule: 请再次输入新密码
+  newPasswd2Error: 两次输入密码不一致
+  resetSuccess: 密码重置成功，请使用新密码登录
+user:
+  oldPasswd: 请输入旧密码
+  oldPasswdLabel: 旧密码
+  oldPasswdRule: 请输入旧密码
+  newPasswd: 请输入新密码
+  newPasswdLabel: 新密码
+  newPasswdRule: 请输入新密码
+  newPasswd2: 请再次输入新密码
+  newPasswd2Label: 确认密码
+  newPasswd2Rule: 请再次输入新密码
+  newPasswd2Error: 两次密码不一致
+  success: 修改成功
+header:
+  setPwd: 修改密码
+  logout: 登出
+menu:
+  home: 作业管理
+  engine: 引擎管理
+  notify: 通知配置
+  setting: 系统设置
+home:
+  jobManagement: 作业管理
+  mobileJobCount: 共 {count} 个作业
+  mobileEmpty: 暂无作业，创建第一个同步作业
+  mobileBasic: 基本信息
+  mobilePaths: 目录设置
+  mobileNoTargets: 暂未选择目标目录
+  mobileScan: 扫描设置
+  mobileExclude: 排除设置
+  mobileTrigger: 调用设置
+  newJob: 新建作业
+  runAll: 执行全部
+  runAllConfirm: 确认执行所有未禁用的作业吗？
+  jobName: 名称
+  status: 状态
+  sourcePath: 来源目录
+  targetPath: 目标目录
+  more: 更多操作
+  manualRun: 手动执行
+  detail: 详情
+  addJob: 新增作业
+  editJob: 编辑作业
+  deleteJobConfirm: 此操作不可逆，将永久删除该作业，确认吗？
+  disableJobConfirm: 将禁用任务，确认吗？
+  disabledRunTip: 如需手动执行，请先启用作业
+  editDisabledTip: 禁用作业后才能编辑
+  method: 同步方法
+  methodView: 同步方式
+  onlyAdd: 仅新增
+  onlyAddTip: 仅新增目标目录没有的文件
+  fullSync: 全同步
+  fullSyncTip: 目标目录比源目录多的文件将被删除
+  moveMode: 移动模式
+  moveModeTip: 同步完成后删除源目录所有文件
+  moveWarning: 移动模式存在风险，可能导致文件丢失；请仅用于不重要或已有多重备份的文件。
+  targetScan: 目标目录扫描
+  sourceScan: 源目录扫描
+  noCache: 不用缓存
+  useCache: 使用缓存
+  cacheDisabled: 不使用
+  cacheEnabled: 使用
+  targetCache: 目标目录扫描缓存
+  sourceCache: 源目录扫描缓存
+  targetInterval: 目标目录操作间隔
+  sourceInterval: 源目录操作间隔
+  operateInterval: 操作间隔为 {seconds} 秒
+  engine: 引擎
+  noEngine: 暂无引擎，请前往引擎管理创建
+  selectEngineFirst: 请先选择引擎
+  srcPath: 源目录
+  dstPath: 目标目录
+  selectDir: 选择目录
+  addDir: 添加目录
+  deleteDir: 删除
+  jobRemark: 作业名称
+  jobRemarkPlaceholder: 用来标识你的作业，选填
+  excludeSyntax: 排除项语法
+  excludeSyntaxTip: 类 gitignore
+  excludeGuide: 点击查看排除项简易教程
+  excludeRules: 排除项规则
+  excludePlaceholder: 输入后点添加才生效
+  excludeExists: 该目录已存在
+  callType: 调用方式
+  intervalCall: 间隔
+  intervalCallTip: 每 n 分钟同步一次
+  cronCall: cron
+  cronCallTip: 推荐使用，有教程
+  manualOnly: 仅手动
+  manualOnlyTip: 不自动调用
+  syncInterval: 同步间隔
+  intervalTip: 间隔方式不会立即调用，如有需要，可在创建后立即手动调用
+  cronGuide: 点击查看 cron 简易教程
+  minute: 分钟
+  second: 秒
+  intervalRequired: 选择间隔方式时，间隔必填
+  cronRequired: 选择 cron 方式时，至少有一项不能为空
+  requiredSource: 请选择来源目录
+  requiredTarget: 请选择目标目录
+  requiredEngine: 请选择引擎
+  nonNegativeInt: 必填且须为非负整数
+task:
+  jobDetail: 作业详情
+  mobileTaskCount: 共 {count} 条任务记录
+  mobileHistory: 历史任务
+  mobileRecord: 任务记录
+  noTask: 暂无任务
+  serial: 序号
+  status: 状态
+  progress: 任务进度（意义见页面底部图例，单位个）
+  syncingProgress: 同步中的任务进度见上方
+  scanning: 扫描同步中
+  noNeedSync: 无需同步
+  deleteUnavailable: 暂不能删除
+  deleteConfirm: 操作不可逆，将永久删除该记录，确定吗？
+  legend: 进度图例
+  total: 需同步文件和目录总数
+  success: 成功
+  fail: 失败
+  other: 其他
+current:
+  notRunning: 作业未在进行中
+  overall: 整体进度
+  noSyncFound: 暂未发现需同步文件
+  unreliableProgress: 扫描未完成前，进度不可靠，仅供参考
+  currentStatus: 当前状态
+  scanDoneSyncing: 扫描完成，同步中
+  scanningSyncing: 扫描并同步中
+  scanningOnly: 扫描中
+  avgSpeed: 平均速度
+  instantSpeed: 瞬时速度
+  speedTip: 如果扫描用时太久，估算速度可能有很大误差
+  duration: 持续时间
+  remaining: 预计还要
+  startAt: 开始时间
+  finishAt: 预计完成
+  timeTip: 扫描未完成前，预计时间仅供参考；如果扫描用时太久，估算时间可能有很大误差
+  abort: 中止任务
+  noFilesYet: 扫描中，暂无需要同步的文件，请耐心等待...
+  wait: 等待中
+  running: 进行中
+  success: 成功
+  fail: 失败
+  other: 其他
+  abortConfirm: 中止任务不影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？
+  abortSent: 中止指令已发送，请等待中止完成
+taskDetail:
+  mobileItemCount: 共 {count} 个文件任务
+  mobileNoItems: 暂无符合条件的文件任务
+  title: 任务详情
+  filterStatus: 筛选状态
+  filterType: 筛选操作类型
+  copyCreate: 复制/创建
+  delete: 删除
+  move: 移动
+  fileName: 文件名/目录
+  fileSize: 文件大小
+  operateType: 操作类型
+  sourcePath: 来源目录
+  targetPath: 目标目录
+  create: 创建
+  copy: 复制
+  failedReason: 失败，原因
+engine:
+  loading: 加载中
+  empty: 暂无引擎，请新增
+  add: 新增
+  edit: 编辑
+  address: 地址
+  addressPlaceholder: 请输入地址，如 http://127.0.0.1:5244
+  remark: 备注
+  remarkPlaceholder: 备注方便你标识引擎，非必填
+  token: 令牌
+  tokenPlaceholderAdd: 请输入令牌，请到 AList 管理 - 设置 - 其他中复制，保存后不要重置令牌
+  tokenPlaceholderEdit: 请输入令牌，留空表示不修改
+  addressRule: 请输入地址
+  tokenRule: 请输入令牌，请到 AList 管理 - 设置 - 其他中复制，保存后不要重置令牌否则令牌失效
+  deleteConfirm: 操作不可逆，将永久删除该引擎，请确认没有作业使用该引擎，否则会导致错误，仍要删除吗？
+notify:
+  loading: 加载中
+  empty: 暂无通知配置，请新增
+  add: 新增
+  edit: 编辑
+  enabled: 已启用
+  disabled: 已禁用
+  method: 方式
+  requestUrl: 请求地址
+  requestMethod: 请求方法
+  contentType: 请求体类型
+  titleName: 标题参数名
+  needContent: 是否需要内容
+  contentName: 内容参数名
+  sendKey: SendKey
+  webhook: WebHook
+  notSendNull: 忽略无同步
+  need: 需要
+  notNeed: 不需要
+  configGuide: 配置指南
+  serverChanT: Server酱ᵀ
+  serverChan3: Server酱³
+  serverChanTip: 同时支持 {serverChanT}（免费 5 次/天）与 {serverChan3}（公测不限次）
+  dingTalkTip: "{configGuide} 安全设置请采用自定义关键字，关键字内容为 TaoSync。"
+  weComTip: "{configGuide} 请在企业微信管理后台获取相关参数"
+  larkTip: "{configGuide} 安全设置请采用自定义关键字，关键字内容为 TaoSync。"
+  corpid: 企业ID
+  agentid: 应用ID
+  corpsecret: 应用Secret
+  touser: 接收用户
+  touserPlaceholder: 请输入接收用户ID，多个用 | 分隔，@all 表示全部
+  testSent: 测试消息已发送，请检查是否正确收到通知
+  deleteConfirm: 操作不可逆，将永久删除该通知配置，仍要删除吗？
+  methods:
+    custom: 自定义
+    serverChan: server酱
+    dingTalk: 钉钉群机器人
+    weCom: 企业微信应用消息
+    lark: Lark群机器人
+refresh:
+  auto: 自动刷新
+pathSelect:
+  title: 选择目录
+  selectFirst: 请先选择路径
+setting:
+  title: 系统设置
+  username: 用户名
+  version: TaoSync 版本：__version_placeholder__
+  github: 项目地址（GitHub）
+  issues: 问题反馈（GitHub Issues）
+taskStatus:
+  waiting: 等待中
+  syncing: 同步中
+  success: 成功
+  finished: 已结束
+  aborted: 异常中止
+  timeout: 执行超时
+  createFailed: 创建失败
+  manualAbort: 人为中止
+taskItemStatus:
+  waiting: 等待中
+  running: 进行中
+  success: 成功
+  canceling: 取消中
+  canceled: 已取消
+  retryError: 出错（将重试）
+  failing: 失败中
+  failed: 已失败
+  waitRetry: 等待重试中
+  beforeRetry: 等待重试前
+time:
+  day: 天
+  hour: 小时
+  minute: 分钟
+  second: 秒

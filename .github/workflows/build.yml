@@ -46,23 +46,26 @@ jobs:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 安装Node.js 14.x
+      - name: 安装Node.js 22.x
         uses: actions/setup-node@v4
         with:
-          node-version: "14.x"
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
       - name: 安装依赖并构建前端
+        working-directory: web
         run: |
-          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
-          cd frontend
-          npm install
+          sed -i "s/__version_placeholder__/$VERSION/g" src/locales/zh-CN.yaml
+          sed -i "s/__version_placeholder__/$VERSION/g" src/locales/en.yaml
+          npm ci
           npm run build
 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
-          path: frontend/dist
+          name: web-dist
+          path: web/dist
           retention-days: 1
 
   build-docker:
@@ -106,8 +109,8 @@ jobs:
       - name: 下载前端
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist
-          path: frontend/dist
+          name: web-dist
+          path: web/dist
 
       - id: build-image
         name: 构建docker镜像
@@ -203,8 +206,8 @@ jobs:
       - name: 下载前端
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist
-          path: frontend/dist
+          name: web-dist
+          path: web/dist
 
       - name: 设置python环境
         uses: actions/setup-python@v5
@@ -254,8 +257,8 @@ jobs:
       - name: 下载前端
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist
-          path: frontend/dist
+          name: web-dist
+          path: web/dist
 
       - name: 设置python环境
         uses: actions/setup-python@v5
@@ -277,10 +280,213 @@ jobs:
           path: dist/*.tar.gz
           retention-days: 1
 
+  build-staticx:
+    name: 构建Linux StaticX
+    runs-on: ubuntu-latest
+    needs: [get-version, build-frontend]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
+    strategy:
+      matrix:
+        platform: ["amd64", "arm64", "arm32"]
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+      - name: 设置QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: 设置构建变量
+        run: |
+          case "${{ matrix.platform }}" in
+            amd64) echo "T_ARCH=amd64" >> "$GITHUB_ENV" ;;
+            arm64) echo "T_ARCH=arm64" >> "$GITHUB_ENV" ;;
+            arm32) echo "T_ARCH=arm/v7" >> "$GITHUB_ENV" ;;
+          esac
+
+      - name: 在Docker中进行静态打包
+        run: |
+          case "${{ matrix.platform }}" in
+            amd64) IMG="python:3.11-slim-bullseye"; LIB="/usr/lib/x86_64-linux-gnu" ;;
+            arm64) IMG="arm64v8/python:3.11-slim-bullseye"; LIB="/usr/lib/aarch64-linux-gnu" ;;
+            arm32) IMG="arm32v7/python:3.11-slim-bullseye"; LIB="/usr/lib/arm-linux-gnueabihf" ;;
+          esac
+
+          docker run --rm \
+            --platform "linux/${T_ARCH}" \
+            -v "$(pwd):/app" \
+            -w /app \
+            -e APP_NAME="${APP_NAME}" \
+            -e LIB_PATH="${LIB}" \
+            "${IMG}" \
+            sh -c '
+              set -e
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential \
+                zlib1g-dev \
+                patchelf \
+                binutils \
+                zip
+              rm -rf /var/lib/apt/lists/*
+
+              python -m pip install --upgrade pip
+              python -m pip install setuptools wheel scons hatchling
+              python -m pip install --no-build-isolation "pyinstaller>=6,<7" staticx
+              python -m pip install -r requirements.txt
+
+              export LD_LIBRARY_PATH="/usr/local/lib:${LIB_PATH}"
+              python -m PyInstaller "${APP_NAME}.spec" \
+                --distpath "/app/dist/${{ matrix.platform }}" \
+                --workpath "/app/build/${{ matrix.platform }}" \
+                --noconfirm
+
+              staticx "/app/dist/${{ matrix.platform }}/${APP_NAME}" "/app/dist/${{ matrix.platform }}/${APP_NAME}_StaticX"
+              mv -f "/app/dist/${{ matrix.platform }}/${APP_NAME}_StaticX" "/app/dist/${{ matrix.platform }}/${APP_NAME}"
+              chmod +x "/app/dist/${{ matrix.platform }}/${APP_NAME}"
+            '
+
+      - name: 压缩StaticX产物
+        run: |
+          cd "dist/${{ matrix.platform }}"
+          zip -r "../../${APP_NAME}-${VERSION}-linux-StaticX-${{ matrix.platform }}.zip" .
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux-staticx-${{ matrix.platform }}
+          path: ${{ env.APP_NAME }}-${{ env.VERSION }}-linux-StaticX-${{ matrix.platform }}.zip
+          retention-days: 1
+
+  build-android:
+    name: 构建Android
+    runs-on: ubuntu-latest
+    needs: [get-version, build-frontend]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+      BUILDOZER_SPEC: buildozer.spec
+      P4A_VERSION: 2024.01.21
+      CACHE_VERSION: v6
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+      - name: 准备Android前端资源
+        run: |
+          rm -rf front
+          cp -r web/dist front
+          test -f front/index.html
+          test -f locales/zh_CN.yaml
+
+      - name: 设置python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libffi-dev libssl-dev libsqlite3-dev libbz2-dev libreadline-dev \
+            libportaudio2 libportaudiocpp0 \
+            libltdl-dev libtool-bin \
+            ccache git wget unzip zip \
+            openjdk-17-jdk build-essential
+          sudo ln -sf "$(which python3)" /usr/bin/python
+          echo "ACLOCAL_PATH=/usr/share/aclocal" >> "$GITHUB_ENV"
+
+      - name: 配置Java环境变量
+        run: |
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> "$GITHUB_ENV"
+          echo "/usr/lib/jvm/java-17-openjdk-amd64/bin" >> "$GITHUB_PATH"
+
+      - name: 安装Buildozer与python-for-android
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "buildozer==1.5.0" "python-for-android==${P4A_VERSION}" "Cython==0.29.34" virtualenv
+          python -c "import pythonforandroid; print('p4a version:', pythonforandroid.__version__)"
+
+      - name: 缓存Buildozer目录
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+          key: buildozer-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-
+
+      - name: 清理旧构建产物
+        run: |
+          rm -rf .buildozer bin .python-for-android
+
+      - name: 切换Android入口
+        run: |
+          test -f "$BUILDOZER_SPEC"
+          test -f main_android.py
+          cp main_android.py main.py
+
+      - name: 注入Android版本号
+        run: |
+          ver_num="${VERSION#v}"
+          sed -i "s/^version = .*/version = $ver_num/" "$BUILDOZER_SPEC"
+          IFS='.' read -r major minor patch <<< "$ver_num"
+          major="${major%%[!0-9]*}"; major="${major:-0}"
+          minor="${minor%%[!0-9]*}"; minor="${minor:-0}"
+          patch="${patch%%[!0-9]*}"; patch="${patch:-0}"
+          numeric_version=$(( major*10000 + minor*100 + patch ))
+          if grep -q "^android.numeric_version" "$BUILDOZER_SPEC"; then
+            sed -i "s/^android.numeric_version = .*/android.numeric_version = $numeric_version/" "$BUILDOZER_SPEC"
+          else
+            printf '\nandroid.numeric_version = %s\n' "$numeric_version" >> "$BUILDOZER_SPEC"
+          fi
+          grep -E "^(version|android.numeric_version)" "$BUILDOZER_SPEC"
+
+      - name: 编译Android Debug APK
+        run: PYTHONWARNINGS="ignore:Unable to find acceptable character detection:UserWarning" buildozer -v android debug
+
+      - name: 整理Android产物
+        run: |
+          mkdir -p dist
+          apk_path=$(find bin -maxdepth 1 -name '*.apk' -print -quit)
+          if [ -z "$apk_path" ]; then
+            echo "::error::未找到编译产物 APK"
+            exit 1
+          fi
+          cp "$apk_path" "dist/${APP_NAME}-${VERSION}-android-debug.apk"
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-android
+          path: dist/*.apk
+          retention-days: 1
+          compression-level: 0
+
   create-release:
     name: 发布release
     runs-on: ubuntu-latest
-    needs: [get-version, build-windows, build-darwin, build-docker]
+    needs: [get-version, build-windows, build-darwin, build-docker, build-staticx, build-android]
     env:
       VERSION: ${{needs.get-version.outputs.VERSION}}
     if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
