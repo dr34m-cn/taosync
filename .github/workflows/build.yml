@@ -286,7 +286,6 @@ jobs:
     needs: [get-version, build-frontend]
     env:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
-    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
     strategy:
       matrix:
         platform: ["amd64", "arm64", "arm32"]
@@ -353,7 +352,7 @@ jobs:
 
               staticx "/app/dist/${{ matrix.platform }}/${APP_NAME}" "/app/dist/${{ matrix.platform }}/${APP_NAME}_StaticX"
               mv -f "/app/dist/${{ matrix.platform }}/${APP_NAME}_StaticX" "/app/dist/${{ matrix.platform }}/${APP_NAME}"
-              chmod +x "/app/dist/${{ matrix.platform }}/${APP_NAME}"
+              chmod 755 "/app/dist/${{ matrix.platform }}/${APP_NAME}"
             '
 
       - name: 压缩StaticX产物
@@ -377,7 +376,6 @@ jobs:
       BUILDOZER_SPEC: buildozer.spec
       P4A_VERSION: 2024.01.21
       CACHE_VERSION: v6
-    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
 
     steps:
       - name: 检出仓库代码
@@ -455,11 +453,11 @@ jobs:
           minor="${minor%%[!0-9]*}"; minor="${minor:-0}"
           patch="${patch%%[!0-9]*}"; patch="${patch:-0}"
           numeric_version=$(( major*10000 + minor*100 + patch ))
-          if grep -q "^android.numeric_version" "$BUILDOZER_SPEC"; then
-            sed -i "s/^android.numeric_version = .*/android.numeric_version = $numeric_version/" "$BUILDOZER_SPEC"
-          else
-            printf '\nandroid.numeric_version = %s\n' "$numeric_version" >> "$BUILDOZER_SPEC"
-          fi
+          # android.numeric_version 必须位于 [app] 段，buildozer 才会传 --numeric-version 给 p4a；
+          # 否则 p4a 会按 --version 拆分计算 versionCode，遇到 pre-release 后缀(如 3-pre-build0)
+          # 触发 int() 失败。先删除任意位置的旧行，再紧随 [app] 段的 version 行之后插入。
+          sed -i "/^android.numeric_version[[:space:]]*=/d" "$BUILDOZER_SPEC"
+          sed -i "/^version[[:space:]]*=/a android.numeric_version = $numeric_version" "$BUILDOZER_SPEC"
           grep -E "^(version|android.numeric_version)" "$BUILDOZER_SPEC"
 
       - name: 编译Android Debug APK
