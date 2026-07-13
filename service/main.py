@@ -196,7 +196,7 @@ _LOG_PAGE_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>taoSync 日志</title>
+<title>taoSync Android</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; }
@@ -205,6 +205,43 @@ body {
   color: #d4d4d4;
   font-family: 'Courier New', Consolas, monospace;
   font-size: 12px;
+  display: flex;
+  flex-direction: column;
+}
+button { letter-spacing: 0; }
+#tabs {
+  flex: 0 0 44px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: #181818;
+  border-bottom: 1px solid #3c3c3c;
+}
+.tab {
+  min-width: 0;
+  appearance: none;
+  background: transparent;
+  color: #a8a8a8;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab.active {
+  background: #252526;
+  color: #ffffff;
+  border-bottom-color: #4ec9b0;
+  font-weight: 600;
+}
+.tab:active { background: #303030; }
+.tab:focus { outline: none; }
+.view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: none;
+}
+.view.active {
   display: flex;
   flex-direction: column;
 }
@@ -218,11 +255,16 @@ body {
   border-bottom: 1px solid #3c3c3c;
 }
 #bar .title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: bold;
   font-size: 13px;
   flex: 1;
 }
 #bar button {
+  flex-shrink: 0;
   background: #3a3a3a;
   color: #d4d4d4;
   border: 1px solid #3c3c3c;
@@ -242,6 +284,7 @@ body {
 #status.offline { background: #f44747; }
 #log {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 6px 10px;
   -webkit-overflow-scrolling: touch;
@@ -261,19 +304,61 @@ body {
 .lv-CRITICAL { color: #569cd6; }
 .lv-ERROR .lv { color: #f44747; }
 .lv-CRITICAL .lv { color: #569cd6; }
+#viewWeb { background: #ffffff; }
+#businessFrame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: #ffffff;
+}
 </style>
 </head>
 <body>
-<div id="bar">
-  <span id="status"></span>
-  <span class="title">taoSync 运行日志</span>
-  <button id="btnClear">清空</button>
-</div>
-<div id="log"></div>
+<nav id="tabs" role="tablist" aria-label="taoSync 页面">
+  <button type="button" id="tabLogs" class="tab active" aria-selected="true" aria-controls="viewLogs" role="tab">日志</button>
+  <button type="button" id="tabWeb" class="tab" aria-selected="false" aria-controls="viewWeb" role="tab">网页</button>
+</nav>
+<section id="viewLogs" class="view active" aria-labelledby="tabLogs" role="tabpanel">
+  <div id="bar">
+    <span id="status"></span>
+    <span class="title">taoSync 运行日志</span>
+    <button type="button" id="btnClear">清空</button>
+  </div>
+  <div id="log"></div>
+</section>
+<section id="viewWeb" class="view" aria-labelledby="tabWeb" role="tabpanel" hidden>
+  <iframe id="businessFrame" title="taoSync 网页" data-src="http://127.0.0.1:8023/"></iframe>
+</section>
 <script>
 var lastSeq = 0;
 var logEl = document.getElementById('log');
 var statusEl = document.getElementById('status');
+var tabLogs = document.getElementById('tabLogs');
+var tabWeb = document.getElementById('tabWeb');
+var viewLogs = document.getElementById('viewLogs');
+var viewWeb = document.getElementById('viewWeb');
+var businessFrame = document.getElementById('businessFrame');
+
+function selectView(name) {
+  var showWeb = name === 'web';
+  tabLogs.classList.toggle('active', !showWeb);
+  tabWeb.classList.toggle('active', showWeb);
+  tabLogs.setAttribute('aria-selected', String(!showWeb));
+  tabWeb.setAttribute('aria-selected', String(showWeb));
+  viewLogs.classList.toggle('active', !showWeb);
+  viewWeb.classList.toggle('active', showWeb);
+  viewLogs.hidden = showWeb;
+  viewWeb.hidden = !showWeb;
+  if (name === 'web' && !businessFrame.getAttribute('src')) {
+    businessFrame.setAttribute('src', businessFrame.dataset.src);
+  }
+}
+
+tabLogs.onclick = function() { selectView('logs'); };
+tabWeb.onclick = function() { selectView('web'); };
 
 document.getElementById('btnClear').onclick = function() {
   logEl.innerHTML = '';
