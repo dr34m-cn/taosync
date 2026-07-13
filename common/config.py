@@ -5,6 +5,7 @@ import os
 from common.commonUtils import generatePasswd, readOrSet
 
 sysConfig = None
+DEFAULT_PASSWORD = 'RANDOM'
 
 
 def getPasswordStr():
@@ -31,19 +32,25 @@ def getConfig():
             'task_save': 0,
             'timeout': 72
         }
+        password = DEFAULT_PASSWORD
         if os.path.exists('data/config.ini'):
             try:
                 cfg = configparser.ConfigParser()
                 cfg.read('data/config.ini', encoding='utf8')
                 tao = cfg['tao']
+                if 'password' in tao:
+                    password = tao.get('password', raw=True)
                 for keyItem in sCfg.keys():
                     if keyItem in tao:
                         sCfg[keyItem] = int(tao[keyItem])
             except Exception as e:
                 logger = logging.getLogger()
-                logger.error(f"配置文件读取失败，将使用默认配置_/_config.ini read error: {e}")
-                logger.exception(e)
+                error_type = type(e).__name__
+                logger.error(f"配置文件读取失败，将使用默认配置_/_config.ini read error: {error_type}")
         else:
+            password = os.getenv('TAO_PASSWORD')
+            if password is None:
+                password = os.getenv('TAO_PASSWD', DEFAULT_PASSWORD)
             try:
                 sCfg['port'] = int(os.getenv('TAO_PORT', 8023))
                 sCfg['expires'] = int(os.getenv('TAO_EXPIRES', 2))
@@ -56,12 +63,15 @@ def getConfig():
                 logger = logging.getLogger()
                 logger.error(f"环境变量读取失败，将使用默认配置_/_ENV read error: {e}")
                 logger.exception(e)
+        if not password or not password.strip():
+            password = DEFAULT_PASSWORD
         sysConfig = {
             'db': {
                 'dbname': dbname
             },
             'server': {
                 'passwdStr': passwdStr,
+                'password': password,
                 **sCfg
             }
         }

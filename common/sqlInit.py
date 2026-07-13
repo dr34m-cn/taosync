@@ -1,5 +1,6 @@
 from common import commonUtils
 from common import sqlBase
+from common.config import DEFAULT_PASSWORD, getConfig
 
 
 @sqlBase.connect_sql
@@ -9,7 +10,10 @@ def init_sql(conn):
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
     if cursor.fetchone() is None:
-        passwd = commonUtils.generatePasswd()
+        configured_password = getConfig()['server']['password']
+        passwd = (commonUtils.generatePasswd()
+                  if configured_password == DEFAULT_PASSWORD
+                  else configured_password)
         cursor.execute("create table user_list("
                        "id integer primary key autoincrement,"
                        "userName text,"                             # 用户名

@@ -6,6 +6,7 @@ login_expired: 登录失效
 running_success: 启动成功：{url}
 init_sql: 初始化数据库完成
 admin_password_generated: 已为 admin 生成随机密码：{}
+admin_password_configured: 已使用手动设定的密码。
 alist_not_found: 未找到 AList，可能已经被删除
 del_job_course_error: 作业启动过程中报错，将自动删除作业，任务为 {}
 job_not_found: 未找到作业，可能已经被删除

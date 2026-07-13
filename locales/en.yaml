@@ -6,6 +6,7 @@ login_expired: Login expired
 running_success: "Running at: {url}"
 init_sql: Database initialization completed
 admin_password_generated: "Generated a random password for admin: {}"
+admin_password_configured: "The manually configured password is in use."
 alist_not_found: AList not found, may have been deleted
 del_job_course_error: An error occurred during job startup and the job will be automatically deleted. The job is {}
 job_not_found: The job was not found and may have been deleted

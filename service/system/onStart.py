@@ -6,6 +6,7 @@ import logging
 import os
 
 from common import sqlInit, commonService, locales
+from common.config import DEFAULT_PASSWORD, getConfig
 from common.LNG import G
 from service.syncJob.jobService import initJob
 from service.system import logJobService
@@ -24,7 +25,10 @@ def init():
     # 初始化数据库，没有则创建
     passwd = sqlInit.init_sql()
     if passwd is not None:
-        msg = G('admin_password_generated').format(passwd)
+        if getConfig()['server']['password'] == DEFAULT_PASSWORD:
+            msg = G('admin_password_generated').format(passwd)
+        else:
+            msg = G('admin_password_configured')
         logger.critical(msg)
     logger.info(G('init_sql'))
     # 启动日志文件与任务定时清理任务
