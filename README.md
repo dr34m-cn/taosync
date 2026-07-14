@@ -105,8 +105,10 @@
   * linux-arm-v7
   * linux-s390x
   * linux-ppc64le
+  * Android
 * [Github Actions](https://docs.github.com/zh/actions)自动打包与发布构建好的可执行程序，过程公开透明，无投毒风险
 * 支持Docker，下载即用
+* 适配PC&移动端显示，方便易用
 * 干净卸载，不用的时候删掉即可，无任何残留或依赖，不影响系统里其他程序
 * 数据库内的登录密码以不可逆散列保存，支持重置密码；如通过配置文件或环境变量设置初始密码，请妥善保护相关配置
 * 完全离线运行（仅连接AList），永不上传用户隐私
@@ -129,16 +131,28 @@
 
 前往[Release](https://github.com/dr34m-cn/taosync/releases)下载对应平台的可执行程序，直接执行
 
-> [!TIP]
-> 开机自启、守护进程等可以参考[OpenList的方式](https://docs.oplist.org/zh/guide/install/manual.html#%E5%AE%88%E6%8A%A4%E8%BF%9B%E7%A8%8B)，把其中的`openlist`改为`taoSync`；注意，本程序**不需要`server`参数**
-
 * docker
 
 ```sh
 docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:latest
 ```
 
-把其中`/opt/data`替换为你实际的目录
+或docker-compose
+```yaml
+version: '3.8'
+
+services:
+  tao-sync:
+    image: dr34m/tao-sync:latest
+    container_name: taoSync
+    restart: always
+    ports:
+      - "8023:8023"
+    volumes:
+      - /opt/data:/app/data
+```
+
+把其中`/opt/data`替换为你实际的目录，在部分NAS(如绿联NAS)中，可以使用相对目录，如`./config:/app/data`
 
 在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://dr34m.cn/2024/07/newpost-57/)，在其他支持Docker的NAS中使用大同小异
 
@@ -208,14 +222,8 @@ task_timeout=72
 
 * windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
 * OpenList支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
-* 移动端适配（可能顺便开发个app？）
 * 支持本地引擎（不基于`OpenList`）
 * 本地引擎支持加密同步
 * 保留历史N个版本（N可自定义，可无限）
 * 配置导入导出
-* 多语言支持
 * linux一键安装、更新与卸载脚本
-
-## Star随时间
-
-[![Stargazers over time](https://starchart.cc/dr34m-cn/taosync.svg?variant=adaptive)](https://starchart.cc/dr34m-cn/taosync)
