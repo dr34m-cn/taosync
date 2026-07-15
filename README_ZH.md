@@ -161,8 +161,6 @@ services:
 
 把其中`/opt/data`替换为你实际的目录，在部分NAS(如绿联NAS)中，可以使用相对目录，如`./config:/app/data`
 
-在绿联NAS中使用可以参考这里[如何在绿联NAS中使用TaoSync同步我的文件到各个网盘](https://dr34m.cn/2024/07/newpost-57/)，在其他支持Docker的NAS中使用大同小异
-
 ### 再使用
 
 访问`http://127.0.0.1:8023`

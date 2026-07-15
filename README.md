@@ -161,8 +161,6 @@ services:
 
 Replace `/opt/data` with the directory you want to use. On some NAS devices, such as UGREEN NAS, you can use a relative path, for example `./config:/app/data`.
 
-For instructions on using TaoSync on a UGREEN NAS, see [How to use TaoSync on a UGREEN NAS to synchronize files to multiple cloud drives (Chinese)](https://dr34m.cn/2024/07/newpost-57/). The setup is similar on other NAS devices that support Docker.
-
 ### Use TaoSync
 
 Open `http://127.0.0.1:8023`.
