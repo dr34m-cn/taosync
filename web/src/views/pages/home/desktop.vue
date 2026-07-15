@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { alistGet, jobDelete, jobGetJob, jobPost, jobPut } from "@/api/job";
+import fileSizeFilter from "./components/fileSizeFilter.vue";
 import pathSelect from "./components/pathSelect.vue";
 import menuRefresh from "./components/menuRefresh.vue";
-import { parseTime } from "@/utils/utils";
+import { parseSize, parseTime } from "@/utils/utils";
+import { isFileSizeBoundaryValid, isFileSizeRangeValid } from "@/utils/fileSizeFilter";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { CaretRight, Plus, View } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
@@ -51,6 +53,20 @@ const disableCu = ref({
 const jobRule = ref();
 const pathSelectRef = ref();
 
+const validateFileSizeRange = (_rule, _value, callback) => {
+  const minFileSize = editData.value?.minFileSize ?? null;
+  const maxFileSize = editData.value?.maxFileSize ?? null;
+  if (!isFileSizeBoundaryValid(minFileSize) || !isFileSizeBoundaryValid(maxFileSize)) {
+    callback(new Error(t("home.fileSizeInvalid")));
+    return;
+  }
+  if (!isFileSizeRangeValid(minFileSize, maxFileSize)) {
+    callback(new Error(t("home.fileSizeRangeInvalid")));
+    return;
+  }
+  callback();
+};
+
 const addRule = computed(() => ({
   srcPath: [
     {
@@ -91,6 +107,12 @@ const addRule = computed(() => ({
       trigger: "blur",
     },
   ],
+  maxFileSize: [
+    {
+      validator: validateFileSizeRange,
+      trigger: "change",
+    },
+  ],
 }));
 
 const methodText = (val) => {
@@ -103,6 +125,17 @@ const cronText = (val) => {
   if (val === 0) return t("home.intervalCall");
   if (val === 1) return t("home.cronCall");
   return t("home.manualOnly");
+};
+
+const sizeFilterText = (job) => {
+  const minFileSize = job.minFileSize ?? null;
+  const maxFileSize = job.maxFileSize ?? null;
+  if (minFileSize !== null && maxFileSize !== null) {
+    return t("home.fileSizeBetween", { min: parseSize(minFileSize), max: parseSize(maxFileSize) });
+  }
+  if (minFileSize !== null) return t("home.fileSizeAtLeast", { size: parseSize(minFileSize) });
+  if (maxFileSize !== null) return t("home.fileSizeAtMost", { size: parseSize(maxFileSize) });
+  return t("home.noLimit");
 };
 
 const getJobList = () => {
@@ -201,6 +234,8 @@ const editJobShow = (row) => {
   editData.value = JSON.parse(JSON.stringify(row));
   editData.value.dstPath = editData.value.dstPath.split(":");
   editData.value.exclude = editData.value.exclude ? editData.value.exclude.split(":") : [];
+  editData.value.minFileSize = editData.value.minFileSize ?? null;
+  editData.value.maxFileSize = editData.value.maxFileSize ?? null;
   editShow.value = true;
 };
 
@@ -222,6 +257,8 @@ const addShow = () => {
     interval: 1440,
     isCron: 0,
     exclude: [],
+    minFileSize: null,
+    maxFileSize: null,
   };
   cronList.value.forEach((item) => {
     nextEditData[item.key] = null;
@@ -421,6 +458,10 @@ onMounted(() => {
               </div>
             </div>
             <div class="form-box-item">
+              <div class="form-box-item-label">{{ $t("home.fileSizeFilter") }}</div>
+              <div class="form-box-item-value">{{ sizeFilterText(props.row) }}</div>
+            </div>
+            <div class="form-box-item">
               <div class="form-box-item-label">{{ $t("common.createdAt") }}</div>
               <div class="form-box-item-value">{{ parseTime(props.row.createTime) }}</div>
             </div>
@@ -609,6 +650,12 @@ onMounted(() => {
               </div>
             </div>
           </el-form-item>
+          <el-form-item prop="maxFileSize" :label="$t('home.fileSizeFilter')" class="size-filter-form-item">
+            <file-size-filter
+              v-model:min-file-size="editData.minFileSize"
+              v-model:max-file-size="editData.maxFileSize"
+            />
+          </el-form-item>
           <div v-if="editData.method == 2" class="move-warning">{{ $t("home.moveWarning") }}</div>
           <el-form-item prop="isCron" :label="$t('home.callType')">
             <el-select v-model="editData.isCron" class="label-width">
@@ -708,6 +755,14 @@ onMounted(() => {
 :global(.job-dialog .el-form-item) {
   min-width: 0;
   margin-bottom: 14px;
+}
+
+:global(.job-dialog .size-filter-form-item) {
+  grid-column: 1 / -1;
+}
+
+:global(.job-dialog .size-filter-form-item .el-form-item__content) {
+  min-width: 0;
 }
 
 :global(.job-dialog .label-width) {

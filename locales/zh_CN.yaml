@@ -36,6 +36,8 @@ cancel_fail: 取消任务过程中失败，原因为：{}
 disable_then_edit: 请先禁用任务才能编辑
 disabled_job_cannot_run: 禁用的作业不能运行
 cannot_disable_manual_job: 不可禁用仅手动作业
+file_size_invalid: 文件大小过滤值必须是非负整数（字节）
+file_size_range_invalid: 文件大小过滤下限不能大于上限
 log_del_success: 日志文件 {} 已被成功删除
 log_del_fail: 日志文件 {} 删除失败，原因为：{}
 log_rename_start: 日志定时更名任务启动成功

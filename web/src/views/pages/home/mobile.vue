@@ -5,7 +5,9 @@ import { useI18n } from "vue-i18n";
 import { CaretRight, CircleCheck, CircleClose, Delete, Edit, Plus, View } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { alistGet, jobDelete, jobGetJob, jobPost, jobPut } from "@/api/job";
-import { parseTime } from "@/utils/utils";
+import { parseSize, parseTime } from "@/utils/utils";
+import { isFileSizeBoundaryValid, isFileSizeRangeValid } from "@/utils/fileSizeFilter";
+import fileSizeFilter from "./components/fileSizeFilter.vue";
 import menuRefresh from "./components/menuRefresh.vue";
 import pathSelect from "./components/pathSelect.vue";
 
@@ -43,6 +45,20 @@ const excludeTmp = ref("");
 const currentPathType = ref("source");
 const jobRule = ref();
 const pathSelectRef = ref();
+
+const validateFileSizeRange = (_rule, _value, callback) => {
+  const minFileSize = editData.value?.minFileSize ?? null;
+  const maxFileSize = editData.value?.maxFileSize ?? null;
+  if (!isFileSizeBoundaryValid(minFileSize) || !isFileSizeBoundaryValid(maxFileSize)) {
+    callback(new Error(t("home.fileSizeInvalid")));
+    return;
+  }
+  if (!isFileSizeRangeValid(minFileSize, maxFileSize)) {
+    callback(new Error(t("home.fileSizeRangeInvalid")));
+    return;
+  }
+  callback();
+};
 
 const addRule = computed(() => ({
   srcPath: [
@@ -84,6 +100,12 @@ const addRule = computed(() => ({
       trigger: "blur",
     },
   ],
+  maxFileSize: [
+    {
+      validator: validateFileSizeRange,
+      trigger: "change",
+    },
+  ],
 }));
 
 const methodText = (value) => {
@@ -96,6 +118,17 @@ const cronText = (value) => {
   if (value === 0) return t("home.intervalCall");
   if (value === 1) return t("home.cronCall");
   return t("home.manualOnly");
+};
+
+const sizeFilterText = (job) => {
+  const minFileSize = job.minFileSize ?? null;
+  const maxFileSize = job.maxFileSize ?? null;
+  if (minFileSize !== null && maxFileSize !== null) {
+    return t("home.fileSizeBetween", { min: parseSize(minFileSize), max: parseSize(maxFileSize) });
+  }
+  if (minFileSize !== null) return t("home.fileSizeAtLeast", { size: parseSize(minFileSize) });
+  if (maxFileSize !== null) return t("home.fileSizeAtMost", { size: parseSize(maxFileSize) });
+  return t("home.noLimit");
 };
 
 const splitPaths = (value) => String(value || "").split(":").filter(Boolean);
@@ -230,6 +263,8 @@ const addShow = async () => {
     interval: 1440,
     isCron: 0,
     exclude: [],
+    minFileSize: null,
+    maxFileSize: null,
   };
   cronList.value.forEach((item) => {
     nextEditData[item.key] = null;
@@ -248,6 +283,8 @@ const editJobShow = async (row) => {
   editData.value = JSON.parse(JSON.stringify(row));
   editData.value.dstPath = splitPaths(editData.value.dstPath);
   editData.value.exclude = splitPaths(editData.value.exclude);
+  editData.value.minFileSize = editData.value.minFileSize ?? null;
+  editData.value.maxFileSize = editData.value.maxFileSize ?? null;
   excludeTmp.value = "";
   editShow.value = true;
 };
@@ -364,6 +401,10 @@ onMounted(getJobList);
           <div>
             <span>{{ $t("home.callType") }}</span>
             <strong>{{ cronText(item.isCron) }}</strong>
+          </div>
+          <div class="size-filter-meta">
+            <span>{{ $t("home.fileSizeFilter") }}</span>
+            <strong>{{ sizeFilterText(item) }}</strong>
           </div>
         </div>
 
@@ -517,6 +558,16 @@ onMounted(getJobList);
                 {{ rule }}
               </el-tag>
             </div>
+          </el-form-item>
+        </section>
+
+        <section class="editor-section">
+          <h2>{{ $t("home.fileSizeFilter") }}</h2>
+          <el-form-item prop="maxFileSize" class="mobile-size-filter-item">
+            <file-size-filter
+              v-model:min-file-size="editData.minFileSize"
+              v-model:max-file-size="editData.maxFileSize"
+            />
           </el-form-item>
         </section>
 
@@ -696,6 +747,14 @@ onMounted(getJobList);
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+
+      .size-filter-meta {
+        grid-column: 1 / -1;
+
+        strong {
+          white-space: normal;
+        }
+      }
     }
 
     .path-section + .path-section {
@@ -801,6 +860,10 @@ onMounted(getJobList);
   margin: 0 0 14px;
   font-size: 16px;
   color: var(--text-primary);
+}
+
+:global(.mobile-job-drawer .mobile-size-filter-item) {
+  margin-bottom: 0;
 }
 
 :global(.mobile-job-drawer .section-title-row) {

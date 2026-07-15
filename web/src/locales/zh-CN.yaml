@@ -137,6 +137,18 @@ home:
   excludeRules: 排除项规则
   excludePlaceholder: 输入后点添加才生效
   excludeExists: 该目录已存在
+  fileSizeFilter: 文件大小过滤
+  excludeBelow: 排除小于
+  excludeAbove: 排除大于
+  fileSizeUnit: 文件大小单位
+  noLimit: 不限制
+  clearSizeBoundary: 清除此限制
+  fileSizeFilterTip: 边界值本身会同步；1 KB = 1024 B；留空表示不限制
+  fileSizeInvalid: 文件大小必须是非负整数（字节）
+  fileSizeRangeInvalid: 文件大小下限不能大于上限
+  fileSizeBetween: "{min} 至 {max}"
+  fileSizeAtLeast: "至少 {size}"
+  fileSizeAtMost: "至多 {size}"
   callType: 调用方式
   intervalCall: 间隔
   intervalCallTip: 每 n 分钟同步一次

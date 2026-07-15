@@ -11,6 +11,26 @@ from service.syncJob import jobClient
 # 作业客户端列表，key为jobId,value为jobClient
 jobClientList = {}
 
+MAX_SQLITE_INTEGER = 9223372036854775807
+
+
+def normalizeFileSize(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise Exception(G('file_size_invalid'))
+    if isinstance(value, int):
+        result = value
+    elif isinstance(value, float) and value.is_integer():
+        result = int(value)
+    elif isinstance(value, str) and value.isdigit():
+        result = int(value)
+    else:
+        raise Exception(G('file_size_invalid'))
+    if result < 0 or result > MAX_SQLITE_INTEGER:
+        raise Exception(G('file_size_invalid'))
+    return result
+
 
 def initJob():
     """
@@ -61,6 +81,14 @@ def cleanJobInput(job):
                 job[key] = value.strip()
     if job['exclude'] is not None:
         job['exclude'] = ":".join([item.strip() for item in job['exclude'].split(':')])
+    job.setdefault('minFileSize', None)
+    job.setdefault('maxFileSize', None)
+    job['minFileSize'] = normalizeFileSize(job['minFileSize'])
+    job['maxFileSize'] = normalizeFileSize(job['maxFileSize'])
+    if (job['minFileSize'] is not None
+            and job['maxFileSize'] is not None
+            and job['minFileSize'] > job['maxFileSize']):
+        raise Exception(G('file_size_range_invalid'))
 
 
 def addJobClient(job, isInit=False):

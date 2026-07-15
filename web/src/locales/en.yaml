@@ -137,6 +137,18 @@ home:
   excludeRules: Exclude Rules
   excludePlaceholder: Enter a rule and click Add
   excludeExists: This directory already exists
+  fileSizeFilter: File Size Filter
+  excludeBelow: Exclude below
+  excludeAbove: Exclude above
+  fileSizeUnit: File size unit
+  noLimit: No limit
+  clearSizeBoundary: Clear this limit
+  fileSizeFilterTip: Boundary values are included; 1 KB = 1024 B; leave blank for no limit
+  fileSizeInvalid: File size must be a non-negative integer byte value
+  fileSizeRangeInvalid: The minimum file size cannot exceed the maximum
+  fileSizeBetween: "{min} to {max}"
+  fileSizeAtLeast: "At least {size}"
+  fileSizeAtMost: "At most {size}"
   callType: Trigger
   intervalCall: Interval
   intervalCallTip: Sync every n minutes

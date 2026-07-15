@@ -36,6 +36,8 @@ cancel_fail: "The task cancellation process failed due to: {}"
 disable_then_edit: Please disable the job before editing it
 disabled_job_cannot_run: Disabled jobs cannot be run
 cannot_disable_manual_job: Manual-only jobs cannot be disabled
+file_size_invalid: File size filters must be non-negative integer byte values
+file_size_range_invalid: The minimum file size cannot exceed the maximum file size
 log_del_success: The log file {} has been successfully deleted
 log_del_fail: "Failed to delete log file {}, reason: {}"
 log_rename_start: The log scheduled renaming task was started successfully

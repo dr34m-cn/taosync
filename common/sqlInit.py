@@ -5,7 +5,7 @@ from common.config import DEFAULT_PASSWORD, getConfig
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 250608
+    cuVersion = 260715
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     passwd = None
@@ -56,6 +56,8 @@ def init_sql(conn):
                        "start_date text DEFAULT NULL,"      # 开始时间
                        "end_date text DEFAULT NULL,"        # 结束时间
                        "exclude text DEFAULT NULL,"         # 排除无需同步项，类似gitignore语法，英文冒号分隔多个规则
+                       "minFileSize integer DEFAULT NULL,"  # 过滤小于该字节数的文件，NULL-不限制
+                       "maxFileSize integer DEFAULT NULL,"  # 过滤大于该字节数的文件，NULL-不限制
                        "createTime integer DEFAULT (strftime('%s', 'now')),"
                        " unique (srcPath, dstPath, alistId))")
         cursor.execute("create table job_task("
@@ -141,6 +143,9 @@ def init_sql(conn):
                 cursor.execute("alter table job add column useCacheS integer DEFAULT 0")
                 cursor.execute("alter table job add column scanIntervalS integer DEFAULT 0")
                 cursor.execute("update job set scanIntervalT = 10, useCacheT = 0 where useCacheT = 2")
+            if sqlVersion < 260715:
+                cursor.execute("alter table job add column minFileSize integer DEFAULT NULL")
+                cursor.execute("alter table job add column maxFileSize integer DEFAULT NULL")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
     cursor.close()
