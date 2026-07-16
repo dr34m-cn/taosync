@@ -32,7 +32,7 @@
 
 ---
 
-Taotao is my daughter's nickname. I'm her dad, and the logo is based on her.
+Taotao is my daughter's nickname.
 
 I originally created this project to preserve photos of Taotao as she grows up, hence the name `TaoSync`.
 
