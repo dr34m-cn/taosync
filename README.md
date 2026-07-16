@@ -163,6 +163,41 @@ services:
 
 Replace `/opt/data` with the directory you want to use. On some NAS devices, such as UGREEN NAS, you can use a relative path, for example `./config:/app/data`.
 
+#### Docker Compose with OpenList
+
+Use the following Compose file to start TaoSync and OpenList together:
+
+```yaml
+services:
+  openlist:
+    image: openlistteam/openlist:latest
+    container_name: openlist
+    user: "0:0"
+    restart: unless-stopped
+    ports:
+      - "5244:5244"
+    environment:
+      UMASK: "022"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./openlist-data:/opt/openlist/data
+
+  tao-sync:
+    image: dr34m/tao-sync:latest
+    container_name: taoSync
+    restart: unless-stopped
+    depends_on:
+      - openlist
+    ports:
+      - "8023:8023"
+    volumes:
+      - ./taosync-data:/app/data
+```
+
+After startup, open OpenList at `http://127.0.0.1:5244` and TaoSync at `http://127.0.0.1:8023`. When adding the engine in TaoSync, use `http://openlist:5244` as the OpenList URL. The service name works as the hostname inside the Compose network.
+
+Current OpenList images no longer use the `PUID` and `PGID` environment variables. This example uses `user: "0:0"` for broad compatibility; for least-privilege operation, replace it with the host UID/GID that should run OpenList and ensure that user can write to `./openlist-data`. See the [OpenList Docker documentation](https://doc.oplist.org/guide/installation/docker) for details.
+
 ### Use TaoSync
 
 Open `http://127.0.0.1:8023`.

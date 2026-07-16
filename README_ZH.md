@@ -163,6 +163,41 @@ services:
 
 把其中`/opt/data`替换为你实际的目录，在部分NAS(如绿联NAS)中，可以使用相对目录，如`./config:/app/data`
 
+#### 与 OpenList 一起部署的 Docker Compose
+
+使用以下 Compose 配置可以同时启动 TaoSync 和 OpenList：
+
+```yaml
+services:
+  openlist:
+    image: openlistteam/openlist:latest
+    container_name: openlist
+    user: "0:0"
+    restart: unless-stopped
+    ports:
+      - "5244:5244"
+    environment:
+      UMASK: "022"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./openlist-data:/opt/openlist/data
+
+  tao-sync:
+    image: dr34m/tao-sync:latest
+    container_name: taoSync
+    restart: unless-stopped
+    depends_on:
+      - openlist
+    ports:
+      - "8023:8023"
+    volumes:
+      - ./taosync-data:/app/data
+```
+
+启动后，可通过 `http://127.0.0.1:5244` 访问 OpenList，通过 `http://127.0.0.1:8023` 访问 TaoSync。在 TaoSync 中添加引擎时，OpenList 地址应填写 `http://openlist:5244`；Compose 网络内可以直接使用服务名作为主机名。
+
+当前 OpenList 镜像已不再使用 `PUID` 和 `PGID` 环境变量。此示例使用 `user: "0:0"` 以获得较广泛的兼容性；如需按最小权限运行，请将其替换为用于运行 OpenList 的宿主机 UID/GID，并确保该用户对 `./openlist-data` 具有写权限。详情请参阅 [OpenList Docker 文档](https://doc.oplist.org/guide/installation/docker)。
+
 ### 再使用
 
 访问`http://127.0.0.1:8023`
