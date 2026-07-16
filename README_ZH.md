@@ -3,7 +3,9 @@
 </p>
 
 <div align="center">
-  <a href="https://github.com/dr34m-cn/taosync"><img width="200" alt="logo" src="./web/public/logo-200-64.png"/></a>
+  <a href="https://github.com/dr34m-cn/taosync">
+    <img height="64" alt="TaoSync" src="./taosync-logo.svg"/>
+  </a>
   <p><em>TaoSync是一个适用于OpenList/AList v3+的自动化同步工具。</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
