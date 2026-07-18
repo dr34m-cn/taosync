@@ -5,11 +5,48 @@ from common.config import DEFAULT_PASSWORD, getConfig
 
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 260715
+    cuVersion = 260718
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
+    userTableExists = cursor.fetchone() is not None
+    if userTableExists:
+        cursor.execute("select count(*) from user_list")
+        if cursor.fetchone()[0] == 0:
+            # A process kill during the very first initialization can leave
+            # empty DDL tables behind. Recover that state, but never destroy a
+            # database that still contains jobs, engines, mounts, or notices.
+            has_business_data = False
+            for table in ('job_source_snapshot', 'job_source_snapshot_meta',
+                          'storage_mount', 'notify', 'job_task_item', 'job_task', 'job'):
+                cursor.execute(
+                    "select count(*) from sqlite_master where type='table' and name=?",
+                    (table,),
+                )
+                if cursor.fetchone()[0] and cursor.execute(
+                    "select count(*) from " + table
+                ).fetchone()[0]:
+                    has_business_data = True
+                    break
+            if not has_business_data:
+                cursor.execute(
+                    "select count(*) from sqlite_master where type='table' and name='alist_list'"
+                )
+                if cursor.fetchone()[0]:
+                    cursor.execute(
+                        "select count(*) from alist_list where url <> 'taosync://internal'"
+                    )
+                    has_business_data = cursor.fetchone()[0] > 0
+            if has_business_data:
+                raise RuntimeError(
+                    "database has storage data but no administrator user; refusing destructive recovery"
+                )
+            for table in ('job_source_snapshot', 'job_source_snapshot_meta',
+                          'storage_mount', 'notify', 'job_task_item', 'job_task',
+                          'job', 'alist_list', 'user_list'):
+                cursor.execute("drop table if exists " + table)
+            userTableExists = False
     passwd = None
-    if cursor.fetchone() is None:
+    if not userTableExists:
         configured_password = getConfig()['server']['password']
         passwd = (commonUtils.generatePasswd()
                   if configured_password == DEFAULT_PASSWORD
@@ -29,8 +66,26 @@ def init_sql(conn):
                        "url text,"          # 地址，例如http://localhost:5244
                        "userName text,"     # 用户名
                        "token text,"        # 令牌
+                       "engineType text DEFAULT 'alist',"
+                       "systemKey text DEFAULT NULL,"
+                       "protected integer DEFAULT 0,"
                        "createTime integer DEFAULT (strftime('%s', 'now')),"
                        " unique (url, userName))")
+        cursor.execute("create unique index idx_alist_system_key on alist_list(systemKey) "
+                       "where systemKey is not null")
+        cursor.execute("insert into alist_list (remark, url, userName, token, engineType, systemKey, protected) "
+                       "values (NULL, 'taosync://internal', 'TaoSync', NULL, 'taosync', 'taosync', 1)")
+        cursor.execute("create table storage_mount("
+                       "id integer primary key autoincrement,"
+                       "engineId integer not null,"
+                       "name text not null,"
+                       "driverType text not null,"
+                       "config text not null,"
+                       "enabled integer DEFAULT 1,"
+                       "configVersion integer DEFAULT 1,"
+                       "authVersion integer DEFAULT 1,"
+                       "createTime integer DEFAULT (strftime('%s', 'now')),"
+                       "unique (engineId, name))")
         cursor.execute("create table job("
                        "id integer primary key autoincrement,"
                        "enable integer DEFAULT 1,"          # 启用，1-启用，0-停用
@@ -43,6 +98,7 @@ def init_sql(conn):
                        "useCacheS integer DEFAULT 0,"       # 扫描源目录时，是否使用缓存，0-不使用，1-使用
                        "scanIntervalS integer DEFAULT 0,"   # 源目录扫描间隔，单位秒
                        "method integer,"                    # 同步方式，0-仅新增，1-全同步，2-移动模式
+                       "sourceMode integer DEFAULT 0,"
                        "interval integer,"                  # 同步间隔，单位：分钟
                        "isCron integer DEFAULT 0,"          # 是否使用cron，0-使用interval, 1-使用cron，2-仅手动
                        "year text DEFAULT NULL,"            # 四位数的年份
@@ -60,6 +116,20 @@ def init_sql(conn):
                        "maxFileSize integer DEFAULT NULL,"  # 过滤大于该字节数的文件，NULL-不限制
                        "createTime integer DEFAULT (strftime('%s', 'now')),"
                        " unique (srcPath, dstPath, alistId))")
+        cursor.execute("create table job_source_snapshot_meta("
+                       "jobId integer primary key,"
+                       "initialized integer DEFAULT 0,"
+                       "scanTime integer DEFAULT NULL,"
+                       "entryCount integer DEFAULT 0"
+                       ")")
+        cursor.execute("create table job_source_snapshot("
+                       "jobId integer not null,"
+                       "path text not null,"
+                       "isDir integer DEFAULT 0,"
+                       "size integer DEFAULT NULL,"
+                       "fingerprint text DEFAULT NULL,"
+                       "primary key (jobId, path)"
+                       ")")
         cursor.execute("create table job_task("
                        "id integer primary key autoincrement,"
                        "jobId integer,"             # 所属工作id，job.id
@@ -146,7 +216,123 @@ def init_sql(conn):
             if sqlVersion < 260715:
                 cursor.execute("alter table job add column minFileSize integer DEFAULT NULL")
                 cursor.execute("alter table job add column maxFileSize integer DEFAULT NULL")
+            if sqlVersion < 260716:
+                cursor.execute("create table if not exists alist_list("
+                               "id integer primary key autoincrement, remark text, url text,"
+                               "userName text, token text,"
+                               "createTime integer DEFAULT (strftime('%s', 'now')),"
+                               "unique (url, userName))")
+                cursor.execute("pragma table_info(alist_list)")
+                engineColumns = {row[1] for row in cursor.fetchall()}
+                if 'engineType' not in engineColumns:
+                    cursor.execute("alter table alist_list add column engineType text DEFAULT 'alist'")
+                if 'systemKey' not in engineColumns:
+                    cursor.execute("alter table alist_list add column systemKey text DEFAULT NULL")
+                if 'protected' not in engineColumns:
+                    cursor.execute("alter table alist_list add column protected integer DEFAULT 0")
+                cursor.execute("update alist_list set engineType='alist' where engineType is null")
+                cursor.execute("create unique index if not exists idx_alist_system_key "
+                               "on alist_list(systemKey) where systemKey is not null")
+                cursor.execute("create table if not exists storage_mount("
+                               "id integer primary key autoincrement,"
+                               "engineId integer not null,"
+                               "name text not null,"
+                               "driverType text not null,"
+                               "config text not null,"
+                               "enabled integer DEFAULT 1,"
+                               "configVersion integer DEFAULT 1,"
+                               "authVersion integer DEFAULT 1,"
+                               "createTime integer DEFAULT (strftime('%s', 'now')),"
+                               "unique (engineId, name))")
+            if sqlVersion < 260717:
+                cursor.execute("select count(*) from sqlite_master where type='table' and name='job'")
+                if cursor.fetchone()[0]:
+                    cursor.execute("pragma table_info(job)")
+                    jobColumns = {row[1] for row in cursor.fetchall()}
+                    if 'sourceMode' not in jobColumns:
+                        cursor.execute("alter table job add column sourceMode integer DEFAULT 0")
+                cursor.execute("create table if not exists job_source_snapshot_meta("
+                               "jobId integer primary key,"
+                               "initialized integer DEFAULT 0,"
+                               "scanTime integer DEFAULT NULL,"
+                               "entryCount integer DEFAULT 0"
+                               ")")
+                cursor.execute("create table if not exists job_source_snapshot("
+                               "jobId integer not null,"
+                               "path text not null,"
+                               "isDir integer DEFAULT 0,"
+                               "size integer DEFAULT NULL,"
+                               "fingerprint text DEFAULT NULL,"
+                               "primary key (jobId, path)"
+                               ")")
+            if sqlVersion < 260718:
+                cursor.execute("select count(*) from sqlite_master "
+                               "where type='table' and name='job_source_snapshot'")
+                if cursor.fetchone()[0]:
+                    cursor.execute("pragma table_info(job_source_snapshot)")
+                    snapshotColumns = {row[1] for row in cursor.fetchall()}
+                    if 'fingerprint' not in snapshotColumns:
+                        cursor.execute("alter table job_source_snapshot "
+                                       "add column fingerprint text DEFAULT NULL")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
+    # Keep the built-in engine present even when a migration was interrupted.
+    cursor.execute("create table if not exists alist_list("
+                   "id integer primary key autoincrement, remark text, url text,"
+                   "userName text, token text,"
+                   "createTime integer DEFAULT (strftime('%s', 'now')),"
+                   "unique (url, userName))")
+    cursor.execute("pragma table_info(alist_list)")
+    engineColumns = {row[1] for row in cursor.fetchall()}
+    if 'engineType' not in engineColumns:
+        cursor.execute("alter table alist_list add column engineType text DEFAULT 'alist'")
+    if 'systemKey' not in engineColumns:
+        cursor.execute("alter table alist_list add column systemKey text DEFAULT NULL")
+    if 'protected' not in engineColumns:
+        cursor.execute("alter table alist_list add column protected integer DEFAULT 0")
+    cursor.execute("create table if not exists storage_mount("
+                   "id integer primary key autoincrement, engineId integer not null,"
+                   "name text not null, driverType text not null, config text not null,"
+                   "enabled integer DEFAULT 1, configVersion integer DEFAULT 1, authVersion integer DEFAULT 1,"
+                   "createTime integer DEFAULT (strftime('%s', 'now')),"
+                   "unique (engineId, name))")
+    cursor.execute("pragma table_info(storage_mount)")
+    mountColumns = {row[1] for row in cursor.fetchall()}
+    if 'configVersion' not in mountColumns:
+        cursor.execute("alter table storage_mount add column configVersion integer DEFAULT 1")
+    if 'authVersion' not in mountColumns:
+        cursor.execute("alter table storage_mount add column authVersion integer DEFAULT 1")
+    cursor.execute("select count(*) from sqlite_master where type='table' and name='job'")
+    if cursor.fetchone()[0]:
+        cursor.execute("pragma table_info(job)")
+        jobColumns = {row[1] for row in cursor.fetchall()}
+        if 'sourceMode' not in jobColumns:
+            cursor.execute("alter table job add column sourceMode integer DEFAULT 0")
+    cursor.execute("create table if not exists job_source_snapshot_meta("
+                   "jobId integer primary key, initialized integer DEFAULT 0,"
+                   "scanTime integer DEFAULT NULL, entryCount integer DEFAULT 0"
+                   ")")
+    cursor.execute("create table if not exists job_source_snapshot("
+                   "jobId integer not null, path text not null,"
+                   "isDir integer DEFAULT 0, size integer DEFAULT NULL,"
+                   "fingerprint text DEFAULT NULL,"
+                   "primary key (jobId, path)"
+                   ")")
+    cursor.execute("pragma table_info(job_source_snapshot)")
+    snapshotColumns = {row[1] for row in cursor.fetchall()}
+    if 'fingerprint' not in snapshotColumns:
+        cursor.execute("alter table job_source_snapshot "
+                       "add column fingerprint text DEFAULT NULL")
+    cursor.execute("create unique index if not exists idx_alist_system_key "
+                   "on alist_list(systemKey) where systemKey is not null")
+    cursor.execute("update alist_list set engineType='alist' where engineType is null")
+    cursor.execute("select id from alist_list where systemKey='taosync' limit 1")
+    if cursor.fetchone() is None:
+        cursor.execute("insert into alist_list (remark, url, userName, token, engineType, systemKey, protected) "
+                       "values (NULL, 'taosync://internal', 'TaoSync', NULL, 'taosync', 'taosync', 1)")
+    else:
+        cursor.execute("update alist_list set userName='TaoSync', url='taosync://internal', "
+                       "engineType='taosync', protected=1 where systemKey='taosync'")
+    conn.commit()
     cursor.close()
     return passwd

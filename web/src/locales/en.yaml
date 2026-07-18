@@ -110,6 +110,8 @@ home:
   moveMode: Move mode
   moveModeTip: Delete source files after syncing
   moveWarning: Move mode may cause file loss. Use it only for unimportant or well-backed-up files.
+  sourceMode: Source Directory Mode
+  sourceModeTip: The first run still scans targets. After a successful snapshot, only the source is scanned; independent target changes are not detected.
   targetScan: Target Scan
   sourceScan: Source Scan
   noCache: No cache
@@ -234,6 +236,97 @@ engine:
   empty: No engines yet. Add one.
   add: Add
   edit: Edit
+  alist: AList
+  internal: Built-in engine
+  directoryCount: "{count} directories"
+  directoryManagement: Directory Management
+  directoryManagementTitle: "{name} Directory Management"
+  addAlist: Add AList Engine
+  addDirectory: Add Directory
+  editDirectory: Edit Directory
+  directoryEmpty: No directories yet. Add the first one.
+  mountName: Directory Name
+  mountNamePlaceholder: Top-level directory name used in job paths
+  driverType: Storage Type
+  rootPath: Root Path
+  localRootPlaceholder: Enter an existing local directory path
+  browseLocalDirectory: Browse local directories
+  localBrowserTitle: Select Local Directory
+  currentDirectory: Current directory
+  parentDirectory: Go to parent directory
+  refreshDirectory: Refresh current directory
+  diskRoots: Disk Roots
+  subdirectories: Subdirectories
+  noSubdirectories: This directory has no subdirectories
+  selectCurrentDirectory: Select Current Directory
+  remoteRootPlaceholder: Remote root path; leave blank for the root
+  host: Host
+  hostPlaceholder: Enter a hostname or IP address
+  scanSmbDevices: Scan for SMB devices
+  smbDiscoveryTitle: Select SMB Device
+  smbDiscoveryDescription: Devices accepting TCP 445 on active IPv4 networks
+  refreshDevices: Scan again
+  noSmbDevices: No SMB devices found. Scan again or enter a host manually.
+  port: Port
+  share: Share
+  sharePlaceholder: Enter the SMB share name
+  domain: Domain
+  username: Username
+  usernamePlaceholder: Enter the SSH username
+  password: Password
+  passwordPlaceholder: Enter the SSH password
+  authenticationMethod: Authentication Method
+  passwordAuthentication: Password
+  privateKeyAuthentication: Private Key
+  privateKey: Private Key
+  privateKeyPlaceholder: Paste a PEM or OpenSSH private key
+  privateKeyPassphrase: Private Key Passphrase
+  showPrivateKey: Show private key
+  hidePrivateKey: Hide private key
+  connectionTimeout: Connection Timeout (seconds)
+  hostKeyFingerprint: Host Key Fingerprint (Optional)
+  hostKeyFingerprintPlaceholder: Optional; populated automatically after a successful test
+  testSftpConnection: Test Connection
+  sftpConnectionTested: Connection tested
+  sftpTestSuccess: SFTP connection test succeeded
+  sftpRootSelectPlaceholder: Select or enter a remote root path
+  optional: Optional
+  anonymousPlaceholder: Leave blank to use anonymous
+  passiveMode: Passive Mode
+  tls: Explicit TLS (AUTH TLS)
+  clientId: Client ID
+  clientSecret: Client Secret
+  refreshToken: Refresh Token
+  driveType: Drive Space
+  rootFolderId: Root Folder ID
+  removeWay: Delete Method
+  secretPlaceholderEdit: Leave blank to keep the current value
+  mountNameRule: Please enter a directory name
+  driverTypeRule: Please select a storage type
+  rootPathRule: Please enter a root path
+  hostRule: Please enter a host
+  usernameRule: Please enter a username
+  passwordRule: Please enter a password
+  privateKeyRule: Please enter a private key
+  hostKeyFingerprintRule: "Use an SHA256 host key fingerprint, such as SHA256:..."
+  shareRule: Please enter a share name
+  clientIdRule: Please enter a Client ID
+  clientSecretRule: Please enter a Client Secret
+  refreshTokenRule: Please enter a Refresh Token
+  mountDeleteConfirm: "Delete directory '{name}'? Jobs using it will no longer run."
+  drivers:
+    local: Local Directory
+    smb: SMB
+    ftp: FTP
+    sftp: SFTP (SSH)
+    aliyun: Aliyun Drive
+  driveTypes:
+    resource: Resource Drive
+    default: Default Drive
+    backup: Backup Drive
+  removeWays:
+    trash: Move to Recycle Bin
+    delete: Delete Permanently
   address: URL
   addressPlaceholder: Enter URL, such as http://127.0.0.1:5244
   remark: Remark

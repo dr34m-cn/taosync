@@ -5,12 +5,11 @@
 import logging
 
 from common.LNG import G
+from mapper import jobMapper
 from mapper.alistMapper import getAlistById, addAlist, removeAlist, getAlistList, updateAlist
+from mapper.storageMapper import getMountList
 from service.alist.alistClient import AlistClient
-
-# alist客户端列表，key为alistId,value为AlistClient
-alistClientList = {}
-
+from service.engine import engineService
 
 def getClientList():
     """
@@ -19,7 +18,12 @@ def getClientList():
     """
     clientList = getAlistList()
     for client in clientList:
-        del client['token']
+        client.pop('token', None)
+        if client.get('engineType') == 'taosync':
+            client['displayName'] = 'TaoSync'
+            client['directoryCount'] = len(getMountList(client['id']))
+        else:
+            client['displayName'] = client.get('remark') or client.get('url')
     return clientList
 
 
@@ -29,11 +33,7 @@ def getClientById(alistId):
     :param alistId:
     :return:
     """
-    global alistClientList
-    if alistId not in alistClientList:
-        alist = getAlistById(alistId)
-        alistClientList[alistId] = AlistClient(alist['url'], alist['token'], alistId)
-    return alistClientList[alistId]
+    return engineService.getClientById(alistId)
 
 
 def updateClient(alist):
@@ -60,13 +60,18 @@ def updateClient(alist):
     if alist['url'].endswith('/'):
         alist['url'] = alist['url'][:-1]
     alistOld = getAlistById(alistId)
-    if alistOld['url'] != alist['url'] or 'token' in alist:
+    if alistOld.get('protected') == 1:
+        raise Exception(G('builtin_engine_protected'))
+    connectionChanged = alistOld['url'] != alist['url'] or 'token' in alist
+    if connectionChanged:
         if 'token' not in alist:
             # 令牌必填，防止通过修改地址为钓鱼地址的方式窃取令牌
             raise Exception(G('without_token'))
-        client = AlistClient(alist['url'], alist['token'], alistId)
-        alistClientList[alistId] = client
+        AlistClient(alist['url'], alist['token'], alistId)
     updateAlist(alist)
+    if connectionChanged:
+        jobMapper.clearSourceSnapshotsByEngine(int(alistId))
+    engineService.invalidateClient(alistId)
 
 
 def addClient(alist):
@@ -96,8 +101,7 @@ def addClient(alist):
         logger.error(G('add_alist_client_fail').format(str(e)))
         raise Exception(e)
     else:
-        global alistClientList
-        alistClientList[alistId] = client
+        engineService.invalidateClient(alistId)
 
 
 def removeClient(alistId):
@@ -105,9 +109,10 @@ def removeClient(alistId):
     删除客户端
     :param alistId:
     """
-    global alistClientList
-    if alistId in alistClientList:
-        del alistClientList[alistId]
+    alist = getAlistById(alistId)
+    if alist.get('protected') == 1:
+        raise Exception(G('builtin_engine_protected'))
+    engineService.invalidateClient(alistId)
     removeAlist(alistId)
 
 
@@ -118,5 +123,4 @@ def getChildPath(alistId, path):
     :param path:
     :return:
     """
-    client = getClientById(alistId)
-    return client.filePathList(path)
+    return engineService.getChildPath(alistId, path)

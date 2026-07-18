@@ -8,6 +8,8 @@ from tornado.concurrent import run_on_executor
 
 from controller.baseController import BaseHandler, handle_request
 from service.alist import alistService
+from service.storage import storageService
+from service.storage import discoveryService
 from service.syncJob import jobService, taskService
 
 
@@ -35,6 +37,46 @@ class Alist(BaseHandler):
     @handle_request
     def delete(self, req):
         alistService.removeClient(req['id'])
+
+
+class Storage(BaseHandler):
+    executor = ThreadPoolExecutor(4)
+
+    @run_on_executor
+    @handle_request
+    def get(self, req):
+        action = req.get('action')
+        if action == 'localBrowse':
+            return discoveryService.localBrowse(req.get('path'))
+        if action == 'smbDiscover':
+            return discoveryService.smbDiscover()
+        if action is not None:
+            raise ValueError('unknown storage action')
+        if 'types' in req:
+            return storageService.getSupportedDrivers()
+        return storageService.getMountList(req['engineId'])
+
+    @run_on_executor
+    @handle_request
+    def post(self, req):
+        action = req.get('action')
+        if action == 'sftpTest':
+            return storageService.testSftp(req)
+        if action == 'sftpBrowse':
+            return storageService.browseSftp(req)
+        if action is not None:
+            raise ValueError('unknown storage action')
+        return storageService.addMount(req)
+
+    @run_on_executor
+    @handle_request
+    def put(self, req):
+        storageService.updateMount(req)
+
+    @run_on_executor
+    @handle_request
+    def delete(self, req):
+        storageService.removeMount(req['id'])
 
 
 class Job(BaseHandler):

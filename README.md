@@ -6,7 +6,7 @@
   <a href="https://github.com/dr34m-cn/taosync">
     <img height="64" alt="TaoSync" src="./taosync-logo.svg"/>
   </a>
-  <p><em>TaoSync is an automated synchronization tool for OpenList/AList v3+.</em></p>
+  <p><em>TaoSync is an automated synchronization tool with a built-in storage engine and OpenList/AList v3+ compatibility.</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
@@ -79,7 +79,7 @@ TaoSync is updated frequently, so these screenshots are for reference only. Refe
 ## Before You Begin
 
 > [!IMPORTANT]
-> You must be familiar with [OpenList](https://docs.oplist.org/) before using TaoSync. `OpenList` is not bundled with TaoSync, so you must run a separate `OpenList` instance.
+> TaoSync includes a built-in, non-removable `TaoSync` engine, so OpenList is no longer required. You can still add an external OpenList/AList instance when you need its additional drivers.
 
 > [!WARNING]
 > **Do not expose TaoSync directly to the public internet. You do so at your own risk!**
@@ -118,20 +118,44 @@ You can create a one-time job by specifying the year, month, day, hour, minute, 
 * Responsive interface for both desktop and mobile devices
 * Clean removal: simply delete TaoSync when you no longer need it; it leaves no residual files or dependencies and does not affect other applications
 * Login passwords are stored in the database using a one-way hash, and password resets are supported. If you set the initial password through a configuration file or environment variable, protect that configuration carefully
-* Runs entirely offline except for connections to AList and never uploads user data
+* Runs offline except for storage services configured by the user and never uploads user data to the TaoSync project
 * Comprehensive error handling for stable, reliable, and internally consistent operation. Errors may happen, but crashes never do (or so I think)
 * Detailed logging: all errors are recorded
-* Engine management: add, delete, edit, and view `OpenList/AList` engines
+* A built-in, non-removable `TaoSync` engine with local directory, SMB, FTP/FTPS, SFTP (SSH), and Aliyun Drive Open Platform support
+* External `OpenList/AList` engines remain fully supported and manageable
 * Job management: create, delete, enable, disable, edit, and manually run jobs
 * Exclusion rules for preventing specified directories or files from being synchronized
 * File-size filtering with independently configurable minimum and maximum values
 * Three synchronization modes: Add only, Full sync, and Move mode
+* Source Directory Mode for all three modes, allowing subsequent jobs to scan only the source and compare it with a database snapshot
 * Scheduled synchronization by interval, `cron`, or manual invocation
 * Real-time visualization of per-file progress, overall progress, synchronization speed, the file currently being synchronized, estimated completion time, and more
 * Controllable storage usage: configure retention periods for task records and logs to keep TaoSync's storage footprint within a predictable range
 * Notifications through DingTalk group bots or ServerChan after a task succeeds or fails
 
 ## Usage
+
+### Built-in TaoSync Engine
+
+The `TaoSync` engine is created automatically on first startup and initially has no directories. Open its directory manager and add a virtual directory backed by one of these storage types:
+
+* Local directory: browse and select an existing absolute path visible to the TaoSync process. For Docker, mount the host directory into the container first.
+* SMB: an SMB 2/3 server and share, credentials, and an optional root within the share. The host field can scan the `/24` networks of TaoSync's active private IPv4 addresses for devices accepting TCP 445; manual entry remains available.
+* FTP: FTP or explicit TLS (AUTH TLS), credentials, and an optional remote root. The server must support `MLSD`, which TaoSync uses to distinguish files, directories, and unsafe link-like entries without leaving the configured root.
+* SFTP (SSH): a server, port, username, and remote root, authenticated by either a password or pasted PEM/OpenSSH private key with an optional passphrase. The `SHA256:` server host-key fingerprint is optional; use connection testing to obtain it, then save it to lock future connections to that key. Uploads use a temporary file and atomic rename; overwriting existing files requires the server's OpenSSH POSIX rename extension.
+* Aliyun Drive: create an application in the [Aliyun Drive Developer Portal](https://www.aliyundrive.com/developer), then obtain `client_id`, `client_secret`, and `refresh_token` through official OAuth. TaoSync uses the official OpenFile API at `openapi.alipan.com` and persists rotated refresh tokens automatically.
+
+After selecting `TaoSync` in a job, paths appear as `/<virtual-directory-name>/...`. File-size comparison, copying, directory creation, deletion, and progress tracking run inside TaoSync. Copies between different storage backends stream through the TaoSync process.
+
+SFTP v3 cannot provide a portable no-follow guarantee across every server-side path race. Use an SSH account restricted by server-side `chroot`, or make the configured remote root writable only by that account. Storage credentials, including SFTP passwords and private keys, currently follow the existing engine behavior and are stored in TaoSync's SQLite database without at-rest encryption; protect the `data` directory accordingly.
+
+### Source Directory Mode
+
+Every successfully completed job stores a complete source-directory snapshot in the database. Add only, Full sync, and Move mode can all enable Source Directory Mode. A first run without a usable snapshot still scans both source and destination; subsequent runs scan only the source and generate operations by comparing relative paths, entry types, file sizes, and a backend version fingerprint when one is available.
+
+The snapshot is replaced atomically only after a complete source scan and a fully successful job. An interrupted scan or a failed copy or delete leaves the previous snapshot in place so the next run retries the work. Changing the engine, source or destination paths, synchronization method, exclusion rules, or file-size filters invalidates the snapshot and makes the next run scan the destination again. Move mode copies to every destination before deleting each source file once.
+
+Because Source Directory Mode does not read destinations, it cannot detect content independently added, removed, or modified there. Full sync deletes only files explicitly tracked by the snapshot and retains directory shells, avoiding accidental removal of excluded or destination-only files. Temporarily disable Source Directory Mode and complete one job when destination state must be checked again. Same-size source replacements are detected when the backend exposes usable version metadata, but accuracy depends on that backend's metadata precision; FTP and SFTP servers may expose only weak or coarse modification metadata. Move mode rechecks the source without cache before deletion and requires a stable version fingerprint; if that fingerprint is unavailable or changed, it keeps the source and reports the operation as incomplete. Every mode rejects dangerous configurations where source and destination paths are equal or nested, including aliases between built-in mounts that resolve to the same backend location.
 
 ### Start TaoSync
 
@@ -207,7 +231,7 @@ The default username is `admin`. If the initial password is configured as `RANDO
 > [!NOTE]
 > If the password does not appear in the console output, check `data/log/sys_xxx.log` in the same directory. It is usually on the first line.
 
-After signing in, first open Engine Management and create an engine. Then go to Job Management and create a synchronization job.
+After signing in, open Engine Management and add directories to the built-in TaoSync engine, or add an external OpenList/AList engine. Then go to Job Management and create a synchronization job.
 
 ## Configuration
 
@@ -266,7 +290,6 @@ To try a development build, look for the latest tag containing `dev` or `pre` on
 
 * Improve the Windows version, including launch at startup, hidden-window operation, start/stop controls, and more [#13](https://github.com/dr34m-cn/taosync/issues/13)
 * Support encrypted synchronization through OpenList [#18](https://github.com/dr34m-cn/taosync/issues/18)
-* Support a local engine that does not depend on `OpenList`
 * Support encrypted synchronization for the local engine
 * Retain the latest N historical versions, with a configurable and potentially unlimited value for N
 * Import and export configuration

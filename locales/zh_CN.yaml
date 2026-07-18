@@ -19,6 +19,7 @@ alist_un_auth: AList 鉴权失败，可能是令牌已失效
 alist_fail_code_reason: AList 返回 {} 错误，原因为：{}
 without_token: 地址改变时令牌必填
 add_alist_client_fail: 新增 AList 客户端时失败，原因为：{}
+builtin_engine_protected: TaoSync 是内置引擎，不能编辑或删除
 task_may_delete: 任务未找到。可能是您手动到 AList 中删除了复制任务；或者 AList 因手动/异常崩溃被重启，导致任务记录丢失
 do_job_err: 执行任务失败，原因为：{}
 src: 来源
@@ -38,6 +39,12 @@ disabled_job_cannot_run: 禁用的作业不能运行
 cannot_disable_manual_job: 不可禁用仅手动作业
 file_size_invalid: 文件大小过滤值必须是非负整数（字节）
 file_size_range_invalid: 文件大小过滤下限不能大于上限
+source_mode_invalid: 源目录模式只能为开启或关闭
+source_target_overlap: 源目录和目标目录不能相同或互相包含
+source_changed_during_move: 移动期间源文件已发生变化，已保留源文件，请重试
+source_version_unavailable: 无法验证移动期间源文件版本，已保留源文件
+move_delivery_incomplete: 并非每个唯一目标目录都有成功复制记录，已保留源文件
+job_changed_during_sync: 作业配置已发生变化，本次扫描快照不会保存
 log_del_success: 日志文件 {} 已被成功删除
 log_del_fail: 日志文件 {} 删除失败，原因为：{}
 log_rename_start: 日志定时更名任务启动成功

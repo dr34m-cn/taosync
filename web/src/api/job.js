@@ -47,6 +47,81 @@ export function alistDelete(id) {
   });
 }
 
+export function storageGet(engineId) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "get",
+    params: { engineId },
+  });
+}
+
+export function storageLocalBrowse(path) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "get",
+    params: {
+      action: "localBrowse",
+      ...(path ? { path } : {}),
+    },
+  });
+}
+
+export function storageSmbDiscover() {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "get",
+    params: { action: "smbDiscover" },
+  });
+}
+
+export function storageSftpTest(data) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "post",
+    data,
+  });
+}
+
+export function storageSftpBrowse(data) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "post",
+    data,
+  });
+}
+
+export function storagePost(data) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "post",
+    data,
+  });
+}
+
+export function storagePut(data) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "put",
+    data,
+  });
+}
+
+export function storageDelete(id) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "delete",
+    data: { id },
+  });
+}
+
 export function jobPost(data) {
   return request({
     url: "/job",

@@ -121,6 +121,14 @@ const methodText = (val) => {
   return t("home.moveMode");
 };
 
+const engineOptionLabel = (engine) => {
+  if (engine.engineType === "taosync") return engine.displayName || "TaoSync";
+  const name = engine.url || engine.displayName || engine.userName || t("engine.alist");
+  return `${name}${engine.remark ? ` [${engine.remark}]` : ""}`;
+};
+
+const engineOptionMeta = (engine) => (engine.engineType === "taosync" ? t("engine.internal") : engine.userName);
+
 const cronText = (val) => {
   if (val === 0) return t("home.intervalCall");
   if (val === 1) return t("home.cronCall");
@@ -182,6 +190,12 @@ const selectPath = (isSrc) => {
   pathSelectRef.value.show();
 };
 
+const changeEngine = () => {
+  if (!editData.value) return;
+  editData.value.srcPath = "";
+  editData.value.dstPath = [];
+};
+
 const toCron = () => {
   window.open("https://dr34m.cn/2024/08/newpost-58/", "_blank");
 };
@@ -236,6 +250,7 @@ const editJobShow = (row) => {
   editData.value.exclude = editData.value.exclude ? editData.value.exclude.split(":") : [];
   editData.value.minFileSize = editData.value.minFileSize ?? null;
   editData.value.maxFileSize = editData.value.maxFileSize ?? null;
+  editData.value.sourceMode = Number(editData.value.sourceMode) === 1 ? 1 : 0;
   editShow.value = true;
 };
 
@@ -254,6 +269,7 @@ const addShow = () => {
     useCacheS: 0,
     scanIntervalS: 0,
     method: 0,
+    sourceMode: 0,
     interval: 1440,
     isCron: 0,
     exclude: [],
@@ -323,6 +339,7 @@ const submit = () => {
     }
     postData.dstPath = postData.dstPath.join(":");
     postData.exclude = postData.exclude.join(":");
+    postData.sourceMode = Number(postData.sourceMode) === 1 ? 1 : 0;
     editLoading.value = true;
     jobPost(postData)
       .then((res) => {
@@ -556,10 +573,10 @@ onMounted(() => {
             </div>
           </el-form-item>
           <el-form-item prop="alistId" :label="$t('home.engine')">
-            <el-select v-model="editData.alistId" :placeholder="$t('home.requiredEngine')" class="label-width" :no-data-text="$t('home.noEngine')">
-              <el-option v-for="item in alistList" :key="item.id" :label="item.url" :value="item.id">
-                <span class="option-left">{{ item.url }}{{ item.remark != null ? `[${item.remark}]` : "" }}</span>
-                <span class="option-right">{{ item.userName }}</span>
+            <el-select v-model="editData.alistId" :placeholder="$t('home.requiredEngine')" class="label-width" :no-data-text="$t('home.noEngine')" @change="changeEngine">
+              <el-option v-for="item in alistList" :key="item.id" :label="engineOptionLabel(item)" :value="item.id">
+                <span class="option-left">{{ engineOptionLabel(item) }}</span>
+                <span class="option-right">{{ engineOptionMeta(item) }}</span>
               </el-option>
             </el-select>
           </el-form-item>
@@ -606,6 +623,12 @@ onMounted(() => {
                 <span class="option-right">{{ $t("home.moveModeTip") }}</span>
               </el-option>
             </el-select>
+          </el-form-item>
+          <el-form-item prop="sourceMode" :label="$t('home.sourceMode')">
+            <div class="label-width source-mode-control">
+              <el-switch v-model="editData.sourceMode" :active-value="1" :inactive-value="0" />
+              <div class="source-mode-tip">{{ $t("home.sourceModeTip") }}</div>
+            </div>
           </el-form-item>
           <el-form-item prop="useCacheT" :label="$t('home.targetCache')">
             <el-select v-model="editData.useCacheT" class="label-width">
@@ -768,6 +791,17 @@ onMounted(() => {
 :global(.job-dialog .label-width) {
   width: 220px;
   min-height: 32px;
+}
+
+:global(.job-dialog .source-mode-control) {
+  height: auto;
+}
+
+:global(.job-dialog .source-mode-tip) {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 :global(.job-dialog .label-list-box) {

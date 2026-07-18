@@ -2,8 +2,26 @@
 @Author：dr34m
 @Date  ：2024/7/9 17:18 
 """
+import time
+
 from common import sqlBase
 from common.LNG import G
+
+SOURCE_SNAPSHOT_FIELDS = (
+    'alistId', 'srcPath', 'dstPath', 'method', 'exclude', 'minFileSize', 'maxFileSize'
+)
+
+
+def sourceSnapshotIdentity(job):
+    identity = {key: job.get(key) for key in SOURCE_SNAPSHOT_FIELDS}
+    for key in ('alistId', 'method', 'minFileSize', 'maxFileSize'):
+        value = identity[key]
+        if value is not None:
+            try:
+                identity[key] = int(value)
+            except (TypeError, ValueError):
+                pass
+    return identity
 
 
 def getJobList(params=None):
@@ -45,24 +63,38 @@ def getJobByTaskId(taskId):
 def addJob(job):
     # 新增作业
     return sqlBase.execute_insert("insert into job (enable, remark, srcPath, dstPath, alistId, useCacheT, "
-                                  "scanIntervalT, useCacheS, scanIntervalS, method, interval"
+                                  "scanIntervalT, useCacheS, scanIntervalS, method, sourceMode, interval"
                                   ",isCron, year, month, day, week, day_of_week, hour, minute, second, "
                                   "start_date, end_date, exclude, minFileSize, maxFileSize) "
                                   "VALUES (:enable, :remark, :srcPath, :dstPath, :alistId, :useCacheT, "
-                                  ":scanIntervalT, :useCacheS, :scanIntervalS, :method, :interval, "
+                                  ":scanIntervalT, :useCacheS, :scanIntervalS, :method, :sourceMode, :interval, "
                                   ":isCron, :year, :month, :day, :week, :day_of_week, :hour, :minute, :second, "
                                   ":start_date, :end_date, :exclude, :minFileSize, :maxFileSize)", job)
 
 
-def updateJob(job):
+@sqlBase.connect_sql
+def updateJob(conn, job, clearSourceSnapshot=False):
     # 更新作业
-    sqlBase.execute_update("update job set enable=:enable, remark=:remark, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
-                           " useCacheT=:useCacheT, scanIntervalT=:scanIntervalT, useCacheS=:useCacheS, scanIntervalS=:scanIntervalS, "
-                           "method=:method, interval=:interval, isCron=:isCron, year=:year, "
-                           "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
-                           "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude, "
-                           "minFileSize=:minFileSize, maxFileSize=:maxFileSize where id=:id",
-                           job)
+    try:
+        conn.execute("begin immediate")
+        cursor = conn.execute(
+            "update job set enable=:enable, remark=:remark, srcPath=:srcPath, dstPath=:dstPath, alistId=:alistId, "
+            " useCacheT=:useCacheT, scanIntervalT=:scanIntervalT, useCacheS=:useCacheS, scanIntervalS=:scanIntervalS, "
+            "method=:method, sourceMode=:sourceMode, interval=:interval, isCron=:isCron, year=:year, "
+            "month=:month, day=:day, week=:week, day_of_week=:day_of_week, hour=:hour, minute=:minute, "
+            "second=:second, start_date=:start_date, end_date=:end_date, exclude=:exclude, "
+            "minFileSize=:minFileSize, maxFileSize=:maxFileSize where id=:id",
+            job,
+        )
+        if cursor.rowcount != 1:
+            raise Exception(G('job_not_found'))
+        if clearSourceSnapshot:
+            conn.execute("delete from job_source_snapshot where jobId=?", (job['id'],))
+            conn.execute("delete from job_source_snapshot_meta where jobId=?", (job['id'],))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def updateJobEnable(jobId, enable):
@@ -70,12 +102,134 @@ def updateJobEnable(jobId, enable):
     sqlBase.execute_update("update job set enable = ? where id = ?", (enable, jobId))
 
 
-def deleteJob(jobId):
+@sqlBase.connect_sql
+def deleteJob(conn, jobId):
     # 删除作业
-    sqlBase.execute_update("delete from job_task_item where "
-                           "taskId in (select id from job_task where jobId=?)", (jobId,))
-    sqlBase.execute_update("delete from job_task where jobId=?", (jobId,))
-    sqlBase.execute_update("delete from job where id=?", (jobId,))
+    try:
+        conn.execute("begin immediate")
+        conn.execute("delete from job_source_snapshot where jobId=?", (jobId,))
+        conn.execute("delete from job_source_snapshot_meta where jobId=?", (jobId,))
+        conn.execute("delete from job_task_item where "
+                     "taskId in (select id from job_task where jobId=?)", (jobId,))
+        conn.execute("delete from job_task where jobId=?", (jobId,))
+        conn.execute("delete from job where id=?", (jobId,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+@sqlBase.connect_sql
+def getSourceSnapshot(conn, jobId):
+    conn.execute("begin")
+    metaRow = conn.execute(
+        "select jobId, initialized, scanTime, entryCount "
+        "from job_source_snapshot_meta where jobId=?", (jobId,)).fetchone()
+    meta = dict(zip(('jobId', 'initialized', 'scanTime', 'entryCount'), metaRow)) if metaRow else {
+        'jobId': int(jobId),
+        'initialized': 0,
+        'scanTime': None,
+        'entryCount': 0,
+    }
+    entryRows = conn.execute(
+        "select path, isDir, size, fingerprint from job_source_snapshot "
+        "where jobId=? order by path", (jobId,)).fetchall()
+    entries = []
+    for path, isDir, size, fingerprint in entryRows:
+        entry = {'path': path, 'isDir': isDir, 'size': size}
+        if fingerprint is not None:
+            entry['fingerprint'] = fingerprint
+        entries.append(entry)
+    conn.commit()
+    return {'meta': meta, 'entries': entries}
+
+
+@sqlBase.connect_sql
+def replaceSourceSnapshot(conn, jobId, entries, expectedIdentity=None):
+    rowsByPath = {}
+    for entry in entries:
+        path = entry['path']
+        if not isinstance(path, str):
+            raise ValueError('snapshot path must be a string')
+        isDir = 1 if entry.get('isDir', entry.get('is_dir', 0)) else 0
+        fingerprint = entry.get('fingerprint')
+        if fingerprint is not None:
+            fingerprint = str(fingerprint)
+        rowsByPath[path] = (
+            int(jobId),
+            path,
+            isDir,
+            None if isDir else entry.get('size'),
+            fingerprint,
+        )
+    rows = list(rowsByPath.values())
+    scanTime = int(time.time())
+    try:
+        conn.execute("begin immediate")
+        identityColumns = ', '.join(SOURCE_SNAPSHOT_FIELDS)
+        jobRow = conn.execute(
+            "select {} from job where id=?".format(identityColumns), (jobId,)
+        ).fetchone()
+        if jobRow is None:
+            raise Exception(G('job_not_found'))
+        if expectedIdentity is not None:
+            currentIdentity = sourceSnapshotIdentity(
+                dict(zip(SOURCE_SNAPSHOT_FIELDS, jobRow))
+            )
+            if currentIdentity != expectedIdentity:
+                raise RuntimeError(G('job_changed_during_sync'))
+        conn.execute("delete from job_source_snapshot where jobId=?", (jobId,))
+        if rows:
+            conn.executemany(
+                "insert into job_source_snapshot(jobId, path, isDir, size, fingerprint) "
+                "values (?, ?, ?, ?, ?)", rows)
+        conn.execute(
+            "insert into job_source_snapshot_meta(jobId, initialized, scanTime, entryCount) "
+            "values (?, 1, ?, ?) "
+            "on conflict(jobId) do update set initialized=1, "
+            "scanTime=excluded.scanTime, entryCount=excluded.entryCount",
+            (jobId, scanTime, len(rows)),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return {
+        'jobId': int(jobId),
+        'initialized': 1,
+        'scanTime': scanTime,
+        'entryCount': len(rows),
+    }
+
+
+@sqlBase.connect_sql
+def clearSourceSnapshot(conn, jobId):
+    try:
+        conn.execute("begin immediate")
+        conn.execute("delete from job_source_snapshot where jobId=?", (jobId,))
+        conn.execute("delete from job_source_snapshot_meta where jobId=?", (jobId,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+@sqlBase.connect_sql
+def clearSourceSnapshotsByEngine(conn, engineId):
+    try:
+        conn.execute("begin immediate")
+        conn.execute(
+            "delete from job_source_snapshot where jobId in "
+            "(select id from job where alistId=?)", (engineId,)
+        )
+        conn.execute(
+            "delete from job_source_snapshot_meta where jobId in "
+            "(select id from job where alistId=?)", (engineId,)
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def updateJobTaskNumMany(taskNums):

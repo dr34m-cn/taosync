@@ -6,6 +6,7 @@ import time
 
 import requests
 
+from common.fileFingerprint import fileFingerprint
 from common.LNG import G
 
 
@@ -22,8 +23,10 @@ def checkExs(path, rts, spec):
     :return: 排除后的内容列表
     """
     rtsNew = rts.copy()
+    base_path = str(path or "").strip("/")
     for rtsItem in rts.keys():
-        if spec.match_file(path + '/' + rtsItem):
+        candidate = "/".join(part for part in (base_path, rtsItem) if part)
+        if spec.match_file(candidate):
             del rtsNew[rtsItem]
     return rtsNew
 
@@ -146,6 +149,16 @@ class AlistClient:
         }
         :param rootPath: 同步根目录
         """
+        details = self.fileListDetailApi(
+            path, useCache, scanInterval, spec, rootPath
+        )
+        return {
+            name: {} if detail['isDir'] else detail['size']
+            for name, detail in details.items()
+        }
+
+    def fileListDetailApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
+        """Return AList entries with stable metadata while keeping fileListApi compatible."""
         self.checkWait(path, scanInterval)
         res = self.post('/api/fs/list', data={
             'path': path,
@@ -153,8 +166,15 @@ class AlistClient:
         })['content']
         if res is not None:
             rts = {
-                f"{item['name']}/" if item['is_dir'] else item['name']: {} if item['is_dir']
-                else item['size'] for item in res
+                f"{item['name']}/" if item['is_dir'] else item['name']: {
+                    'isDir': 1 if item['is_dir'] else 0,
+                    'size': None if item['is_dir'] else item['size'],
+                    'fingerprint': fileFingerprint(
+                        'alist',
+                        item.get('hash_info') or item.get('hash'),
+                        item.get('modified') or item.get('updated_at'),
+                    ),
+                } for item in res
             }
         else:
             rts = {}

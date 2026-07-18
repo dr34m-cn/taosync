@@ -19,6 +19,7 @@ alist_un_auth: AList authentication failed, possibly because the token has expir
 alist_fail_code_reason: "AList returns {}, reason: {}"
 without_token: Token is required when address changes
 add_alist_client_fail: "Failed to add AList client, reason: {}"
+builtin_engine_protected: The built-in TaoSync engine cannot be edited or deleted
 task_may_delete: Task not found. You may have manually deleted the copy task in AList, or AList was restarted manually or abnormally.
 do_job_err: "Task execution failed due to: {}"
 src: source
@@ -38,6 +39,12 @@ disabled_job_cannot_run: Disabled jobs cannot be run
 cannot_disable_manual_job: Manual-only jobs cannot be disabled
 file_size_invalid: File size filters must be non-negative integer byte values
 file_size_range_invalid: The minimum file size cannot exceed the maximum file size
+source_mode_invalid: Source directory mode must be enabled or disabled
+source_target_overlap: Source and destination directories must not be equal or nested
+source_changed_during_move: The source file changed during the move and was kept; retry the job
+source_version_unavailable: The source file was kept because its version could not be verified after copying
+move_delivery_incomplete: Source file was kept because not every unique destination has a successful copy
+job_changed_during_sync: The job configuration changed, so this scan snapshot was not saved
 log_del_success: The log file {} has been successfully deleted
 log_del_fail: "Failed to delete log file {}, reason: {}"
 log_rename_start: The log scheduled renaming task was started successfully

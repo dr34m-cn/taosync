@@ -110,6 +110,8 @@ home:
   moveMode: 移动模式
   moveModeTip: 同步完成后删除源目录所有文件
   moveWarning: 移动模式存在风险，可能导致文件丢失；请仅用于不重要或已有多重备份的文件。
+  sourceMode: 源目录模式
+  sourceModeTip: 首次仍扫描目标；有成功快照后仅扫描源目录并与数据库对比，目标端独立变化不会被发现。
   targetScan: 目标目录扫描
   sourceScan: 源目录扫描
   noCache: 不用缓存
@@ -234,6 +236,97 @@ engine:
   empty: 暂无引擎，请新增
   add: 新增
   edit: 编辑
+  alist: AList
+  internal: 内置引擎
+  directoryCount: "{count} 个目录"
+  directoryManagement: 目录管理
+  directoryManagementTitle: "{name} 目录管理"
+  addAlist: 添加 AList 引擎
+  addDirectory: 添加目录
+  editDirectory: 编辑目录
+  directoryEmpty: 暂无目录，请添加第一个目录
+  mountName: 目录名称
+  mountNamePlaceholder: 用于作业路径的顶层目录名称
+  driverType: 网盘类型
+  rootPath: 根目录
+  localRootPlaceholder: 请输入本机已存在的目录路径
+  browseLocalDirectory: 浏览本地目录
+  localBrowserTitle: 选择本地目录
+  currentDirectory: 当前目录
+  parentDirectory: 返回上级目录
+  refreshDirectory: 刷新当前目录
+  diskRoots: 磁盘根目录
+  subdirectories: 子目录
+  noSubdirectories: 当前目录没有子目录
+  selectCurrentDirectory: 选择当前目录
+  remoteRootPlaceholder: 远端根目录，留空表示根路径
+  host: 主机
+  hostPlaceholder: 请输入主机名或 IP 地址
+  scanSmbDevices: 扫描 SMB 设备
+  smbDiscoveryTitle: 选择 SMB 设备
+  smbDiscoveryDescription: 活动 IPv4 网段内 TCP 445 可连接的设备
+  refreshDevices: 重新扫描设备
+  noSmbDevices: 未发现 SMB 设备，可重新扫描或手动输入主机
+  port: 端口
+  share: 共享名称
+  sharePlaceholder: 请输入 SMB 共享名称
+  domain: 域
+  username: 用户名
+  usernamePlaceholder: 请输入 SSH 用户名
+  password: 密码
+  passwordPlaceholder: 请输入 SSH 密码
+  authenticationMethod: 认证方式
+  passwordAuthentication: 密码
+  privateKeyAuthentication: 私钥
+  privateKey: 私钥
+  privateKeyPlaceholder: 请粘贴 PEM 或 OpenSSH 私钥文本
+  privateKeyPassphrase: 私钥密码
+  showPrivateKey: 显示私钥
+  hidePrivateKey: 隐藏私钥
+  connectionTimeout: 连接超时（秒）
+  hostKeyFingerprint: 主机密钥指纹（选填）
+  hostKeyFingerprintPlaceholder: 选填；测试成功后可自动获取
+  testSftpConnection: 测试连接
+  sftpConnectionTested: 连接已测试
+  sftpTestSuccess: SFTP 连接测试成功
+  sftpRootSelectPlaceholder: 选择或输入远端根目录
+  optional: 选填
+  anonymousPlaceholder: 留空使用 anonymous
+  passiveMode: 被动模式
+  tls: 显式 TLS（AUTH TLS）
+  clientId: Client ID
+  clientSecret: Client Secret
+  refreshToken: Refresh Token
+  driveType: 网盘空间
+  rootFolderId: 根文件夹 ID
+  removeWay: 删除方式
+  secretPlaceholderEdit: 留空表示保留现有值
+  mountNameRule: 请输入目录名称
+  driverTypeRule: 请选择网盘类型
+  rootPathRule: 请输入根目录
+  hostRule: 请输入主机
+  usernameRule: 请输入用户名
+  passwordRule: 请输入密码
+  privateKeyRule: 请输入私钥
+  hostKeyFingerprintRule: "请输入 SHA256 格式的主机密钥指纹，例如 SHA256:..."
+  shareRule: 请输入共享名称
+  clientIdRule: 请输入 Client ID
+  clientSecretRule: 请输入 Client Secret
+  refreshTokenRule: 请输入 Refresh Token
+  mountDeleteConfirm: "将删除目录“{name}”，使用该目录的作业将无法运行，仍要删除吗？"
+  drivers:
+    local: 本地目录
+    smb: SMB
+    ftp: FTP
+    sftp: SFTP（SSH）
+    aliyun: 阿里云盘
+  driveTypes:
+    resource: 资源库
+    default: 默认盘
+    backup: 备份盘
+  removeWays:
+    trash: 移入回收站
+    delete: 永久删除
   address: 地址
   addressPlaceholder: 请输入地址，如 http://127.0.0.1:5244
   remark: 备注

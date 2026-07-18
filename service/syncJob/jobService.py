@@ -6,12 +6,14 @@ import logging
 
 from common.LNG import G
 from mapper import jobMapper
+from service.storage import storageService
 from service.syncJob import jobClient
 
 # 作业客户端列表，key为jobId,value为jobClient
 jobClientList = {}
 
 MAX_SQLITE_INTEGER = 9223372036854775807
+SOURCE_SNAPSHOT_FIELDS = jobMapper.SOURCE_SNAPSHOT_FIELDS
 
 
 def normalizeFileSize(value):
@@ -30,6 +32,18 @@ def normalizeFileSize(value):
     if result < 0 or result > MAX_SQLITE_INTEGER:
         raise Exception(G('file_size_invalid'))
     return result
+
+
+def normalizeSourceMode(value):
+    if value is None:
+        return 0
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int) and value in (0, 1):
+        return value
+    if isinstance(value, str) and value in ('0', '1'):
+        return int(value)
+    raise Exception(G('source_mode_invalid'))
 
 
 def initJob():
@@ -83,8 +97,20 @@ def cleanJobInput(job):
         job['exclude'] = ":".join([item.strip() for item in job['exclude'].split(':')])
     job.setdefault('minFileSize', None)
     job.setdefault('maxFileSize', None)
+    job.setdefault('sourceMode', 0)
     job['minFileSize'] = normalizeFileSize(job['minFileSize'])
     job['maxFileSize'] = normalizeFileSize(job['maxFileSize'])
+    job['sourceMode'] = normalizeSourceMode(job['sourceMode'])
+    if job.get('srcPath') and job.get('dstPath'):
+        for dstPath in job['dstPath'].split(':'):
+            engineId = job.get('alistId')
+            pathsOverlap = (
+                jobClient.virtualPathsOverlap(job['srcPath'], dstPath)
+                if engineId is None
+                else storageService.enginePathsOverlap(engineId, job['srcPath'], dstPath)
+            )
+            if pathsOverlap:
+                raise Exception(G('source_target_overlap'))
     if (job['minFileSize'] is not None
             and job['maxFileSize'] is not None
             and job['minFileSize'] > job['maxFileSize']):
@@ -131,12 +157,23 @@ def editJobClient(job):
     client = getJobClientById(jobId)
     if client.job['enable'] == 1 and client.job['isCron'] != 2:
         raise Exception(G('disable_then_edit'))
+    clearSnapshot = any(client.job.get(key) != job.get(key) for key in SOURCE_SNAPSHOT_FIELDS)
+    oldJob = client.job.copy()
     client.stopJob(remove=True)
     global jobClientList
-    del jobClientList[jobId]
-    client = jobClient.JobClient(job)
-    jobMapper.updateJob(job)
-    jobClientList[jobId] = client
+    newClient = None
+    try:
+        newClient = jobClient.JobClient(job)
+        jobMapper.updateJob(job, clearSourceSnapshot=clearSnapshot)
+    except Exception:
+        if newClient is not None:
+            newClient.stopJob(remove=True)
+        try:
+            jobClientList[jobId] = jobClient.JobClient(oldJob)
+        except Exception as restoreError:
+            logging.getLogger().exception(restoreError)
+        raise
+    jobClientList[jobId] = newClient
 
 
 def doAllJobManual():

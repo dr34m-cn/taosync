@@ -10,7 +10,7 @@ source.include_patterns = front/**,locales/**,common/**,controller/**,mapper/**,
 
 version = 0.3.2
 
-requirements = python3,pyjnius,android,tornado,requests,urllib3,certifi,chardet,idna,apscheduler,tzlocal,tzdata,setuptools,configparser,pathspec,openssl,sqlite3
+requirements = python3,pyjnius,android,tornado,requests,urllib3,certifi,chardet,idna,apscheduler,tzlocal,tzdata,setuptools,configparser,pathspec,openssl,sqlite3,cryptography,smbprotocol,paramiko
 
 orientation = portrait
 fullscreen = 0

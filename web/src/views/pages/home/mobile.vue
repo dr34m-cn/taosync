@@ -120,6 +120,12 @@ const cronText = (value) => {
   return t("home.manualOnly");
 };
 
+const engineOptionLabel = (engine) => {
+  if (engine.engineType === "taosync") return engine.displayName || "TaoSync";
+  const name = engine.url || engine.displayName || engine.userName || t("engine.alist");
+  return `${name}${engine.remark ? ` [${engine.remark}]` : ""}`;
+};
+
 const sizeFilterText = (job) => {
   const minFileSize = job.minFileSize ?? null;
   const maxFileSize = job.maxFileSize ?? null;
@@ -260,6 +266,7 @@ const addShow = async () => {
     useCacheS: 0,
     scanIntervalS: 0,
     method: 0,
+    sourceMode: 0,
     interval: 1440,
     isCron: 0,
     exclude: [],
@@ -285,6 +292,7 @@ const editJobShow = async (row) => {
   editData.value.exclude = splitPaths(editData.value.exclude);
   editData.value.minFileSize = editData.value.minFileSize ?? null;
   editData.value.maxFileSize = editData.value.maxFileSize ?? null;
+  editData.value.sourceMode = Number(editData.value.sourceMode) === 1 ? 1 : 0;
   excludeTmp.value = "";
   editShow.value = true;
 };
@@ -297,6 +305,12 @@ const closeEditor = () => {
 const selectPath = (type) => {
   currentPathType.value = type;
   pathSelectRef.value?.show();
+};
+
+const changeEngine = () => {
+  if (!editData.value) return;
+  editData.value.srcPath = "";
+  editData.value.dstPath = [];
 };
 
 const submitPath = (path) => {
@@ -335,6 +349,7 @@ const submit = () => {
     }
     postData.dstPath = postData.dstPath.join(":");
     postData.exclude = postData.exclude.join(":");
+    postData.sourceMode = Number(postData.sourceMode) === 1 ? 1 : 0;
     editLoading.value = true;
     jobPost(postData)
       .then((res) => {
@@ -472,8 +487,8 @@ onMounted(getJobList);
             <el-switch v-model="editData.enable" :active-value="1" :inactive-value="0" :disabled="editData.isCron == 2" />
           </el-form-item>
           <el-form-item :label="$t('home.engine')" prop="alistId">
-            <el-select v-model="editData.alistId" :placeholder="$t('home.requiredEngine')" :no-data-text="$t('home.noEngine')">
-              <el-option v-for="item in alistList" :key="item.id" :label="`${item.url}${item.remark ? ` [${item.remark}]` : ''}`" :value="item.id" />
+            <el-select v-model="editData.alistId" :placeholder="$t('home.requiredEngine')" :no-data-text="$t('home.noEngine')" @change="changeEngine">
+              <el-option v-for="item in alistList" :key="item.id" :label="engineOptionLabel(item)" :value="item.id" />
             </el-select>
           </el-form-item>
           <el-form-item :label="$t('home.jobRemark')" prop="remark">
@@ -486,6 +501,10 @@ onMounted(getJobList);
               <el-option :label="$t('home.moveMode')" :value="2" />
             </el-select>
             <div v-if="editData.method == 2" class="field-warning">{{ $t("home.moveWarning") }}</div>
+          </el-form-item>
+          <el-form-item :label="$t('home.sourceMode')" prop="sourceMode">
+            <el-switch v-model="editData.sourceMode" :active-value="1" :inactive-value="0" />
+            <div class="field-tip">{{ $t("home.sourceModeTip") }}</div>
           </el-form-item>
         </section>
 

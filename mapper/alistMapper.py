@@ -7,7 +7,7 @@ from common.LNG import G
 
 
 def getAlistList():
-    return sqlBase.fetchall_to_table("select * from alist_list")
+    return sqlBase.fetchall_to_table("select * from alist_list order by protected desc, createTime asc, id asc")
 
 
 def getAlistById(alistId):
@@ -30,4 +30,9 @@ def updateAlist(alist):
 
 
 def removeAlist(alistId):
-    sqlBase.execute_update("delete from alist_list where id=?", (alistId,))
+    # The built-in TaoSync engine is a system object and must never be removed.
+    sqlBase.execute_update("delete from alist_list where id=? and protected=0", (alistId,))
+
+
+def getEngineById(engineId):
+    return getAlistById(engineId)

@@ -23,6 +23,7 @@ def make_app():
         (r"/svr/user", systemController.User),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
+        (r"/svr/storage", jobController.Storage),
         (r"/svr/job", jobController.Job),
         (r"/svr/notify", notifyController.Notify),
         (r"/", MainIndex),
