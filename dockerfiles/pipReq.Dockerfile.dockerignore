@@ -1,0 +1,7 @@
+**
+!requirements.in
+!requirements.txt
+!dockerfiles/
+!dockerfiles/verify_requirements_lock.py
+!wheels/
+!wheels/**

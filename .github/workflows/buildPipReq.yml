@@ -3,29 +3,270 @@ name: build-pipReq
 on:
   push:
     branches: [ 'main' ]
-    paths: [ 'dockerfiles/pipReq.Dockerfile', 'requirements.txt' ]
+    paths:
+      - '.github/workflows/buildPipReq.yml'
+      - 'dockerfiles/pipReq.Dockerfile'
+      - 'requirements.in'
+      - 'requirements.txt'
+
+env:
+  DOCKER_USER: dr34m
+  DOCKER_NAME: tao-sync
+  WHEEL_CACHE_BRANCH: wheels
+  WHEEL_CACHE_KEY: py311-alpine3.23
+
+concurrency:
+  group: build-pipReq-wheel-cache
+  cancel-in-progress: false
 
 jobs:
-  build_docker:
+  build-docker:
+    name: 构建 ${{ matrix.platform }}
     runs-on: ubuntu-latest
+    env:
+      PLATFORM_PAIR: ${{ matrix.platform_pair }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            platform_pair: linux-amd64
+          - platform: linux/arm64
+            platform_pair: linux-arm64
+          - platform: linux/arm/v7
+            platform_pair: linux-arm-v7
+          - platform: linux/386
+            platform_pair: linux-386
+          - platform: linux/arm/v6
+            platform_pair: linux-arm-v6
+          - platform: linux/s390x
+            platform_pair: linux-s390x
+          - platform: linux/ppc64le
+            platform_pair: linux-ppc64le
 
     steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - id: wheel-cache-branch
+        name: 检查wheel缓存分支
+        run: |
+          set -euo pipefail
+          set +e
+          git ls-remote --exit-code --heads origin \
+            "refs/heads/${WHEEL_CACHE_BRANCH}" >/dev/null 2>&1
+          branch_status=$?
+          set -e
+
+          case "$branch_status" in
+            0) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            2) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "Unable to query wheel cache branch." >&2
+              exit "$branch_status"
+              ;;
+          esac
+
+      - name: 检出wheel缓存
+        if: steps.wheel-cache-branch.outputs.exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.WHEEL_CACHE_BRANCH }}
+          path: wheel-cache
+          fetch-depth: 1
+          sparse-checkout: |
+            ${{ env.WHEEL_CACHE_KEY }}/${{ matrix.platform_pair }}
+
+      - name: 准备当前平台wheel缓存
+        run: |
+          cache_source="wheel-cache/${WHEEL_CACHE_KEY}/${PLATFORM_PAIR}"
+          cache_target="wheels/${WHEEL_CACHE_KEY}/${PLATFORM_PAIR}"
+          mkdir -p "$cache_target"
+          touch "$cache_target/.gitkeep"
+          if [ -d "$cache_source" ]; then
+            cp -a "$cache_source/." "$cache_target/"
+          fi
+
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
-        
+        with:
+          platforms: all
+
       - name: 设置Docker BuildX
         uses: docker/setup-buildx-action@v3
-    
+
       - name: 登录到DockerHub
         uses: docker/login-action@v3
         with:
-          username: dr34m
+          username: ${{ env.DOCKER_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 构建并推送
+      - id: build-image
+        name: 构建并按digest推送镜像
         uses: docker/build-push-action@v6
         with:
+          context: .
           file: dockerfiles/pipReq.Dockerfile
-          push: true
-          tags: dr34m/tao-sync:not-for-use-pip-req
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            WHEEL_CACHE_DIR=wheels/${{ env.WHEEL_CACHE_KEY }}/${{ env.PLATFORM_PAIR }}
+          outputs: |
+            type=docker
+            type=image,name=${{ env.DOCKER_USER }}/${{ env.DOCKER_NAME }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: 导出digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build-image.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: 上传digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+      - name: 从镜像中提取wheel缓存
+        run: |
+          container="extract-${PLATFORM_PAIR}"
+          output="wheels-${PLATFORM_PAIR}"
+          mkdir -p "$output"
+          docker create --name "$container" "${{ steps.build-image.outputs.imageid }}" /bin/true
+          docker cp "$container:/wheels/." "$output/"
+          docker rm "$container"
+
+      - name: 上传wheel缓存
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ env.PLATFORM_PAIR }}
+          path: wheels-${{ env.PLATFORM_PAIR }}/*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  merge-docker:
+    name: 合并并推送多架构镜像
+    runs-on: ubuntu-latest
+    needs: [ build-docker ]
+
+    steps:
+      - name: 下载digest
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: 设置Docker BuildX
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录到DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 创建清单并推送
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            -t "${DOCKER_USER}/${DOCKER_NAME}:not-for-use-pip-req" \
+            $(printf "${DOCKER_USER}/${DOCKER_NAME}@sha256:%s " *)
+
+  commit-wheels:
+    name: 回写wheel缓存
+    runs-on: ubuntu-latest
+    needs: [ build-docker ]
+    if: ${{ always() && !cancelled() }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: wheel-cache-repo
+          fetch-depth: 1
+
+      - name: 下载全部wheel缓存
+        id: download-wheels
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: wheels-*
+          path: ${{ runner.temp }}/wheels-downloads
+
+      - id: update-wheel-cache
+        name: 更新wheel缓存分支
+        working-directory: wheel-cache-repo
+        run: |
+          set -euo pipefail
+
+          set +e
+          git ls-remote --exit-code --heads origin \
+            "refs/heads/${WHEEL_CACHE_BRANCH}" >/dev/null 2>&1
+          branch_status=$?
+          set -e
+
+          case "$branch_status" in
+            0)
+              git fetch --depth=1 origin \
+                "refs/heads/${WHEEL_CACHE_BRANCH}:refs/remotes/origin/${WHEEL_CACHE_BRANCH}"
+              git checkout -B "$WHEEL_CACHE_BRANCH" \
+                "refs/remotes/origin/${WHEEL_CACHE_BRANCH}"
+              ;;
+            2)
+              git checkout --orphan "$WHEEL_CACHE_BRANCH"
+              git rm -r -f -q .
+              ;;
+            *)
+              echo "Unable to query wheel cache branch." >&2
+              exit "$branch_status"
+              ;;
+          esac
+
+          updated=false
+          artifact_root="${RUNNER_TEMP}/wheels-downloads"
+          if [ -d "$artifact_root" ]; then
+            while IFS= read -r -d '' source_dir; do
+              platform_pair="${source_dir##*/wheels-}"
+              case "$platform_pair" in
+                linux-amd64|linux-arm64|linux-arm-v7|linux-386|\
+                linux-arm-v6|linux-s390x|linux-ppc64le) ;;
+                *)
+                  echo "Unexpected wheel artifact: $source_dir" >&2
+                  exit 1
+                  ;;
+              esac
+
+              target_dir="${WHEEL_CACHE_KEY}/${platform_pair}"
+              rm -rf "$target_dir"
+              mkdir -p "$target_dir"
+              cp -a "$source_dir/." "$target_dir/"
+              updated=true
+            done < <(
+              find "$artifact_root" -mindepth 1 -maxdepth 1 \
+                -type d -name 'wheels-*' -print0
+            )
+          fi
+
+          echo "updated=$updated" >> "$GITHUB_OUTPUT"
+          if [ "$updated" = false ]; then
+            echo "No successful wheel artifacts were produced."
+          fi
+
+      - name: 提交并推送wheel缓存
+        if: steps.update-wheel-cache.outputs.updated == 'true'
+        working-directory: wheel-cache-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$WHEEL_CACHE_KEY"
+          if git diff --cached --quiet; then
+            echo "Wheel cache is already up to date."
+            exit 0
+          fi
+          git commit -m "chore(wheels): update cached wheels [skip ci]"
+          git push origin "HEAD:refs/heads/${WHEEL_CACHE_BRANCH}"
