@@ -1,2 +1,2 @@
-FROM alpine:3.20.2
+FROM alpine:3.23
 RUN apk update && apk add tzdata
