@@ -1,4 +1,4 @@
-# Python 3.11 runtime dependency lock.
+# Python 3.11 runtime dependency lock
 # Keep requirements.in as the human-maintained direct dependency list.
 
 # Direct dependencies
