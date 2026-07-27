@@ -315,13 +315,29 @@ jobs:
 
       - name: 在Docker中进行静态打包
         run: |
+          set -euo pipefail
+
           case "${{ matrix.platform }}" in
-            amd64) IMG="python:3.11-slim-bullseye"; LIB="/usr/lib/x86_64-linux-gnu" ;;
-            arm64) IMG="arm64v8/python:3.11-slim-bullseye"; LIB="/usr/lib/aarch64-linux-gnu" ;;
-            arm32) IMG="arm32v7/python:3.11-slim-bullseye"; LIB="/usr/lib/arm-linux-gnueabihf" ;;
+            amd64) LIB="/usr/lib/x86_64-linux-gnu" ;;
+            arm64) LIB="/usr/lib/aarch64-linux-gnu" ;;
+            arm32) LIB="/usr/lib/arm-linux-gnueabihf" ;;
           esac
 
-          docker run --rm \
+          IMG="python:3.11-slim-bullseye"
+          for attempt in 1 2 3 4 5; do
+            if docker pull --platform "linux/${T_ARCH}" "$IMG"; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "Failed to pull $IMG for linux/${T_ARCH} after 5 attempts." >&2
+              exit 1
+            fi
+            delay=$((attempt * 15))
+            echo "Image pull attempt $attempt failed; retrying in ${delay}s..." >&2
+            sleep "$delay"
+          done
+
+          docker run --rm --pull=never \
             --platform "linux/${T_ARCH}" \
             -v "$(pwd):/app" \
             -w /app \
