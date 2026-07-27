@@ -405,8 +405,6 @@ jobs:
               rm -rf /var/lib/apt/lists/*
 
               python -m pip install --upgrade pip
-              python -m pip install setuptools wheel scons hatchling
-              python -m pip install --no-build-isolation "pyinstaller>=6,<7" staticx
               python -m pip wheel \
                 --no-cache-dir \
                 --prefer-binary \
@@ -422,6 +420,13 @@ jobs:
                 --find-links /wheels \
                 -r requirements.txt
               python -m pip check
+
+              # ARM source wheels from StaticX use an upstream manylinux1 tag
+              # that pip check rejects. Validate runtime dependencies first.
+              python -m pip install setuptools wheel scons hatchling
+              python -m pip install --no-build-isolation \
+                "pyinstaller>=6,<7" \
+                "staticx==0.14.2"
 
               export LD_LIBRARY_PATH="/usr/local/lib:${LIB_PATH}"
               python -m PyInstaller "${APP_NAME}.spec" \
