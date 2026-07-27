@@ -625,9 +625,17 @@ jobs:
           restore-keys: |
             buildozer-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-
 
-      - name: 清理旧构建产物
+      - name: 缓存p4a原生构建目录
+        uses: actions/cache@v4
+        with:
+          path: .buildozer/android/platform/build-arm64-v8a_armeabi-v7a
+          key: p4a-native-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+          restore-keys: |
+            p4a-native-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-
+
+      - name: 清理旧打包产物
         run: |
-          rm -rf .buildozer bin .python-for-android
+          rm -rf bin .python-for-android
 
       - name: 切换Android入口
         run: |
