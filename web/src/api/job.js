@@ -77,6 +77,18 @@ export function storageSmbDiscover() {
   });
 }
 
+export function storageSmbShares(data) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "post",
+    data: {
+      action: "smbShares",
+      ...data,
+    },
+  });
+}
+
 export function storageSftpTest(data) {
   return request({
     url: "/storage",

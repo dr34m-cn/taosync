@@ -64,6 +64,8 @@ class Storage(BaseHandler):
             return storageService.testSftp(req)
         if action == 'sftpBrowse':
             return storageService.browseSftp(req)
+        if action == 'smbShares':
+            return storageService.discoverSmbShares(req)
         if action is not None:
             raise ValueError('unknown storage action')
         return storageService.addMount(req)

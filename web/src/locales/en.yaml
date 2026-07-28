@@ -270,6 +270,11 @@ engine:
   port: Port
   share: Share
   sharePlaceholder: Enter the SMB share name
+  scanSmbShares: Scan SMB shares
+  smbShareDiscoveryTitle: Select SMB Share
+  smbShareDiscoveryDescription: File shares available on this host and port
+  refreshShares: Scan shares again
+  noSmbShares: No shares found. Scan again or enter a share name manually.
   domain: Domain
   username: Username
   usernamePlaceholder: Enter the SSH username
@@ -305,6 +310,7 @@ engine:
   driverTypeRule: Please select a storage type
   rootPathRule: Please enter a root path
   hostRule: Please enter a host
+  portRule: Enter a port between 1 and 65535
   usernameRule: Please enter a username
   passwordRule: Please enter a password
   privateKeyRule: Please enter a private key

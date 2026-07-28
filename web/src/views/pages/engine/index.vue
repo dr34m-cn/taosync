@@ -9,13 +9,13 @@ import {
   storageGet,
   storageLocalBrowse,
   storagePost,
-  storageSmbDiscover,
+  storageSmbShares,
   storageSftpBrowse,
   storageSftpTest,
   storagePut,
 } from "@/api/job";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ArrowUp, Connection, Delete, Edit, FolderOpened, Hide, Monitor, Plus, RefreshRight, Search, View } from "@element-plus/icons-vue";
+import { ArrowUp, Connection, Delete, Edit, FolderOpened, Hide, Plus, RefreshRight, Search, View } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -41,9 +41,9 @@ const mountFormRef = ref();
 const localBrowseShow = ref(false);
 const localBrowseLoading = ref(false);
 const localBrowseData = ref({ path: "", parent: null, roots: [], directories: [] });
-const smbDiscoverShow = ref(false);
-const smbDiscoverLoading = ref(false);
-const smbDevices = ref([]);
+const smbShareDiscoverShow = ref(false);
+const smbShareDiscoverLoading = ref(false);
+const smbShares = ref([]);
 const privateKeyVisible = ref(false);
 const sftpTestLoading = ref(false);
 const sftpTestSignature = ref("");
@@ -55,7 +55,7 @@ const sftpRootBrowserBase = ref("/");
 const sftpRootBrowserSelection = ref(null);
 const sftpRootTreeKey = ref(0);
 let localBrowseRequestId = 0;
-let smbDiscoverRequestId = 0;
+let smbShareDiscoverRequestId = 0;
 let sftpTestRequestId = 0;
 let sftpRootBrowseEpoch = 0;
 let sftpApplyingTestResult = false;
@@ -139,6 +139,15 @@ const requiredRule = (messageKey, trigger = "blur") => ({
   trigger,
 });
 
+const portRule = (_rule, value, callback) => {
+  const port = Number(value);
+  if (Number.isInteger(port) && port >= 1 && port <= 65535) {
+    callback();
+    return;
+  }
+  callback(new Error(t("engine.portRule")));
+};
+
 const hostKeyFingerprintRule = (_rule, value, callback) => {
   const fingerprint = String(value || "").trim();
   if (!fingerprint || /^SHA256:[A-Za-z0-9+/]+={0,2}$/.test(fingerprint)) {
@@ -193,6 +202,7 @@ const mountRules = computed(() => {
   }
   if (driverType === "smb") {
     rules["config.share"] = [requiredRule("engine.shareRule")];
+    rules["config.port"] = [{ validator: portRule, trigger: "change" }];
   }
   if (driverType === "aliyun") {
     rules["config.client_id"] = [requiredRule("engine.clientIdRule")];
@@ -213,6 +223,25 @@ const mountRules = computed(() => {
     }
   }
   return rules;
+});
+
+const smbShareDiscoverReady = computed(() => {
+  if (mountData.value?.driverType !== "smb") return false;
+  const config = mountData.value.config || {};
+  const port = Number(config.port);
+  return Boolean(String(config.host || "").trim()) && Number.isInteger(port) && port >= 1 && port <= 65535;
+});
+
+const smbShareDiscoverSignature = computed(() => {
+  if (mountData.value?.driverType !== "smb") return "";
+  const config = mountData.value.config || {};
+  return JSON.stringify({
+    host: String(config.host || "").trim(),
+    port: Number(config.port || 445),
+    domain: String(config.domain || "").trim(),
+    username: String(config.username || "").trim(),
+    password: String(config.password || ""),
+  });
 });
 
 const sftpConnectionSignature = computed(() => {
@@ -477,7 +506,7 @@ const editMount = (mount) => {
 const handleDriverChange = (driverType) => {
   resetSftpTest();
   localBrowseShow.value = false;
-  smbDiscoverShow.value = false;
+  smbShareDiscoverShow.value = false;
   privateKeyVisible.value = false;
   mountData.value.config = driverDefaults(driverType);
   nextTick(() => mountFormRef.value?.clearValidate());
@@ -492,7 +521,7 @@ const handleSftpAuthChange = () => {
 const closeMount = () => {
   resetSftpTest();
   localBrowseShow.value = false;
-  smbDiscoverShow.value = false;
+  smbShareDiscoverShow.value = false;
   privateKeyVisible.value = false;
   mountFormRef.value?.clearValidate();
   mountShow.value = false;
@@ -710,36 +739,67 @@ const selectLocalDirectory = () => {
   nextTick(() => mountFormRef.value?.clearValidate("config.root_path"));
 };
 
-const discoverSmbDevices = () => {
-  const requestId = ++smbDiscoverRequestId;
-  smbDiscoverLoading.value = true;
-  return storageSmbDiscover()
+const smbShareConfig = () => {
+  const config = mountData.value?.config || {};
+  return {
+    host: config.host,
+    port: config.port,
+    domain: config.domain,
+    username: config.username,
+    password: config.password,
+  };
+};
+
+const discoverSmbShares = () => {
+  if (!smbShareDiscoverReady.value || smbShareDiscoverLoading.value) return Promise.resolve();
+  const requestId = ++smbShareDiscoverRequestId;
+  const requestSignature = smbShareDiscoverSignature.value;
+  smbShareDiscoverLoading.value = true;
+  return storageSmbShares({
+    engineId: mountData.value.engineId,
+    ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
+    config: smbShareConfig(),
+  })
     .then((res) => {
-      if (requestId !== smbDiscoverRequestId) return;
+      if (requestId !== smbShareDiscoverRequestId || requestSignature !== smbShareDiscoverSignature.value) return;
       const seen = new Set();
-      smbDevices.value = (Array.isArray(res.data) ? res.data : []).filter((device) => {
-        const address = String(device?.address || "").trim();
-        if (!address || seen.has(address)) return false;
-        seen.add(address);
+      smbShares.value = (Array.isArray(res.data) ? res.data : []).filter((share) => {
+        const name = String(typeof share === "string" ? share : share?.name || "").trim();
+        const key = name.toLocaleLowerCase();
+        if (!name || seen.has(key)) return false;
+        seen.add(key);
         return true;
-      });
+      }).map((share) => (
+        typeof share === "string" ? { name: String(share).trim(), comment: "" } : {
+          name: String(share?.name || "").trim(),
+          comment: String(share?.comment || "").trim(),
+        }
+      ));
     })
     .finally(() => {
-      if (requestId === smbDiscoverRequestId) smbDiscoverLoading.value = false;
+      if (requestId === smbShareDiscoverRequestId) smbShareDiscoverLoading.value = false;
     });
 };
 
-const openSmbDiscovery = () => {
-  smbDevices.value = [];
-  smbDiscoverShow.value = true;
-  discoverSmbDevices();
+const openSmbShareDiscovery = async () => {
+  if (!smbShareDiscoverReady.value) {
+    try {
+      await mountFormRef.value?.validateField(["config.host", "config.port"]);
+    } catch {
+      return;
+    }
+    return;
+  }
+  smbShares.value = [];
+  smbShareDiscoverShow.value = true;
+  discoverSmbShares();
 };
 
-const selectSmbDevice = (device) => {
-  if (!mountData.value || !device?.address) return;
-  mountData.value.config.host = device.address;
-  smbDiscoverShow.value = false;
-  nextTick(() => mountFormRef.value?.clearValidate("config.host"));
+const selectSmbShare = (share) => {
+  if (!mountData.value || !share?.name) return;
+  mountData.value.config.share = share.name;
+  smbShareDiscoverShow.value = false;
+  nextTick(() => mountFormRef.value?.clearValidate("config.share"));
 };
 
 const mountPayload = () => {
@@ -986,19 +1046,24 @@ onMounted(() => {
 
           <template v-else-if="mountData.driverType === 'smb'">
             <el-form-item prop="config.host" :label="$t('engine.host')">
-              <el-input v-model="mountData.config.host" :placeholder="$t('engine.hostPlaceholder')">
-                <template #append>
-                  <el-tooltip :content="$t('engine.scanSmbDevices')" placement="top">
-                    <el-button :icon="Search" :aria-label="$t('engine.scanSmbDevices')" @click="openSmbDiscovery" />
-                  </el-tooltip>
-                </template>
-              </el-input>
+              <el-input v-model="mountData.config.host" :placeholder="$t('engine.hostPlaceholder')" />
             </el-form-item>
             <el-form-item prop="config.port" :label="$t('engine.port')">
               <el-input-number v-model="mountData.config.port" :min="1" :max="65535" controls-position="right" />
             </el-form-item>
             <el-form-item prop="config.share" :label="$t('engine.share')">
-              <el-input v-model="mountData.config.share" :placeholder="$t('engine.sharePlaceholder')" />
+              <el-input v-model="mountData.config.share" :placeholder="$t('engine.sharePlaceholder')">
+                <template #append>
+                  <el-tooltip :content="$t('engine.scanSmbShares')" placement="top">
+                    <el-button
+                      :icon="Search"
+                      :aria-label="$t('engine.scanSmbShares')"
+                      :disabled="!smbShareDiscoverReady"
+                      @click="openSmbShareDiscovery"
+                    />
+                  </el-tooltip>
+                </template>
+              </el-input>
             </el-form-item>
             <el-form-item prop="config.root_path" :label="$t('engine.rootPath')">
               <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')" />
@@ -1317,43 +1382,43 @@ onMounted(() => {
     </el-dialog>
 
     <el-dialog
-      v-model="smbDiscoverShow"
+      v-model="smbShareDiscoverShow"
       class="smb-discovery-dialog"
       width="min(620px, calc(100vw - 24px))"
-      :title="$t('engine.smbDiscoveryTitle')"
+      :title="$t('engine.smbShareDiscoveryTitle')"
       :append-to-body="true"
       :close-on-click-modal="false"
     >
       <div class="smb-discovery-toolbar">
-        <span>{{ $t("engine.smbDiscoveryDescription") }}</span>
-        <el-tooltip :content="$t('engine.refreshDevices')" placement="top">
+        <span>{{ $t("engine.smbShareDiscoveryDescription") }}</span>
+        <el-tooltip :content="$t('engine.refreshShares')" placement="top">
           <el-button
             :icon="RefreshRight"
-            :aria-label="$t('engine.refreshDevices')"
-            :loading="smbDiscoverLoading"
-            @click="discoverSmbDevices"
+            :aria-label="$t('engine.refreshShares')"
+            :loading="smbShareDiscoverLoading"
+            @click="discoverSmbShares"
           />
         </el-tooltip>
       </div>
-      <div v-loading="smbDiscoverLoading" class="smb-device-content">
+      <div v-loading="smbShareDiscoverLoading" class="smb-device-content">
         <el-empty
-          v-if="!smbDiscoverLoading && smbDevices.length === 0"
-          :description="$t('engine.noSmbDevices')"
+          v-if="!smbShareDiscoverLoading && smbShares.length === 0"
+          :description="$t('engine.noSmbShares')"
           :image-size="80"
         />
         <div v-else class="smb-device-list">
           <button
-            v-for="device in smbDevices"
-            :key="device.address"
+            v-for="share in smbShares"
+            :key="share.name"
             type="button"
             class="smb-device-item"
-            :disabled="smbDiscoverLoading"
-            @click="selectSmbDevice(device)"
+            :disabled="smbShareDiscoverLoading"
+            @click="selectSmbShare(share)"
           >
-            <span class="smb-device-icon"><el-icon><Monitor /></el-icon></span>
+            <span class="smb-device-icon"><el-icon><FolderOpened /></el-icon></span>
             <span class="smb-device-info">
-              <strong>{{ device.name || device.address }}</strong>
-              <span>{{ device.address }}</span>
+              <strong>{{ share.name }}</strong>
+              <span v-if="share.comment">{{ share.comment }}</span>
             </span>
             <span class="smb-device-select">{{ $t("common.select") }}</span>
           </button>

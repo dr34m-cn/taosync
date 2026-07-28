@@ -270,6 +270,11 @@ engine:
   port: 端口
   share: 共享名称
   sharePlaceholder: 请输入 SMB 共享名称
+  scanSmbShares: 扫描 SMB 共享
+  smbShareDiscoveryTitle: 选择 SMB 共享
+  smbShareDiscoveryDescription: 当前主机和端口可用的文件共享
+  refreshShares: 重新扫描共享
+  noSmbShares: 未发现可用共享，请重新扫描或手动输入共享名称
   domain: 域
   username: 用户名
   usernamePlaceholder: 请输入 SSH 用户名
@@ -305,6 +310,7 @@ engine:
   driverTypeRule: 请选择网盘类型
   rootPathRule: 请输入根目录
   hostRule: 请输入主机
+  portRule: 请输入 1 到 65535 之间的端口
   usernameRule: 请输入用户名
   passwordRule: 请输入密码
   privateKeyRule: 请输入私钥

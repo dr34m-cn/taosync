@@ -280,6 +280,13 @@ def smbDiscover():
         return _copy_discovery_result(_discovery_cache)
 
 
+def list_smb_shares(config):
+    """List file shares exposed by one SMB host for mount configuration."""
+    from service.storage.smbShares import list_smb_shares as _list_smb_shares
+
+    return _list_smb_shares(config)
+
+
 def _safe_root(name, path):
     try:
         path = os.path.realpath(os.path.abspath(path))

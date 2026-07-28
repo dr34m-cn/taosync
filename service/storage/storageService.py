@@ -2,6 +2,7 @@ import re
 
 from mapper import storageMapper
 from mapper.alistMapper import getEngineById
+from service.storage import discoveryService
 from service.storage.factory import SECRET_FIELDS, createDriver, getDriverTypes
 from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
 
@@ -182,6 +183,37 @@ def browseSftp(data):
     if "path" not in data:
         raise ValueError("SFTP browse path is required")
     return createDriver("sftp", _sftpRequestConfig(data)).browse(data["path"])
+
+
+def _smbRequestConfig(data):
+    engineId = int(data["engineId"])
+    _requireTaoSync(engineId)
+    rawConfig = data.get("config")
+    if rawConfig is None:
+        rawConfig = {}
+    if not isinstance(rawConfig, dict):
+        raise ValueError("storage configuration must be an object")
+
+    old = None
+    mountId = data.get("mountId")
+    if mountId not in (None, ""):
+        old = storageMapper.getMountById(int(mountId))
+        if int(old["engineId"]) != engineId:
+            raise ValueError("storage directory does not belong to the selected engine")
+        if old["driverType"] != "smb":
+            raise ValueError("storage directory is not an SMB mount")
+
+    config = {**dict((old or {}).get("config") or {}), **dict(rawConfig)}
+    # Passwords are masked by the frontend when an existing mount is edited.
+    # Preserve the stored value in that case, just like normal SMB updates.
+    if not config.get("password") and old is not None:
+        config["password"] = old["config"].get("password", "")
+    return config
+
+
+def discoverSmbShares(data):
+    """List shares on an SMB host without creating or updating a mount."""
+    return discoveryService.list_smb_shares(_smbRequestConfig(data))
 
 
 def addMount(data):
