@@ -117,11 +117,16 @@ class Job(BaseHandler):
             # 禁用作业
             if 'abort' in req:
                 jobService.abortJob(req['id'])
-            else:
+            elif 'id' in req:
                 jobService.pauseJob(req['id'])
+            else:
+                jobService.pauseAllJob()
         else:
             # 启用作业
-            jobService.continueJob(req['id'])
+            if 'id' in req:
+                jobService.continueJob(req['id'])
+            else:
+                jobService.continueAllJob()
 
     @run_on_executor
     @handle_request

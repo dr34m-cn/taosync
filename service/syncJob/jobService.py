@@ -2,6 +2,7 @@
 @Author：dr34m
 @Date  ：2024/7/9 17:17 
 """
+import json
 import logging
 
 from common.LNG import G
@@ -190,6 +191,22 @@ def doAllJobManual():
             client.doManual()
 
 
+def pauseAllJob():
+    """Disable every scheduled job; manual-only jobs cannot be disabled."""
+    for job in jobMapper.getJobList():
+        if job.get('isCron') == 2 or job.get('enable') != 1:
+            continue
+        pauseJob(job['id'])
+
+
+def continueAllJob():
+    """Enable every scheduled job that is currently disabled."""
+    for job in jobMapper.getJobList():
+        if job.get('isCron') == 2 or job.get('enable') == 1:
+            continue
+        continueJob(job['id'])
+
+
 def doJobManual(jobId):
     """
     手动执行作业
@@ -255,7 +272,38 @@ def getJobList(req):
     }
     :return:
     """
-    return jobMapper.getJobList(req)
+    result = jobMapper.getJobList(req)
+    rows = result.get('dataList', result) if isinstance(result, dict) else result
+    latestTasks = {
+        task['jobId']: task for task in jobMapper.getLatestJobTaskList(
+            [row['id'] for row in rows]
+        )
+    }
+    for row in rows:
+        task = latestTasks.get(row['id'])
+        if task is None:
+            row['lastTask'] = None
+            continue
+        taskNum = {}
+        if task.get('taskNum'):
+            try:
+                parsed = json.loads(task['taskNum'])
+                if isinstance(parsed, dict):
+                    taskNum = parsed
+            except (TypeError, ValueError):
+                pass
+        task['allNum'] = taskNum.get('allNum', task.get('itemAllNum') or 0)
+        task['successNum'] = taskNum.get('successNum', task.get('itemSuccessNum') or 0)
+        task['failNum'] = taskNum.get('failNum', task.get('itemFailNum') or 0)
+        task['otherNum'] = taskNum.get('otherNum', task.get('itemOtherNum') or 0)
+        task['duration'] = taskNum.get('duration')
+        task.pop('taskNum', None)
+        task.pop('itemAllNum', None)
+        task.pop('itemSuccessNum', None)
+        task.pop('itemFailNum', None)
+        task.pop('itemOtherNum', None)
+        row['lastTask'] = task
+    return result
 
 
 def getJobCurrent(jobId, status=None):

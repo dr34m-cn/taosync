@@ -3,12 +3,13 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { alistGet, jobDelete, jobGetJob, jobPost, jobPut } from "@/api/job";
 import fileSizeFilter from "./components/fileSizeFilter.vue";
+import jobLastRun from "./components/jobLastRun.vue";
 import pathSelect from "./components/pathSelect.vue";
 import menuRefresh from "./components/menuRefresh.vue";
 import { parseSize, parseTime } from "@/utils/utils";
 import { isFileSizeBoundaryValid, isFileSizeRangeValid } from "@/utils/fileSizeFilter";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { CaretRight, Plus, View } from "@element-plus/icons-vue";
+import { ArrowDown, ArrowUp, CaretRight, CircleCheck, CircleClose, Plus, View } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import { useMediaQuery } from "@vueuse/core";
 
@@ -52,6 +53,7 @@ const disableCu = ref({
 });
 const jobRule = ref();
 const pathSelectRef = ref();
+const jobTableRef = ref();
 
 const validateFileSizeRange = (_rule, _value, callback) => {
   const minFileSize = editData.value?.minFileSize ?? null;
@@ -183,6 +185,32 @@ const runAllJob = () => {
         btnLoading.value = false;
       });
   });
+};
+
+const toggleAllJobs = (enabled) => {
+  ElMessageBox.confirm(
+    enabled ? t("home.enableAllConfirm") : t("home.disableAllConfirm"),
+    t("common.tips"),
+    {
+      confirmButtonText: t("common.confirm"),
+      cancelButtonText: t("common.cancel"),
+      type: enabled ? "success" : "warning",
+    }
+  ).then(() => {
+    btnLoading.value = true;
+    jobPut({ pause: enabled ? false : true })
+      .then((res) => {
+        ElMessage({ message: res.msg, type: "success" });
+        getJobList();
+      })
+      .finally(() => {
+        btnLoading.value = false;
+      });
+  });
+};
+
+const toggleAllExpanded = (expanded) => {
+  jobData.value.dataList.forEach((row) => jobTableRef.value?.toggleRowExpansion(row, expanded));
 };
 
 const selectPath = (isSrc) => {
@@ -422,12 +450,50 @@ onMounted(() => {
         >
           {{ $t("home.runAll") }}
         </el-button>
+        <el-button
+          v-if="jobData.dataList.length > 0"
+          type="warning"
+          :icon="CircleClose"
+          :loading="btnLoading"
+          size="small"
+          @click="toggleAllJobs(false)"
+        >
+          {{ $t("home.disableAll") }}
+        </el-button>
+        <el-button
+          v-if="jobData.dataList.length > 0"
+          type="success"
+          :icon="CircleCheck"
+          :loading="btnLoading"
+          size="small"
+          @click="toggleAllJobs(true)"
+        >
+          {{ $t("home.enableAll") }}
+        </el-button>
+        <el-button
+          v-if="jobData.dataList.length > 0"
+          :icon="ArrowUp"
+          :loading="btnLoading"
+          size="small"
+          @click="toggleAllExpanded(false)"
+        >
+          {{ $t("home.collapseAll") }}
+        </el-button>
+        <el-button
+          v-if="jobData.dataList.length > 0"
+          :icon="ArrowDown"
+          :loading="btnLoading"
+          size="small"
+          @click="toggleAllExpanded(true)"
+        >
+          {{ $t("home.expandAll") }}
+        </el-button>
       </div>
       <div class="top-box-title">{{ $t("home.jobManagement") }}</div>
       <menuRefresh :autoRefresh="false" :freshInterval="5273" :loading="loading" @getData="getJobList" />
     </div>
 
-    <el-table class="job-table" :data="jobData.dataList" height="calc(100% - 117px)" v-loading="loading">
+    <el-table ref="jobTableRef" class="job-table" :data="jobData.dataList" height="calc(100% - 117px)" v-loading="loading">
       <el-table-column type="expand">
         <template #default="props">
           <div class="form-box">
@@ -481,6 +547,12 @@ onMounted(() => {
             <div class="form-box-item">
               <div class="form-box-item-label">{{ $t("common.createdAt") }}</div>
               <div class="form-box-item-value">{{ parseTime(props.row.createTime) }}</div>
+            </div>
+            <div class="form-box-item">
+              <div class="form-box-item-label">{{ $t("home.lastRun") }}</div>
+              <div class="form-box-item-value">
+                <jobLastRun :task="props.row.lastTask" />
+              </div>
             </div>
             <div class="form-box-item">
               <div class="form-box-item-label">{{ $t("home.more") }}</div>
@@ -750,6 +822,11 @@ onMounted(() => {
     display: inline-block;
     margin-right: 6px;
     margin-bottom: 4px;
+  }
+
+  .top-box-left {
+    min-width: 0;
+    flex-wrap: wrap;
   }
 }
 

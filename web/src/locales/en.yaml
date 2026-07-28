@@ -85,6 +85,17 @@ home:
   mobileScan: Scan Settings
   mobileExclude: Exclude Settings
   mobileTrigger: Trigger Settings
+  disableAll: Disable All
+  enableAll: Enable All
+  disableAllConfirm: This will disable every job that can be disabled. Continue?
+  enableAllConfirm: This will enable every job that can be enabled. Continue?
+  collapseAll: Collapse All
+  expandAll: Expand All
+  lastRun: Last Run
+  noLastRun: No execution yet
+  executionTime: Execution Time
+  duration: Duration
+  successRate: Success Rate
   newJob: New Job
   runAll: Run All
   runAllConfirm: Run all enabled jobs?

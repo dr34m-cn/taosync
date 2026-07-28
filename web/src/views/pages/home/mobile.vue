@@ -8,6 +8,7 @@ import { alistGet, jobDelete, jobGetJob, jobPost, jobPut } from "@/api/job";
 import { parseSize, parseTime } from "@/utils/utils";
 import { isFileSizeBoundaryValid, isFileSizeRangeValid } from "@/utils/fileSizeFilter";
 import fileSizeFilter from "./components/fileSizeFilter.vue";
+import jobLastRun from "./components/jobLastRun.vue";
 import menuRefresh from "./components/menuRefresh.vue";
 import pathSelect from "./components/pathSelect.vue";
 
@@ -435,6 +436,11 @@ onMounted(getJobList);
           </div>
         </div>
 
+        <div class="last-run-section">
+          <div class="path-label">{{ $t("home.lastRun") }}</div>
+          <jobLastRun :task="item.lastTask" />
+        </div>
+
         <div class="job-actions">
           <el-button type="primary" :icon="CaretRight" :loading="btnLoading" @click="runJob(item)">{{ $t("home.manualRun") }}</el-button>
           <el-button type="danger" :icon="Delete" :loading="btnLoading" @click="removeJob(item)">{{ $t("common.delete") }}</el-button>
@@ -799,6 +805,12 @@ onMounted(getJobList);
       box-sizing: border-box;
       overflow-wrap: anywhere;
       font-size: 12px;
+    }
+
+    .last-run-section {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
     }
 
     .source-path {

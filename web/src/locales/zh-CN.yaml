@@ -85,6 +85,17 @@ home:
   mobileScan: 扫描设置
   mobileExclude: 排除设置
   mobileTrigger: 调用设置
+  disableAll: 全部禁用
+  enableAll: 全部启用
+  disableAllConfirm: 将禁用所有可禁用作业，确认吗？
+  enableAllConfirm: 将启用所有可启用作业，确认吗？
+  collapseAll: 全部折叠
+  expandAll: 全部展开
+  lastRun: 上一次执行
+  noLastRun: 暂无执行记录
+  executionTime: 执行时间
+  duration: 耗时
+  successRate: 成功率
   newJob: 新建作业
   runAll: 执行全部
   runAllConfirm: 确认执行所有未禁用的作业吗？

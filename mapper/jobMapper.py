@@ -29,6 +29,42 @@ def getJobList(params=None):
     return sqlBase.fetchall_to_page("select * from job order by createTime desc ", params)
 
 
+def getLatestJobTaskList(jobIds):
+    """Return the newest task and item counters for each requested job."""
+    jobIds = [int(jobId) for jobId in jobIds]
+    if not jobIds:
+        return []
+    placeholders = ",".join("?" for _ in jobIds)
+    query = f"""
+        select
+            task.id,
+            task.jobId,
+            task.status,
+            task.errMsg,
+            task.runTime,
+            task.taskNum,
+            task.createTime,
+            count(item.id) as itemAllNum,
+            sum(case when item.status = 2 then 1 else 0 end) as itemSuccessNum,
+            sum(case when item.status = 7 then 1 else 0 end) as itemFailNum,
+            sum(case when item.status not in (0, 1, 2, 7) then 1 else 0 end) as itemOtherNum
+        from job_task task
+        left join job_task_item item on item.taskId = task.id
+        where task.jobId in ({placeholders})
+          and not exists (
+              select 1
+              from job_task newer
+              where newer.jobId = task.jobId
+                and (
+                    newer.createTime > task.createTime
+                    or (newer.createTime = task.createTime and newer.id > task.id)
+                )
+          )
+        group by task.id
+    """
+    return sqlBase.fetchall_to_table(query, tuple(jobIds))
+
+
 def getEnableJobList():
     """
     获取未禁用的作业列表

@@ -9,13 +9,14 @@ import {
   storageGet,
   storageLocalBrowse,
   storagePost,
+  storageSmbDiscover,
   storageSmbShares,
   storageSftpBrowse,
   storageSftpTest,
   storagePut,
 } from "@/api/job";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ArrowUp, Connection, Delete, Edit, FolderOpened, Hide, Plus, RefreshRight, Search, View } from "@element-plus/icons-vue";
+import { ArrowUp, Connection, Delete, Edit, FolderOpened, Hide, Monitor, Plus, RefreshRight, Search, View } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -41,6 +42,9 @@ const mountFormRef = ref();
 const localBrowseShow = ref(false);
 const localBrowseLoading = ref(false);
 const localBrowseData = ref({ path: "", parent: null, roots: [], directories: [] });
+const smbDiscoverShow = ref(false);
+const smbDiscoverLoading = ref(false);
+const smbDevices = ref([]);
 const smbShareDiscoverShow = ref(false);
 const smbShareDiscoverLoading = ref(false);
 const smbShares = ref([]);
@@ -55,6 +59,7 @@ const sftpRootBrowserBase = ref("/");
 const sftpRootBrowserSelection = ref(null);
 const sftpRootTreeKey = ref(0);
 let localBrowseRequestId = 0;
+let smbDiscoverRequestId = 0;
 let smbShareDiscoverRequestId = 0;
 let sftpTestRequestId = 0;
 let sftpRootBrowseEpoch = 0;
@@ -506,6 +511,7 @@ const editMount = (mount) => {
 const handleDriverChange = (driverType) => {
   resetSftpTest();
   localBrowseShow.value = false;
+  smbDiscoverShow.value = false;
   smbShareDiscoverShow.value = false;
   privateKeyVisible.value = false;
   mountData.value.config = driverDefaults(driverType);
@@ -521,6 +527,7 @@ const handleSftpAuthChange = () => {
 const closeMount = () => {
   resetSftpTest();
   localBrowseShow.value = false;
+  smbDiscoverShow.value = false;
   smbShareDiscoverShow.value = false;
   privateKeyVisible.value = false;
   mountFormRef.value?.clearValidate();
@@ -737,6 +744,38 @@ const selectLocalDirectory = () => {
   mountData.value.config.root_path = localBrowseData.value.path;
   localBrowseShow.value = false;
   nextTick(() => mountFormRef.value?.clearValidate("config.root_path"));
+};
+
+const discoverSmbDevices = () => {
+  const requestId = ++smbDiscoverRequestId;
+  smbDiscoverLoading.value = true;
+  return storageSmbDiscover()
+    .then((res) => {
+      if (requestId !== smbDiscoverRequestId) return;
+      const seen = new Set();
+      smbDevices.value = (Array.isArray(res.data) ? res.data : []).filter((device) => {
+        const address = String(device?.address || "").trim();
+        if (!address || seen.has(address)) return false;
+        seen.add(address);
+        return true;
+      });
+    })
+    .finally(() => {
+      if (requestId === smbDiscoverRequestId) smbDiscoverLoading.value = false;
+    });
+};
+
+const openSmbDiscovery = () => {
+  smbDevices.value = [];
+  smbDiscoverShow.value = true;
+  discoverSmbDevices();
+};
+
+const selectSmbDevice = (device) => {
+  if (!mountData.value || !device?.address) return;
+  mountData.value.config.host = device.address;
+  smbDiscoverShow.value = false;
+  nextTick(() => mountFormRef.value?.clearValidate("config.host"));
 };
 
 const smbShareConfig = () => {
@@ -1046,7 +1085,17 @@ onMounted(() => {
 
           <template v-else-if="mountData.driverType === 'smb'">
             <el-form-item prop="config.host" :label="$t('engine.host')">
-              <el-input v-model="mountData.config.host" :placeholder="$t('engine.hostPlaceholder')" />
+              <el-input v-model="mountData.config.host" :placeholder="$t('engine.hostPlaceholder')">
+                <template #append>
+                  <el-tooltip :content="$t('engine.scanSmbDevices')" placement="top">
+                    <el-button
+                      :icon="Search"
+                      :aria-label="$t('engine.scanSmbDevices')"
+                      @click="openSmbDiscovery"
+                    />
+                  </el-tooltip>
+                </template>
+              </el-input>
             </el-form-item>
             <el-form-item prop="config.port" :label="$t('engine.port')">
               <el-input-number v-model="mountData.config.port" :min="1" :max="65535" controls-position="right" />
@@ -1379,6 +1428,51 @@ onMounted(() => {
           {{ $t("engine.selectCurrentDirectory") }}
         </el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="smbDiscoverShow"
+      class="smb-discovery-dialog"
+      width="min(620px, calc(100vw - 24px))"
+      :title="$t('engine.smbDiscoveryTitle')"
+      :append-to-body="true"
+      :close-on-click-modal="false"
+    >
+      <div class="smb-discovery-toolbar">
+        <span>{{ $t("engine.smbDiscoveryDescription") }}</span>
+        <el-tooltip :content="$t('engine.refreshDevices')" placement="top">
+          <el-button
+            :icon="RefreshRight"
+            :aria-label="$t('engine.refreshDevices')"
+            :loading="smbDiscoverLoading"
+            @click="discoverSmbDevices"
+          />
+        </el-tooltip>
+      </div>
+      <div v-loading="smbDiscoverLoading" class="smb-device-content">
+        <el-empty
+          v-if="!smbDiscoverLoading && smbDevices.length === 0"
+          :description="$t('engine.noSmbDevices')"
+          :image-size="80"
+        />
+        <div v-else class="smb-device-list">
+          <button
+            v-for="device in smbDevices"
+            :key="device.address"
+            type="button"
+            class="smb-device-item"
+            :disabled="smbDiscoverLoading"
+            @click="selectSmbDevice(device)"
+          >
+            <span class="smb-device-icon"><el-icon><Monitor /></el-icon></span>
+            <span class="smb-device-info">
+              <strong>{{ device.name || device.address }}</strong>
+              <span>{{ device.address }}</span>
+            </span>
+            <span class="smb-device-select">{{ $t("common.select") }}</span>
+          </button>
+        </div>
+      </div>
     </el-dialog>
 
     <el-dialog
