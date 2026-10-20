@@ -1,12 +1,12 @@
 <p align="center">
-  <strong>English</strong> | <a href="./README_ZH.md">简体中文</a>
+  <a href="./README_EN.md">English</a> | <strong>简体中文</strong>
 </p>
 
 <div align="center">
   <a href="https://github.com/dr34m-cn/taosync">
     <img height="64" alt="TaoSync" src="./taosync-logo.svg"/>
   </a>
-  <p><em>TaoSync is an automated synchronization tool with a built-in storage engine and OpenList/AList v3+ compatibility.</em></p>
+  <p><em>TaoSync是一个适用于OpenList/AList v3+的自动化同步工具。</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
@@ -21,86 +21,86 @@
       <img src="https://img.shields.io/badge/frontend-vue-42b883.svg" alt="Vue" />
     </a>
     <a href="https://github.com/dr34m-cn/taosync/releases">
-      <img src="https://img.shields.io/github/release/dr34m-cn/taosync" alt="Latest version" />
+      <img src="https://img.shields.io/github/release/dr34m-cn/taosync" alt="latest version" />
     </a>
     <a href="https://github.com/dr34m-cn/taosync/releases">
       <img src="https://img.shields.io/github/downloads/dr34m-cn/taosync/total?color=%239F7AEA&logo=github" alt="Downloads" />
     </a>
     <a href="https://hub.docker.com/r/dr34m/tao-sync">
-      <img src="https://img.shields.io/docker/pulls/dr34m/tao-sync?color=%2348BB78&logo=docker&label=pulls" alt="Docker Hub pulls" />
+      <img src="https://img.shields.io/docker/pulls/dr34m/tao-sync?color=%2348BB78&logo=docker&label=pulls" alt="DockerHub" />
     </a>
   </div>
 </div>
 
 ---
 
-Taotao is my daughter's nickname.
+桃桃是我女儿的乳名。
 
-I originally created this project to preserve photos of Taotao as she grows up, hence the name `TaoSync`.
+本程序开发之初，主要是为了保存桃桃成长的照片，故名`taoSync`
 
-**If you find TaoSync useful, please star the repository. Thank you!** [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [Docker Hub](https://hub.docker.com/r/dr34m/tao-sync)
+**如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
 <details>
 
-<summary>Click to view screenshots</summary>
+<summary>点击展开截图</summary>
 
-TaoSync is updated frequently, so these screenshots are for reference only. Refer to the current interface for the latest design.
+由于更新频繁，截图仅供参考，以实际为准
 
-#### Job Details
+#### 作业详情
 
-![Job details](./README/作业详情.jpg)
+![作业详情](./README/作业详情.jpg)
 
-#### Engine Management
+#### 引擎管理
 
-![Engine list](./README/引擎列表.png)
+![引擎列表](./README/引擎列表.png)
 
-#### Edit Engine
+#### 引擎编辑
 
-![Edit engine](./README/引擎编辑.png)
+![引擎编辑](./README/引擎编辑.png)
 
-#### Create Job
+#### 新建作业
 
-![Create job](./README/新建作业.jpg)
+![新建作业](./README/新建作业.jpg)
 
-#### Job List
+#### 作业列表
 
-![Job list](./README/作业列表.png)
+![作业列表](./README/作业列表.png)
 
-#### Task Details
+#### 任务详情
 
-![Task details](./README/任务详情.png)
+![任务详情](./README/任务详情.png)
 
-#### Notification Settings
+#### 通知配置
 
-![Notification settings](./README/通知配置.jpg)
+![通知配置](./README/通知配置.jpg)
 
 </details>
 
-## Before You Begin
+## 须知
 
 > [!IMPORTANT]
-> TaoSync includes a built-in, non-removable `TaoSync` engine, so OpenList is no longer required. You can still add an external OpenList/AList instance when you need its additional drivers.
+> 使用本工具前你必须了解并且会使用[OpenList](https://docs.oplist.org/)；本工具没有集成`OpenList`，你需要额外启动`OpenList`
 
 > [!WARNING]
-> **Do not expose TaoSync directly to the public internet. You do so at your own risk!**
+> **警告！不要在外网暴露本系统，否则后果自负！**
 >
-> TaoSync includes some security measures, but absolute security cannot be guaranteed. If external access is necessary, use a strong password and enable `SSL`.
+> 本系统已经做了一定的安全方面的工作，但仍不能保证绝对安全。如确实需要，请务必使用强密码，并使用`SSL`
 
-## Use Cases
+## 用途举例
 
-#### 1. Synchronized Backups
+#### 1. 同步备份
 
-Back up local files to multiple cloud drives, FTP servers, or similar storage services, or synchronize files between multiple cloud drives.
+把本地文件备份到多个网盘或FTP之类的存储，或者在多个网盘之间同步文件等；
 
-TaoSync can scan specified directories for differences on a schedule. Full sync mode makes the destination match the source, while Add only mode copies only files that exist in the source but not in the destination.
+可以定时扫描指定目录下文件差异，让目标目录与源目录相同（全同步模式）；或仅新增存在于源目录，却不存在于目标目录的文件（仅新增模式）
 
-#### 2. Scheduled Downloads
+#### 2. 定时下载
 
-You can create a one-time job by specifying the year, month, day, hour, minute, and second using `cron`. This lets TaoSync automatically download files from a specific cloud drive to local storage during off-peak hours.
+可以设置一次性任务（`cron`方式设置年月日时分秒，将在指定时间执行一次），可在闲时自动从特定网盘下载文件到本地
 
-## Features
+## 特性
 
-* Free and open source, open to public review, and available on virtually all common platforms
+* 开源免费，接受任意审查，几乎支持所有常用平台
   * windows-amd64
   * windows-arm64
   * darwin-amd64
@@ -113,63 +113,39 @@ You can create a one-time job by specifying the year, month, day, hour, minute, 
   * linux-s390x
   * linux-ppc64le
   * Android
-* Executables are automatically built and released through [GitHub Actions](https://docs.github.com/en/actions), making the entire build process public and transparent and minimizing the risk of tampered builds
-* Ready-to-use Docker image
-* Responsive interface for both desktop and mobile devices
-* Clean removal: simply delete TaoSync when you no longer need it; it leaves no residual files or dependencies and does not affect other applications
-* Login passwords are stored in the database using a one-way hash, and password resets are supported. If you set the initial password through a configuration file or environment variable, protect that configuration carefully
-* Runs offline except for storage services configured by the user and never uploads user data to the TaoSync project
-* Comprehensive error handling for stable, reliable, and internally consistent operation. Errors may happen, but crashes never do (or so I think)
-* Detailed logging: all errors are recorded
-* A built-in, non-removable `TaoSync` engine with local directory, SMB, FTP/FTPS, SFTP (SSH), and Aliyun Drive Open Platform support
-* External `OpenList/AList` engines remain fully supported and manageable
-* Job management: create, delete, enable, disable, edit, and manually run jobs
-* Exclusion rules for preventing specified directories or files from being synchronized
-* File-size filtering with independently configurable minimum and maximum values
-* Three synchronization modes: Add only, Full sync, and Move mode
-* Source Directory Mode for all three modes, allowing subsequent jobs to scan only the source and compare it with a database snapshot
-* Scheduled synchronization by interval, `cron`, or manual invocation
-* Real-time visualization of per-file progress, overall progress, synchronization speed, the file currently being synchronized, estimated completion time, and more
-* Controllable storage usage: configure retention periods for task records and logs to keep TaoSync's storage footprint within a predictable range
-* Notifications through DingTalk group bots or ServerChan after a task succeeds or fails
+* [Github Actions](https://docs.github.com/zh/actions)自动打包与发布构建好的可执行程序，过程公开透明，无投毒风险
+* 支持Docker，下载即用
+* 适配PC&移动端显示，方便易用
+* 干净卸载，不用的时候删掉即可，无任何残留或依赖，不影响系统里其他程序
+* 数据库内的登录密码以不可逆散列保存，支持重置密码；如通过配置文件或环境变量设置初始密码，请妥善保护相关配置
+* 完全离线运行（仅连接AList），永不上传用户隐私
+* 完善的错误处理，稳定可靠，逻辑自洽；可能出错，但永不崩溃（我猜的）
+* 完善的日志，所有错误都会被记录
+* 引擎管理，可以自由增删改查`OpenList/AList`
+* 作业管理，可以新增/删除/启用/禁用/编辑/手动执行作业
+* 支持排除项规则，可以排除指定目录或文件不同步
+* 支持按文件大小过滤，可分别设置最小和最大值
+* 仅新增、全同步、移动三种模式
+* 定时同步支持间隔、`cron`、手动调用
+* 同步进度、总体进度、同步速度、实时同步文件、预估时间等实时可视化查看
+* 存储可控，合理配置任务记录与日志保留天数，可以控制本程序所占用存储在可控范围内
+* 支持钉钉群机器人或server酱通知，可在任务成功或失败后发送通知
 
-## Usage
+## 使用方法
 
-### Built-in TaoSync Engine
+### 先启动
 
-The `TaoSync` engine is created automatically on first startup and initially has no directories. Open its directory manager and add a virtual directory backed by one of these storage types:
+* 可执行程序
 
-* Local directory: browse and select an existing absolute path visible to the TaoSync process. For Docker, mount the host directory into the container first.
-* SMB: an SMB 2/3 server and share, credentials, and an optional root within the share. The host field can scan the `/24` networks of TaoSync's active private IPv4 addresses for devices accepting TCP 445; manual entry remains available.
-* FTP: FTP or explicit TLS (AUTH TLS), credentials, and an optional remote root. The server must support `MLSD`, which TaoSync uses to distinguish files, directories, and unsafe link-like entries without leaving the configured root.
-* SFTP (SSH): a server, port, username, and remote root, authenticated by either a password or pasted PEM/OpenSSH private key with an optional passphrase. The `SHA256:` server host-key fingerprint is optional; use connection testing to obtain it, then save it to lock future connections to that key. Uploads use a temporary file and atomic rename; overwriting existing files requires the server's OpenSSH POSIX rename extension.
-* Aliyun Drive: create an application in the [Aliyun Drive Developer Portal](https://www.aliyundrive.com/developer), then obtain `client_id`, `client_secret`, and `refresh_token` through official OAuth. TaoSync uses the official OpenFile API at `openapi.alipan.com` and persists rotated refresh tokens automatically.
+前往[Release](https://github.com/dr34m-cn/taosync/releases)下载对应平台的可执行程序，直接执行
 
-After selecting `TaoSync` in a job, paths appear as `/<virtual-directory-name>/...`. File-size comparison, copying, directory creation, deletion, and progress tracking run inside TaoSync. Copies between different storage backends stream through the TaoSync process.
-
-SFTP v3 cannot provide a portable no-follow guarantee across every server-side path race. Use an SSH account restricted by server-side `chroot`, or make the configured remote root writable only by that account. Storage credentials, including SFTP passwords and private keys, currently follow the existing engine behavior and are stored in TaoSync's SQLite database without at-rest encryption; protect the `data` directory accordingly.
-
-### Source Directory Mode
-
-Every successfully completed job stores a complete source-directory snapshot in the database. Add only, Full sync, and Move mode can all enable Source Directory Mode. A first run without a usable snapshot still scans both source and destination; subsequent runs scan only the source and generate operations by comparing relative paths, entry types, file sizes, and a backend version fingerprint when one is available.
-
-The snapshot is replaced atomically only after a complete source scan and a fully successful job. An interrupted scan or a failed copy or delete leaves the previous snapshot in place so the next run retries the work. Changing the engine, source or destination paths, synchronization method, exclusion rules, or file-size filters invalidates the snapshot and makes the next run scan the destination again. Move mode copies to every destination before deleting each source file once.
-
-Because Source Directory Mode does not read destinations, it cannot detect content independently added, removed, or modified there. Full sync deletes only files explicitly tracked by the snapshot and retains directory shells, avoiding accidental removal of excluded or destination-only files. Temporarily disable Source Directory Mode and complete one job when destination state must be checked again. Same-size source replacements are detected when the backend exposes usable version metadata, but accuracy depends on that backend's metadata precision; FTP and SFTP servers may expose only weak or coarse modification metadata. Move mode rechecks the source without cache before deletion and requires a stable version fingerprint; if that fingerprint is unavailable or changed, it keeps the source and reports the operation as incomplete. Every mode rejects dangerous configurations where source and destination paths are equal or nested, including aliases between built-in mounts that resolve to the same backend location.
-
-### Start TaoSync
-
-* Standalone executable
-
-Download the executable for your platform from [Releases](https://github.com/dr34m-cn/taosync/releases) and run it directly.
-
-* Docker
+* docker
 
 ```sh
 docker run -d --restart=always -p 8023:8023 -v /opt/data:/app/data --name=taoSync dr34m/tao-sync:latest
 ```
 
-Or use Docker Compose:
+或docker-compose
 
 ```yaml
 version: '3.8'
@@ -185,11 +161,11 @@ services:
       - /opt/data:/app/data
 ```
 
-Replace `/opt/data` with the directory you want to use. On some NAS devices, such as UGREEN NAS, you can use a relative path, for example `./config:/app/data`.
+把其中`/opt/data`替换为你实际的目录，在部分NAS(如绿联NAS)中，可以使用相对目录，如`./config:/app/data`
 
-#### Docker Compose with OpenList
+#### 与 OpenList 一起部署的 Docker Compose
 
-Use the following Compose file to start TaoSync and OpenList together:
+使用以下 Compose 配置可以同时启动 TaoSync 和 OpenList：
 
 ```yaml
 services:
@@ -218,79 +194,78 @@ services:
       - ./taosync-data:/app/data
 ```
 
-After startup, open OpenList at `http://127.0.0.1:5244` and TaoSync at `http://127.0.0.1:8023`. When adding the engine in TaoSync, use `http://openlist:5244` as the OpenList URL. The service name works as the hostname inside the Compose network.
+启动后，可通过 `http://127.0.0.1:5244` 访问 OpenList，通过 `http://127.0.0.1:8023` 访问 TaoSync。在 TaoSync 中添加引擎时，OpenList 地址应填写 `http://openlist:5244`；Compose 网络内可以直接使用服务名作为主机名。
 
-Current OpenList images no longer use the `PUID` and `PGID` environment variables. This example uses `user: "0:0"` for broad compatibility; for least-privilege operation, replace it with the host UID/GID that should run OpenList and ensure that user can write to `./openlist-data`. See the [OpenList Docker documentation](https://doc.oplist.org/guide/installation/docker) for details.
+当前 OpenList 镜像已不再使用 `PUID` 和 `PGID` 环境变量。此示例使用 `user: "0:0"` 以获得较广泛的兼容性；如需按最小权限运行，请将其替换为用于运行 OpenList 的宿主机 UID/GID，并确保该用户对 `./openlist-data` 具有写权限。详情请参阅 [OpenList Docker 文档](https://doc.oplist.org/guide/installation/docker)。
 
-### Use TaoSync
+### 再使用
 
-Open `http://127.0.0.1:8023`.
+访问`http://127.0.0.1:8023`
 
-The default username is `admin`. If the initial password is configured as `RANDOM`, find the generated password in the logs. If you configured a password manually, use that value to sign in. After signing in, go to Settings and change the password immediately.
+默认账号为`admin`。当初始密码配置为`RANDOM`时，密码请到日志中查看；如果手动配置了密码，请直接使用该值登录。登录后请立即前往系统设置修改密码
 
 > [!NOTE]
-> If the password does not appear in the console output, check `data/log/sys_xxx.log` in the same directory. It is usually on the first line.
+> 如果没有显示这个日志，可以到同级目录的`data/log/sys_xxx.log`文件查看，通常在第一行
 
-After signing in, open Engine Management and add directories to the built-in TaoSync engine, or add an external OpenList/AList engine. Then go to Job Management and create a synchronization job.
+进入系统后先到`引擎管理`菜单创建引擎，然后前往`作业管理`创建同步作业
 
-## Configuration
+## 配置项
 
 <details>
-<summary>Click to view configuration options</summary>
+<summary>点击展开配置项</summary>
 
-Configuration precedence: `data/config.ini` > `environment variables` > `default values`. When a higher-priority source is present, all lower-priority sources are **ignored**. Restart TaoSync or its Docker container after changing the configuration.
+配置优先级：`data/config.ini`>`环境变量`>`默认值`；前一个存在，则后边都将被**忽略**。修改配置需重启程序或Docker。
 
-Example `data/config.ini` file (when present, this file has the **highest priority**):
+`data/config.ini`文件示例（如该文件存在，则**优先级最高**）
 
 ```ini
 [tao]
-# Initial administrator password; only used when the database is first created.
-# RANDOM or an empty value generates a random password.
+# 初始管理员密码，仅首次创建数据库时生效；RANDOM或空值表示随机生成
 password=RANDOM
-# Listening port
+# 运行端口号
 port=8023
-# Login session lifetime in days
+# 登录有效期，单位天
 expires=2
-# Log level: 0-DEBUG, 1-INFO, 2-WARNING, 3-ERROR, 4-CRITICAL.
-# Higher values produce fewer logs; 1 or 2 is recommended.
+# 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2
 log_level=1
-# Console log level; available in v0.2.3 and later. Uses the same levels as above.
+# 控制台日志等级：适用于v0.2.3及之后版本，与上同
 console_level=2
-# System log retention period in days. Older logs are removed automatically; 0 disables automatic cleanup.
+# 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理
 log_save=7
-# Task record retention period in days. Older records are removed automatically; 0 disables automatic cleanup.
+# 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理
 task_save=0
-# Task execution timeout in hours. Set this high enough for large backups to complete.
+# 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多
 task_timeout=72
 ```
 
-This file does not exist by default. To use it, create `config.ini` in the `data` directory next to the TaoSync executable and add the content shown above. The file must use `UTF-8` encoding.
+上边的文件默认不存在，如需要，您可以手动在程序同级目录的`data`目录下创建`config.ini`，并填入上边的内容。注意，文件应使用`UTF-8`编码
 
-| config.ini    | Docker environment variable | Description | Default |
-| ------------- | --------------------------- | ----------- | ------- |
-| password      | TAO_PASSWORD                | Initial administrator password; only used when the database is first created. `RANDOM` or an empty value generates a random password. The legacy `TAO_PASSWD` variable is also supported | RANDOM |
-| port          | TAO_PORT                    | Listening port | 8023 |
-| expires       | TAO_EXPIRES                 | Login session lifetime, in days | 2 |
-| log_level     | TAO_LOG_LEVEL               | Log level: 0-DEBUG, 1-INFO, 2-WARNING, 3-ERROR, 4-CRITICAL. Higher values produce fewer logs; 1 or 2 is recommended | 1 |
-| console_level | TAO_CONSOLE_LEVEL           | Console log level; available in v0.2.3 and later. Uses the same levels as above | 2 |
-| log_save      | TAO_LOG_SAVE                | System log retention period, in days. Older logs are removed automatically; 0 disables automatic cleanup | 7 |
-| task_save     | TAO_TASK_SAVE               | Task record retention period, in days. Older records are removed automatically; 0 disables automatic cleanup | 0 |
-| task_timeout  | TAO_TASK_TIMEOUT            | Task execution timeout, in hours. Set this high enough for large backups to complete | 72 |
-| -             | TZ                          | Time zone | Asia/Shanghai |
+| config.ini    | Docker环境变量    | 描述                                                         | 默认值           |
+| ------------- | ----------------- | ------------------------------------------------------------ |---------------|
+| password      | TAO_PASSWORD      | 初始管理员密码，仅首次创建数据库时生效；`RANDOM`或空值表示随机生成；兼容旧变量`TAO_PASSWD` | RANDOM        |
+| port          | TAO_PORT          | 运行端口号                                                   | 8023          |
+| expires       | TAO_EXPIRES       | 登录有效期，单位天                                           | 2             |
+| log_level     | TAO_LOG_LEVEL     | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
+| console_level | TAO_CONSOLE_LEVEL | 控制台日志等级：适用于v0.2.3及之后版本；与上同               | 2             |
+| log_save      | TAO_LOG_SAVE      | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
+| task_save     | TAO_TASK_SAVE     | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
+| task_timeout  | TAO_TASK_TIMEOUT  | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
+| -             | TZ                | 时区                                                         | Asia/Shanghai |
 
 </details>
 
-## Development Status
+## 研发状态
 
-The changelog is available [here](https://github.com/dr34m-cn/taosync/tree/main/doc/changelog).
+历史记录在[这里](https://github.com/dr34m-cn/taosync/tree/main/doc/changelog)；
 
-To try a development build, look for the latest tag containing `dev` or `pre` on [Docker Hub](https://hub.docker.com/r/dr34m/tao-sync) or [Releases](https://github.com/dr34m-cn/taosync/releases), such as `v0.1.0-dev-build0`. Development builds may contain obvious errors or serious bugs and are not recommended for beginners.
+如想体验研发中的版本(可能存在明显错误或严重bug，不建议小白尝试)，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)或[Release](https://github.com/dr34m-cn/taosync/releases)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
-### Planned (subject to change or cancellation if implementation proves too difficult; no promises)
+### 规划中（随时改变or因太难不做了，概不负责）
 
-* Improve the Windows version, including launch at startup, hidden-window operation, start/stop controls, and more [#13](https://github.com/dr34m-cn/taosync/issues/13)
-* Support encrypted synchronization through OpenList [#18](https://github.com/dr34m-cn/taosync/issues/18)
-* Support encrypted synchronization for the local engine
-* Retain the latest N historical versions, with a configurable and potentially unlimited value for N
-* Import and export configuration
-* One-command scripts to install, update, and uninstall TaoSync on Linux
+* windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
+* OpenList支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
+* 支持本地引擎（不基于`OpenList`）
+* 本地引擎支持加密同步
+* 保留历史N个版本（N可自定义，可无限）
+* 配置导入导出
+* linux一键安装、更新与卸载脚本
