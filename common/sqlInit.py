@@ -3,9 +3,12 @@ from common import sqlBase
 from common.config import DEFAULT_PASSWORD, getConfig
 
 
+CU_VERSION = 260718
+
+
 @sqlBase.connect_sql
 def init_sql(conn):
-    cuVersion = 260718
+    cuVersion = CU_VERSION
     cursor = conn.cursor()
     cursor.execute("SELECT name FROM sqlite_master WHERE name='user_list'")
     userTableExists = cursor.fetchone() is not None

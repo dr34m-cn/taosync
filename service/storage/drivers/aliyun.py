@@ -62,8 +62,8 @@ class AliyunDriveDriver(StorageDriver):
     """Aliyun Drive Open API driver.
 
     It uses the public OAuth/OpenFile endpoints rather than private web-client
-    APIs. A developer application client ID, client secret and refresh token
-    are therefore required.
+    APIs. Authentication can use either local application credentials or a
+    separately deployed TaoSync OAuth service.
     """
 
     driver_type = "aliyun"
@@ -84,11 +84,22 @@ class AliyunDriveDriver(StorageDriver):
         self.oauth_url = str(
             self.config.get("oauth_url") or self.api_url + "/oauth/access_token"
         )
+        self.auth_service_url = str(self.config.get("auth_service_url") or "").strip().rstrip("/")
+        self.auth_mode = str(self.config.get("auth_mode") or "").strip().lower()
         self.client_id = str(self.config.get("client_id") or "").strip()
         self.client_secret = str(self.config.get("client_secret") or "").strip()
         self.refresh_token = str(self.config.get("refresh_token") or "").strip()
-        if not self.client_id or not self.client_secret or not self.refresh_token:
-            raise ValueError("Aliyun client_id, client_secret and refresh_token are required")
+        self.refresh_proof = str(self.config.get("refresh_proof") or "").strip()
+        if not self.auth_mode:
+            self.auth_mode = "service" if self.auth_service_url and not self.client_secret else "direct"
+        if self.auth_mode == "service":
+            if not self.auth_service_url or not self.refresh_token or not self.refresh_proof:
+                raise ValueError("Aliyun authorization service, refresh_token and refresh_proof are required")
+        elif self.auth_mode == "direct":
+            if not self.client_id or not self.client_secret or not self.refresh_token:
+                raise ValueError("Aliyun client_id, client_secret and refresh_token are required")
+        else:
+            raise ValueError("invalid Aliyun auth_mode")
         self.access_token = str(self.config.get("access_token") or "")
         self.expires_at = float(self.config.get("expires_at") or 0)
         self.drive_type = str(self.config.get("drive_type") or "resource")
@@ -131,12 +142,13 @@ class AliyunDriveDriver(StorageDriver):
     def _persist(self):
         expected_tokens = {
             key: self.config.get(key)
-            for key in ("access_token", "refresh_token", "expires_at", "drive_id")
+            for key in ("access_token", "refresh_token", "refresh_proof", "expires_at", "drive_id")
         }
         self.config.update(
             {
                 "access_token": self.access_token,
                 "refresh_token": self.refresh_token,
+                "refresh_proof": self.refresh_proof,
                 "expires_at": self.expires_at,
                 "drive_id": self.drive_id,
             }
@@ -160,6 +172,8 @@ class AliyunDriveDriver(StorageDriver):
             self.access_token = str(config["access_token"])
         if config.get("refresh_token"):
             self.refresh_token = str(config["refresh_token"])
+        if config.get("refresh_proof"):
+            self.refresh_proof = str(config["refresh_proof"])
         if config.get("expires_at") is not None:
             try:
                 self.expires_at = float(config["expires_at"])
@@ -171,6 +185,7 @@ class AliyunDriveDriver(StorageDriver):
             {
                 "access_token": self.access_token,
                 "refresh_token": self.refresh_token,
+                "refresh_proof": self.refresh_proof,
                 "expires_at": self.expires_at,
                 "drive_id": self.drive_id,
             }
@@ -209,22 +224,34 @@ class AliyunDriveDriver(StorageDriver):
                 return
             if not force and self.access_token and self.expires_at > time.time() + 90:
                 return
-            response = self.session.post(
-                self.oauth_url,
-                json={
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret,
-                    "grant_type": "refresh_token",
-                    "refresh_token": self.refresh_token,
-                },
-                timeout=(30, 60),
-            )
+            if self.auth_mode == "service":
+                response = self.session.post(
+                    self.auth_service_url + "/v1/aliyun/token/refresh",
+                    json={
+                        "refresh_token": self.refresh_token,
+                        "refresh_proof": self.refresh_proof,
+                    },
+                    timeout=(30, 60),
+                )
+            else:
+                response = self.session.post(
+                    self.oauth_url,
+                    json={
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                        "grant_type": "refresh_token",
+                        "refresh_token": self.refresh_token,
+                    },
+                    timeout=(30, 60),
+                )
             data = _response_json(response)
             if response.status_code >= 400 or not data.get("access_token"):
                 raise RuntimeError(_api_error("Aliyun OAuth failed", response, data))
             self.access_token = data["access_token"]
             if data.get("refresh_token"):
                 self.refresh_token = data["refresh_token"]
+            if data.get("refresh_proof"):
+                self.refresh_proof = data["refresh_proof"]
             self.expires_at = time.time() + int(data.get("expires_in") or 7200)
             self.rate_key = _account_key(self.client_id, self.refresh_token, self.drive_id)
             self._persist()

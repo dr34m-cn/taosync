@@ -86,6 +86,58 @@ def _normalizeDriverConfig(driverType, config):
     return dict(getattr(driver, "config", config))
 
 
+def _aliyunAuthMode(config):
+    explicit = str(config.get("auth_mode") or "").strip().lower()
+    if explicit:
+        return explicit
+    return "service" if config.get("auth_service_url") and not config.get("client_secret") else "direct"
+
+
+def _prepareAliyunConfig(rawConfig, old=None):
+    oldConfig = dict((old or {}).get("config") or {})
+    oldMode = _aliyunAuthMode(oldConfig) if old is not None else None
+    inferredMode = (
+        "service"
+        if rawConfig.get("auth_service_url") and not rawConfig.get("client_secret")
+        else "direct"
+    )
+    requestedMode = str(rawConfig.get("auth_mode") or oldMode or inferredMode).strip().lower()
+    if requestedMode not in ("service", "direct"):
+        raise ValueError("invalid Aliyun auth_mode")
+    sameMode = old is not None and requestedMode == oldMode
+    config = {**(oldConfig if sameMode else {}), **dict(rawConfig)}
+    config["auth_mode"] = requestedMode
+    if sameMode:
+        # The frontend deliberately masks secrets while editing a mount. Keep
+        # the stored token set when the corresponding field is omitted.
+        for field in (
+            "client_secret",
+            "refresh_token",
+            "refresh_proof",
+            "access_token",
+            "expires_at",
+        ):
+            if not rawConfig.get(field) and oldConfig.get(field):
+                config[field] = oldConfig[field]
+    if requestedMode == "service":
+        from service.storage.aliyunAuth import _auth_server_url
+
+        configuredServer = _auth_server_url()
+        submittedServer = str(config.get("auth_service_url") or "").strip().rstrip("/")
+        if submittedServer and submittedServer != configuredServer:
+            raise ValueError("Aliyun authorization must use the configured public service")
+        config["auth_service_url"] = configuredServer
+        config["client_secret"] = ""
+        if not config.get("refresh_token") or not config.get("refresh_proof"):
+            raise ValueError("Aliyun scan authorization is required")
+    else:
+        config["auth_service_url"] = ""
+        config["refresh_proof"] = ""
+        if not config.get("client_id") or not config.get("client_secret") or not config.get("refresh_token"):
+            raise ValueError("Aliyun client_id, client_secret and refresh_token are required")
+    return config
+
+
 def _sftpAuthType(config):
     explicit = str(config.get("auth_type") or "").strip().lower()
     if explicit:
@@ -224,11 +276,12 @@ def addMount(data):
     raw_config = data.get("config") or {}
     if not isinstance(raw_config, dict):
         raise ValueError("storage configuration must be an object")
-    config = (
-        _prepareSftpConfig(raw_config)
-        if driverType == "sftp"
-        else dict(raw_config)
-    )
+    if driverType == "sftp":
+        config = _prepareSftpConfig(raw_config)
+    elif driverType == "aliyun":
+        config = _prepareAliyunConfig(raw_config)
+    else:
+        config = dict(raw_config)
     _validateUniqueName(engineId, name)
     config = _normalizeDriverConfig(driverType, config)
     mountId = storageMapper.addMount(
@@ -259,12 +312,17 @@ def updateMount(data):
         raise ValueError("storage configuration must be an object")
     if driverType == "sftp":
         config = _prepareSftpConfig(raw_config, old=old)
+    elif driverType == "aliyun":
+        config = _prepareAliyunConfig(raw_config, old=old)
     else:
         config = {**old["config"], **dict(raw_config)}
         for secret in SECRET_FIELDS.get(driverType, set()):
             if not config.get(secret):
                 config[secret] = old["config"].get(secret, "")
-    authFields = {"client_id", "client_secret", "refresh_token", "api_url", "oauth_url"}
+    authFields = {
+        "auth_mode", "auth_service_url", "client_id", "client_secret",
+        "refresh_token", "api_url", "oauth_url"
+    }
     authChanged = driverType == "aliyun" and any(
         old["config"].get(key) != config.get(key) for key in authFields
     )
@@ -296,7 +354,7 @@ def updateMount(data):
 
 def updateMountConfig(mountId, expectedAuthVersion, config, expectedTokens=None):
     """Persist rotated cloud tokens without overwriting edited mount fields."""
-    tokenFields = {"access_token", "refresh_token", "expires_at", "drive_id"}
+    tokenFields = {"access_token", "refresh_token", "refresh_proof", "expires_at", "drive_id"}
     values = {key: config.get(key) for key in tokenFields if key in config}
     return storageMapper.updateMountTokens(
         int(mountId), int(expectedAuthVersion), values, expectedTokens=expectedTokens

@@ -1,0 +1,18 @@
+server:
+  host: 0.0.0.0
+  port: 8030
+  public_base_url: https://auth.example.com
+  signing_secret: replace-with-at-least-32-random-characters
+  session_ttl: 300
+  max_sessions_per_ip: 10
+  trust_proxy_headers: true
+
+aliyun:
+  client_id: replace-with-app-id
+  client_secret: replace-with-app-secret
+  callback_url: https://auth.example.com/v1/aliyun/callback
+  authorize_url: https://openapi.alipan.com/oauth/authorize
+  token_url: https://openapi.alipan.com/oauth/access_token
+  qr_authorize_url: https://openapi.alipan.com/oauth/authorize/qrcode
+  qr_status_url: https://openapi.alipan.com/oauth/qrcode/{sid}/status
+  scope: user:base,file:all:read,file:all:write

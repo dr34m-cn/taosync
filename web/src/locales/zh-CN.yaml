@@ -313,6 +313,21 @@ engine:
   clientId: Client ID
   clientSecret: Client Secret
   refreshToken: Refresh Token
+  scanAuthorization: 扫码授权
+  ownApplication: 自有应用
+  aliyunAuthorization: 阿里云盘授权
+  authorized: 已授权
+  notAuthorized: 未授权
+  waitingForScan: 等待扫码
+  authorizationFailed: 授权失败
+  aliyunQrCode: 阿里云盘授权二维码
+  scanWithAliyunDrive: 使用阿里云盘 App 扫码并确认授权
+  authorizationExpiresIn: 二维码将在约 {seconds} 秒后过期
+  startAuthorization: 开始扫码授权
+  rescanAuthorization: 重新生成二维码
+  openAuthorizationPage: 打开授权页面
+  aliyunAuthSuccess: 阿里云盘授权成功
+  aliyunAuthRequired: 请先完成阿里云盘扫码授权
   driveType: 网盘空间
   rootFolderId: 根文件夹 ID
   removeWay: 删除方式

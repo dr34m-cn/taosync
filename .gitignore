@@ -7,6 +7,7 @@ tst-*.py
 secret.key
 __pycache__/
 front/
+.venv/
 venv/
 *.db
 
@@ -18,6 +19,8 @@ wheels/
 node_modules/
 .env.local
 .env.*.local
+apiServer/config.yaml
+apiServer/.venv/
 
 package-lock.json
 !web/package-lock.json

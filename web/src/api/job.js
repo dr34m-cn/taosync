@@ -107,6 +107,24 @@ export function storageSftpBrowse(data) {
   });
 }
 
+export function storageAliyunAuthStart(engineId) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "post",
+    data: { action: "aliyunAuthStart", engineId },
+  });
+}
+
+export function storageAliyunAuthPoll(engineId, handle) {
+  return request({
+    url: "/storage",
+    headers: { isMask: false },
+    method: "post",
+    data: { action: "aliyunAuthPoll", engineId, handle },
+  });
+}
+
 export function storagePost(data) {
   return request({
     url: "/storage",

@@ -313,6 +313,21 @@ engine:
   clientId: Client ID
   clientSecret: Client Secret
   refreshToken: Refresh Token
+  scanAuthorization: Scan to Authorize
+  ownApplication: Own Application
+  aliyunAuthorization: Aliyun Drive Authorization
+  authorized: Authorized
+  notAuthorized: Not authorized
+  waitingForScan: Waiting for scan
+  authorizationFailed: Authorization failed
+  aliyunQrCode: Aliyun Drive authorization QR code
+  scanWithAliyunDrive: Scan with the Aliyun Drive app and approve access
+  authorizationExpiresIn: QR code expires in about {seconds} seconds
+  startAuthorization: Start authorization
+  rescanAuthorization: Generate a new QR code
+  openAuthorizationPage: Open authorization page
+  aliyunAuthSuccess: Aliyun Drive authorization succeeded
+  aliyunAuthRequired: Authorize Aliyun Drive before saving
   driveType: Drive Space
   rootFolderId: Root Folder ID
   removeWay: Delete Method

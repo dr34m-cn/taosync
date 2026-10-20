@@ -18,7 +18,7 @@ SECRET_FIELDS = {
     "smb": {"password"},
     "ftp": {"password"},
     "sftp": {"password", "private_key", "private_key_passphrase"},
-    "aliyun": {"client_secret", "refresh_token", "access_token"},
+    "aliyun": {"client_secret", "refresh_token", "refresh_proof", "access_token"},
 }
 
 

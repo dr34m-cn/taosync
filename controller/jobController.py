@@ -60,6 +60,12 @@ class Storage(BaseHandler):
     @handle_request
     def post(self, req):
         action = req.get('action')
+        if action == 'aliyunAuthStart':
+            from service.storage import aliyunAuth
+            return aliyunAuth.start(req['engineId'])
+        if action == 'aliyunAuthPoll':
+            from service.storage import aliyunAuth
+            return aliyunAuth.poll(req['engineId'], req['handle'])
         if action == 'sftpTest':
             return storageService.testSftp(req)
         if action == 'sftpBrowse':

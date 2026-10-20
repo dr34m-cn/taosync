@@ -1,11 +1,13 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   alistDelete,
   alistGet,
   alistPost,
   alistPut,
   storageDelete,
+  storageAliyunAuthPoll,
+  storageAliyunAuthStart,
   storageGet,
   storageLocalBrowse,
   storagePost,
@@ -16,7 +18,20 @@ import {
   storagePut,
 } from "@/api/job";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { ArrowUp, Connection, Delete, Edit, FolderOpened, Hide, Monitor, Plus, RefreshRight, Search, View } from "@element-plus/icons-vue";
+import {
+  ArrowUp,
+  Connection,
+  Delete,
+  Edit,
+  FolderOpened,
+  Hide,
+  Link,
+  Monitor,
+  Plus,
+  RefreshRight,
+  Search,
+  View,
+} from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -58,6 +73,13 @@ const sftpRootBrowserShow = ref(false);
 const sftpRootBrowserBase = ref("/");
 const sftpRootBrowserSelection = ref(null);
 const sftpRootTreeKey = ref(0);
+const aliyunAuthLoading = ref(false);
+const aliyunAuthHandle = ref("");
+const aliyunAuthQrCode = ref("");
+const aliyunAuthorizationUrl = ref("");
+const aliyunAuthStatus = ref("idle");
+const aliyunAuthExpiresIn = ref(0);
+let aliyunAuthPollTimer = null;
 let localBrowseRequestId = 0;
 let smbDiscoverRequestId = 0;
 let smbShareDiscoverRequestId = 0;
@@ -88,7 +110,19 @@ const driverConfigKeys = {
     "private_key_passphrase",
     "host_key_fingerprint",
   ],
-  aliyun: ["client_id", "client_secret", "refresh_token", "drive_type", "root_folder_id", "remove_way"],
+  aliyun: [
+    "auth_mode",
+    "auth_service_url",
+    "client_id",
+    "client_secret",
+    "refresh_token",
+    "refresh_proof",
+    "access_token",
+    "expires_at",
+    "drive_type",
+    "root_folder_id",
+    "remove_way",
+  ],
 };
 
 const driverDefaults = (driverType) => {
@@ -127,9 +161,14 @@ const driverDefaults = (driverType) => {
       host_key_fingerprint: "",
     },
     aliyun: {
+      auth_mode: "service",
+      auth_service_url: "",
       client_id: "",
       client_secret: "",
       refresh_token: "",
+      refresh_proof: "",
+      access_token: "",
+      expires_at: 0,
       drive_type: "resource",
       root_folder_id: "root",
       remove_way: "trash",
@@ -184,6 +223,17 @@ const hasSftpSecret = (field) => {
 const hasUsableStoredSftpPassphrase = () =>
   !String(mountData.value?.config?.private_key || "") && hasUsableStoredSftpSecret("private_key_passphrase");
 
+const hasStoredAliyunSecret = (field) => mountEditFlag.value && Boolean(mountData.value?.secretState?.[field]);
+
+const aliyunAuthorized = computed(() => {
+  if (mountData.value?.driverType !== "aliyun") return false;
+  const config = mountData.value.config || {};
+  const hasRefreshToken = Boolean(String(config.refresh_token || "")) || hasStoredAliyunSecret("refresh_token");
+  if (config.auth_mode === "direct") return hasRefreshToken;
+  const hasRefreshProof = Boolean(String(config.refresh_proof || "")) || hasStoredAliyunSecret("refresh_proof");
+  return hasRefreshToken && hasRefreshProof;
+});
+
 const editRule = computed(() => ({
   url: [requiredRule("engine.addressRule")],
 }));
@@ -210,10 +260,14 @@ const mountRules = computed(() => {
     rules["config.port"] = [{ validator: portRule, trigger: "change" }];
   }
   if (driverType === "aliyun") {
-    rules["config.client_id"] = [requiredRule("engine.clientIdRule")];
-    if (!mountEditFlag.value) {
-      rules["config.client_secret"] = [requiredRule("engine.clientSecretRule")];
-      rules["config.refresh_token"] = [requiredRule("engine.refreshTokenRule")];
+    if (mountData.value?.config?.auth_mode === "direct") {
+      rules["config.client_id"] = [requiredRule("engine.clientIdRule")];
+      if (!hasStoredAliyunSecret("client_secret")) {
+        rules["config.client_secret"] = [requiredRule("engine.clientSecretRule")];
+      }
+      if (!hasStoredAliyunSecret("refresh_token")) {
+        rules["config.refresh_token"] = [requiredRule("engine.refreshTokenRule")];
+      }
     }
   }
   if (driverType === "sftp") {
@@ -310,6 +364,97 @@ const sftpTestSucceeded = computed(
 const resetSftpRootBrowser = () => {
   sftpRootBrowseEpoch += 1;
   sftpRootBrowserSelection.value = null;
+};
+
+const resetAliyunAuth = ({ keepStatus = false } = {}) => {
+  if (aliyunAuthPollTimer) {
+    window.clearTimeout(aliyunAuthPollTimer);
+    aliyunAuthPollTimer = null;
+  }
+  aliyunAuthLoading.value = false;
+  aliyunAuthHandle.value = "";
+  aliyunAuthQrCode.value = "";
+  aliyunAuthorizationUrl.value = "";
+  aliyunAuthExpiresIn.value = 0;
+  if (!keepStatus) aliyunAuthStatus.value = "idle";
+};
+
+const scheduleAliyunAuthPoll = (delay = 2000) => {
+  if (!aliyunAuthHandle.value || !mountShow.value) return;
+  aliyunAuthPollTimer = window.setTimeout(pollAliyunAuth, delay);
+};
+
+const pollAliyunAuth = async () => {
+  const handle = aliyunAuthHandle.value;
+  const engineId = mountData.value?.engineId;
+  if (!handle || !engineId || !mountShow.value) return;
+  try {
+    const res = await storageAliyunAuthPoll(engineId, handle);
+    if (handle !== aliyunAuthHandle.value || !mountData.value) return;
+    const data = res.data || {};
+    aliyunAuthStatus.value = data.status || "pending";
+    aliyunAuthExpiresIn.value = Number(data.expiresIn || 0);
+    if (data.status === "authorized") {
+      Object.assign(mountData.value.config, data.config || {});
+      mountData.value.secretState = {
+        ...(mountData.value.secretState || {}),
+        refresh_token: true,
+        refresh_proof: true,
+        access_token: true,
+      };
+      resetAliyunAuth({ keepStatus: true });
+      nextTick(() => mountFormRef.value?.clearValidate());
+      ElMessage.success(t("engine.aliyunAuthSuccess"));
+      return;
+    }
+    scheduleAliyunAuthPoll(2000);
+  } catch {
+    if (handle === aliyunAuthHandle.value) {
+      resetAliyunAuth();
+      aliyunAuthStatus.value = "error";
+    }
+  }
+};
+
+const startAliyunAuth = async () => {
+  if (aliyunAuthLoading.value || !mountData.value?.engineId) return;
+  resetAliyunAuth();
+  aliyunAuthLoading.value = true;
+  try {
+    const res = await storageAliyunAuthStart(mountData.value.engineId);
+    const data = res.data || {};
+    aliyunAuthHandle.value = String(data.handle || "");
+    aliyunAuthQrCode.value = String(data.qrCode || "");
+    aliyunAuthorizationUrl.value = String(data.authorizationUrl || "");
+    aliyunAuthExpiresIn.value = Number(data.expiresIn || 0);
+    aliyunAuthStatus.value = "pending";
+    scheduleAliyunAuthPoll(Math.max(1000, Number(data.pollInterval || 2) * 1000));
+  } finally {
+    aliyunAuthLoading.value = false;
+  }
+};
+
+const openAliyunAuthorization = () => {
+  if (aliyunAuthorizationUrl.value) {
+    window.open(aliyunAuthorizationUrl.value, "_blank", "noopener,noreferrer");
+  }
+};
+
+const handleAliyunAuthModeChange = () => {
+  resetAliyunAuth();
+  if (mountData.value?.driverType === "aliyun") {
+    Object.assign(mountData.value.config, {
+      auth_service_url: "",
+      client_id: "",
+      client_secret: "",
+      refresh_token: "",
+      refresh_proof: "",
+      access_token: "",
+      expires_at: 0,
+    });
+    mountData.value.secretState = {};
+  }
+  nextTick(() => mountFormRef.value?.clearValidate());
 };
 
 const closeSftpRootBrowser = () => {
@@ -476,6 +621,7 @@ const resetSftpTest = () => {
 
 const addMount = () => {
   resetSftpTest();
+  resetAliyunAuth();
   mountEditFlag.value = false;
   privateKeyVisible.value = false;
   mountData.value = {
@@ -489,6 +635,7 @@ const addMount = () => {
 
 const editMount = (mount) => {
   resetSftpTest();
+  resetAliyunAuth();
   mountEditFlag.value = true;
   privateKeyVisible.value = false;
   mountData.value = {
@@ -502,6 +649,13 @@ const editMount = (mount) => {
       ...(mount.config || {}),
     },
   };
+  if (mount.driverType === "aliyun") {
+    const config = mount.config || {};
+    if (!config.auth_mode) {
+      mountData.value.config.auth_mode = config.auth_service_url ? "service" : "direct";
+    }
+    aliyunAuthStatus.value = aliyunAuthorized.value ? "authorized" : "idle";
+  }
   if (mount.driverType === "sftp") {
     sftpOriginalCredentialIdentity.value = sftpCredentialIdentity(mountData.value.config);
   }
@@ -510,6 +664,7 @@ const editMount = (mount) => {
 
 const handleDriverChange = (driverType) => {
   resetSftpTest();
+  resetAliyunAuth();
   localBrowseShow.value = false;
   smbDiscoverShow.value = false;
   smbShareDiscoverShow.value = false;
@@ -526,6 +681,7 @@ const handleSftpAuthChange = () => {
 
 const closeMount = () => {
   resetSftpTest();
+  resetAliyunAuth();
   localBrowseShow.value = false;
   smbDiscoverShow.value = false;
   smbShareDiscoverShow.value = false;
@@ -856,6 +1012,14 @@ const mountPayload = () => {
 };
 
 const submitMount = () => {
+  if (
+    mountData.value?.driverType === "aliyun" &&
+    mountData.value.config?.auth_mode === "service" &&
+    !aliyunAuthorized.value
+  ) {
+    ElMessage.warning(t("engine.aliyunAuthRequired"));
+    return;
+  }
   mountFormRef.value.validate((valid) => {
     if (!valid) return;
     mountLoading.value = true;
@@ -916,6 +1080,10 @@ const mountSummary = (mount) => {
 
 onMounted(() => {
   getAlistList();
+});
+
+onBeforeUnmount(() => {
+  resetAliyunAuth();
 });
 </script>
 
@@ -1272,25 +1440,77 @@ onMounted(() => {
           </template>
 
           <template v-else-if="mountData.driverType === 'aliyun'">
-            <el-form-item prop="config.client_id" :label="$t('engine.clientId')">
-              <el-input v-model="mountData.config.client_id" />
+            <el-form-item class="form-span-2" prop="config.auth_mode" :label="$t('engine.authenticationMethod')">
+              <el-radio-group
+                class="aliyun-auth-methods"
+                v-model="mountData.config.auth_mode"
+                @change="handleAliyunAuthModeChange"
+              >
+                <el-radio-button value="service">{{ $t("engine.scanAuthorization") }}</el-radio-button>
+                <el-radio-button value="direct">{{ $t("engine.ownApplication") }}</el-radio-button>
+              </el-radio-group>
             </el-form-item>
-            <el-form-item prop="config.client_secret" :label="$t('engine.clientSecret')">
-              <el-input
-                v-model="mountData.config.client_secret"
-                show-password
-                autocomplete="new-password"
-                :placeholder="mountEditFlag ? $t('engine.secretPlaceholderEdit') : ''"
-              />
+            <el-form-item v-if="mountData.config.auth_mode === 'service'" class="form-span-2 aliyun-auth-form-item">
+              <div class="aliyun-auth-panel">
+                <div class="aliyun-auth-status">
+                  <strong>{{ $t("engine.aliyunAuthorization") }}</strong>
+                  <el-tag v-if="aliyunAuthorized" type="success" effect="plain">{{ $t("engine.authorized") }}</el-tag>
+                  <el-tag v-else-if="aliyunAuthStatus === 'pending'" type="warning" effect="plain">
+                    {{ $t("engine.waitingForScan") }}
+                  </el-tag>
+                  <el-tag v-else-if="aliyunAuthStatus === 'error'" type="danger" effect="plain">
+                    {{ $t("engine.authorizationFailed") }}
+                  </el-tag>
+                  <el-tag v-else type="info" effect="plain">{{ $t("engine.notAuthorized") }}</el-tag>
+                </div>
+                <div v-if="aliyunAuthQrCode" class="aliyun-qr-wrap">
+                  <img :src="aliyunAuthQrCode" :alt="$t('engine.aliyunQrCode')" />
+                  <span>{{ $t("engine.scanWithAliyunDrive") }}</span>
+                  <small v-if="aliyunAuthExpiresIn > 0">
+                    {{ $t("engine.authorizationExpiresIn", { seconds: aliyunAuthExpiresIn }) }}
+                  </small>
+                </div>
+                <div class="aliyun-auth-actions">
+                  <el-button
+                    type="primary"
+                    plain
+                    :icon="RefreshRight"
+                    :loading="aliyunAuthLoading"
+                    @click="startAliyunAuth"
+                  >
+                    {{ aliyunAuthQrCode ? $t("engine.rescanAuthorization") : $t("engine.startAuthorization") }}
+                  </el-button>
+                  <el-button
+                    v-if="aliyunAuthorizationUrl"
+                    :icon="Link"
+                    @click="openAliyunAuthorization"
+                  >
+                    {{ $t("engine.openAuthorizationPage") }}
+                  </el-button>
+                </div>
+              </div>
             </el-form-item>
-            <el-form-item class="form-span-2" prop="config.refresh_token" :label="$t('engine.refreshToken')">
-              <el-input
-                v-model="mountData.config.refresh_token"
-                show-password
-                autocomplete="new-password"
-                :placeholder="mountEditFlag ? $t('engine.secretPlaceholderEdit') : ''"
-              />
-            </el-form-item>
+            <template v-else>
+              <el-form-item prop="config.client_id" :label="$t('engine.clientId')">
+                <el-input v-model="mountData.config.client_id" />
+              </el-form-item>
+              <el-form-item prop="config.client_secret" :label="$t('engine.clientSecret')">
+                <el-input
+                  v-model="mountData.config.client_secret"
+                  show-password
+                  autocomplete="new-password"
+                  :placeholder="mountEditFlag ? $t('engine.secretPlaceholderEdit') : ''"
+                />
+              </el-form-item>
+              <el-form-item class="form-span-2" prop="config.refresh_token" :label="$t('engine.refreshToken')">
+                <el-input
+                  v-model="mountData.config.refresh_token"
+                  show-password
+                  autocomplete="new-password"
+                  :placeholder="mountEditFlag ? $t('engine.secretPlaceholderEdit') : ''"
+                />
+              </el-form-item>
+            </template>
             <el-form-item prop="config.drive_type" :label="$t('engine.driveType')">
               <el-select v-model="mountData.config.drive_type">
                 <el-option :label="$t('engine.driveTypes.resource')" value="resource" />
@@ -1312,7 +1532,16 @@ onMounted(() => {
       </el-form>
       <template #footer>
         <el-button @click="closeMount">{{ $t("common.cancel") }}</el-button>
-        <el-button type="primary" :loading="mountLoading" @click="submitMount">{{ $t("common.confirm") }}</el-button>
+        <el-button
+          type="primary"
+          :loading="mountLoading"
+          :disabled="
+            mountData?.driverType === 'aliyun' && mountData.config?.auth_mode === 'service' && !aliyunAuthorized
+          "
+          @click="submitMount"
+        >
+          {{ $t("common.confirm") }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -1741,6 +1970,75 @@ onMounted(() => {
   width: 100%;
 }
 
+:global(.mount-editor-dialog .aliyun-auth-methods) {
+  display: flex;
+  width: 100%;
+}
+
+:global(.mount-editor-dialog .aliyun-auth-methods .el-radio-button) {
+  min-width: 0;
+  flex: 1;
+}
+
+:global(.mount-editor-dialog .aliyun-auth-methods .el-radio-button__inner) {
+  width: 100%;
+}
+
+:global(.mount-editor-dialog .aliyun-auth-form-item .el-form-item__content) {
+  display: block;
+}
+
+:global(.mount-editor-dialog .aliyun-auth-panel) {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-sizing: border-box;
+  background: var(--home-item-background-color);
+}
+
+:global(.mount-editor-dialog .aliyun-auth-status) {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+:global(.mount-editor-dialog .aliyun-qr-wrap) {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+:global(.mount-editor-dialog .aliyun-qr-wrap img) {
+  display: block;
+  width: min(220px, 70vw);
+  aspect-ratio: 1;
+  border: 1px solid var(--border-color);
+  background: #ffffff;
+}
+
+:global(.mount-editor-dialog .aliyun-qr-wrap small) {
+  color: var(--text-muted);
+}
+
+:global(.mount-editor-dialog .aliyun-auth-actions) {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+:global(.mount-editor-dialog .aliyun-auth-actions .el-button) {
+  margin: 0;
+}
+
 :global(.mount-editor-dialog .sftp-auth-methods .el-radio-button) {
   min-width: 0;
   flex: 1;
@@ -2069,6 +2367,20 @@ onMounted(() => {
 
   :global(.mount-editor-dialog .sftp-test-actions .el-tag) {
     align-self: flex-start;
+  }
+
+  :global(.mount-editor-dialog .aliyun-auth-status) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  :global(.mount-editor-dialog .aliyun-auth-actions) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global(.mount-editor-dialog .aliyun-auth-actions .el-button) {
+    width: 100%;
   }
 
   :global(.local-browser-dialog .local-browser-toolbar) {
