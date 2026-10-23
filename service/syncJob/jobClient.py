@@ -588,8 +588,45 @@ class JobTask:
                 parentPath, fileName = self.entryLocation(dstRoot, entry['path'])
                 if any(self.pathWithin(entry['path'], prefix) for prefix in failedDirectoryPrefixes):
                     continue
+                if (self.job['method'] == 1
+                        and previous.get(entry['path'], {}).get('isDir')
+                        and not self.removeSnapshotDirectoryConflict(dstRoot, entry['path'], previous)):
+                    continue
                 srcPath, _ = self.entryLocation(self.job['srcPath'], entry['path'])
                 self.copyFile(srcPath, parentPath, fileName, entry['size'])
+
+    def removeSnapshotDirectoryConflict(self, dstRoot, relativePath, previous):
+        """Remove only empty, previously tracked directories blocking a file."""
+        if self.breakFlag:
+            return False
+        parent, name = self.entryLocation(dstRoot, relativePath)
+        try:
+            # Inspect the unfiltered target: excluded entries must prevent removal.
+            entries, _ = self.readDirectory(parent, 0, self.job['scanIntervalT'])
+            if name + '/' not in entries:
+                return True
+            directory = parent + name + '/'
+            children, _ = self.readDirectory(directory, 0, self.job['scanIntervalT'])
+            for child in children:
+                childRelative = relativePath + '/' + child.rstrip('/')
+                if (not child.endswith('/')
+                        or not previous.get(childRelative, {}).get('isDir')):
+                    raise ValueError('Target directory contains protected or untracked entries: ' + directory)
+            for child in children:
+                if not self.removeSnapshotDirectoryConflict(
+                        dstRoot, relativePath + '/' + child[:-1], previous):
+                    return False
+            remaining, _ = self.readDirectory(directory, 0, self.job['scanIntervalT'])
+            if remaining:
+                raise ValueError('Target directory is not empty: ' + directory)
+            if self.breakFlag:
+                return False
+            self.alistClient.deleteFile(parent, [name], self.job['scanIntervalT'])
+        except Exception as exc:
+            self.delHook(parent, name + '/', None, status=7, errMsg=str(exc), isPath=1)
+            return False
+        self.delHook(parent, name + '/', None, isPath=1)
+        return True
 
     @staticmethod
     def pathWithin(path, prefix):
