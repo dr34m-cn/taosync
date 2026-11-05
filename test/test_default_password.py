@@ -151,10 +151,9 @@ class DefaultPasswordTest(unittest.TestCase):
 
         self.assertEqual(password, 'generated-password')
         generate_password.assert_called_once_with()
-        self.assertEqual(
-            self._stored_admin_password(db_path),
-            commonUtils.passwd2md5('generated-password'),
-        )
+        self.assertTrue(commonUtils.verifyPasswd(
+            'generated-password', self._stored_admin_password(db_path),
+        ))
 
     def test_manual_setting_is_used_without_random_generation(self):
         db_path = self._set_runtime_config('manual-password')
@@ -164,10 +163,9 @@ class DefaultPasswordTest(unittest.TestCase):
 
         self.assertEqual(password, 'manual-password')
         generate_password.assert_not_called()
-        self.assertEqual(
-            self._stored_admin_password(db_path),
-            commonUtils.passwd2md5('manual-password'),
-        )
+        self.assertTrue(commonUtils.verifyPasswd(
+            'manual-password', self._stored_admin_password(db_path),
+        ))
 
     def test_existing_database_password_is_not_overwritten(self):
         db_path = self._set_runtime_config('first-password')

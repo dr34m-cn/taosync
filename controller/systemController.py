@@ -1,23 +1,28 @@
-import json
+from concurrent.futures import ThreadPoolExecutor
+
+from tornado.concurrent import run_on_executor
 
 from common.LNG import language
-from common.config import getConfig
 from controller.baseController import BaseHandler, handle_request, cookieName
 from service.system import userService
 
 
 class Login(BaseHandler):
+    # 密码哈希计算较慢，放到线程池执行，避免阻塞事件循环
+    executor = ThreadPoolExecutor(2)
+
+    @run_on_executor
     @handle_request
     def post(self, req):
-        cfg = getConfig()
-        user = userService.checkPwd(None, req['passwd'], req['userName'])
-        self.set_signed_cookie(cookieName, json.dumps(user),
-                               expires_days=cfg['server']['expires'])
+        user = userService.checkPwd(None, req['passwd'], req['userName'],
+                                    clientKey=self.request.remote_ip)
+        self.set_session_cookie(user)
         userReturn = user.copy()
-        del userReturn['passwd']
-        del userReturn['sqlVersion']
+        userReturn.pop('passwd', None)
+        userReturn.pop('sqlVersion', None)
         return userReturn
 
+    @run_on_executor
     @handle_request
     def put(self, req):
         return userService.resetPasswd(req['userName'], req['key'], req.get('passwd', None))
@@ -28,15 +33,17 @@ class Login(BaseHandler):
 
 
 class User(BaseHandler):
+    executor = ThreadPoolExecutor(1)
+
     @handle_request
     def get(self, req):
         user = req['__user']
         return user
 
+    @run_on_executor
     @handle_request
     def put(self, req):
-        user = json.loads(self._get_signed_user_cookie())
-        userService.editPasswd(user['id'], req['passwd'], req['oldPasswd'])
+        userService.editPasswd(req['__user']['id'], req['passwd'], req['oldPasswd'])
 
 
 class Language(BaseHandler):

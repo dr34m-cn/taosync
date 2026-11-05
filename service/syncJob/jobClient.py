@@ -8,16 +8,49 @@ import logging
 import posixpath
 import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 
+from apscheduler.executors.pool import ThreadPoolExecutor as SchedulerThreadPool
+from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.background import BackgroundScheduler
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
+from common.config import getConfig
 from common.LNG import G
 from mapper import jobMapper
 from service.engine import engineService
 from service.syncJob import taskService
+
+# 同时提交到引擎的复制任务上限
+MAX_ACTIVE_COPY = 20
+# 查询引擎任务状态时，允许的连续失败次数（网络抖动等），超过才判定失败
+MAX_TASK_INFO_FAILURES = 5
+# 中止或超时后，等待进行中的复制任务完成取消的最长秒数
+ABORT_DRAIN_SECONDS = 60
+
+_scheduler = None
+_schedulerLock = threading.Lock()
+
+
+def getScheduler():
+    """所有作业共用一个调度器，避免每个作业各自创建线程池。"""
+    global _scheduler
+    with _schedulerLock:
+        if _scheduler is None:
+            scheduler = BackgroundScheduler(executors={'default': SchedulerThreadPool(20)})
+            scheduler.start()
+            _scheduler = scheduler
+        return _scheduler
+
+
+def taskTimeoutSeconds():
+    """任务执行超时时间（配置单位为小时），0 或无效值表示不限制。"""
+    try:
+        hours = float(getConfig()['server'].get('timeout') or 0)
+    except (TypeError, ValueError, KeyError):
+        hours = 0
+    return max(0.0, hours * 3600)
 
 
 def isFileSizeAllowed(fileSize, minFileSize=None, maxFileSize=None):
@@ -85,6 +118,7 @@ class CopyItem:
         不断检查状态并更新
         :return:
         """
+        failures = 0
         while True:
             if self.jobTask.breakFlag:
                 self.status = 4
@@ -100,10 +134,16 @@ class CopyItem:
             time.sleep(0.61 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
             try:
                 taskInfo = self.alistClient.taskInfo(self.alistTaskId)
+                failures = 0
             except Exception as e:
                 logger = logging.getLogger()
-                logger.exception(e)
                 eMsg = str(e)
+                failures += 1
+                if '404' not in eMsg and failures < MAX_TASK_INFO_FAILURES:
+                    # 网络抖动等临时错误：引擎侧任务仍可能在运行，稍后重试
+                    logger.warning(G('task_info_retry').format(failures, MAX_TASK_INFO_FAILURES, eMsg))
+                    continue
+                logger.exception(e)
                 if '404' in eMsg:
                     eMsg = (G('task_may_delete'))
                 taskInfo = {
@@ -127,9 +167,22 @@ class CopyItem:
     def endIt(self):
         # Move-mode source files are deleted by JobTask only after every target
         # copy has succeeded. Deleting here races when a job has multiple targets.
-        self.jobTask.copyHook(self.srcPath, self.dstPath, self.fileName, self.fileSize, self.alistTaskId, self.status,
-                              errMsg=self.errMsg, copyType=self.copyType, createTime=self.createTime)
-        del self.jobTask.doing[self.doingKey]
+        self.jobTask.completeCopy(self)
+
+    def toRecord(self, status=None, errMsg=None):
+        return {
+            'taskId': self.taskId,
+            'srcPath': self.srcPath,
+            'dstPath': self.dstPath,
+            'isPath': 0,
+            'fileName': self.fileName,
+            'fileSize': self.fileSize,
+            'type': self.copyType,
+            'alistTaskId': self.alistTaskId,
+            'status': self.status if status is None else status,
+            'errMsg': self.errMsg if errMsg is None else errMsg,
+            'createTime': self.createTime
+        }
 
 
 class JobTask:
@@ -144,12 +197,19 @@ class JobTask:
         self.job = self.jobClient.job
         self.alistClient = engineService.getClientById(self.job['alistId'])
         self.createTime = time.time()
+        # 保护 finish/doing/waiting：扫描线程、提交线程、复制线程与查询接口会同时访问
+        self.stateLock = threading.RLock()
         # 已完成（包含成功或者失败）
         self.finish = []
         # 已经提交到alist的任务
         self.doing = {}
         # 等待提交到alist的任务
-        self.waiting = []
+        self.waiting = deque()
+        # 结果已入库，之后到达的回调不再记录
+        self.finalized = False
+        # 超过配置的任务超时时间而中止
+        self.timedOut = False
+        self.timeoutSeconds = taskTimeoutSeconds()
         # 上次查看详情的时间戳，低于3秒表示正在看，在看则快速检查状态，否则低速检查以节约开销
         self.lastWatching = 0.0
         # 队列序号，用作复制任务的doingKey
@@ -210,6 +270,10 @@ class JobTask:
         }
         """
         self.lastWatching = time.time()
+        with self._stateLock():
+            waitItems = list(self.waiting)
+            doItems = list(self.doing.values())
+            finishItems = list(self.finish)
         waits = [{
             'srcPath': waitItem.srcPath,
             'dstPath': waitItem.dstPath,
@@ -221,7 +285,7 @@ class JobTask:
             'progress': waitItem.progress,
             'errMsg': waitItem.errMsg,
             'createTime': waitItem.createTime
-        } for waitItem in self.waiting]
+        } for waitItem in waitItems]
         dos = [{
             'srcPath': doItem.srcPath,
             'dstPath': doItem.dstPath,
@@ -233,8 +297,8 @@ class JobTask:
             'progress': doItem.progress,
             'errMsg': doItem.errMsg,
             'createTime': doItem.createTime
-        } for doItem in self.doing.values()]
-        allTask = list(itertools.chain(waits, dos, self.finish))
+        } for doItem in doItems]
+        allTask = list(itertools.chain(waits, dos, finishItems))
         keyValSpace = {
             'wait': 0,
             'running': 1,
@@ -275,48 +339,96 @@ class JobTask:
         return result
 
     def getCurrentByStatus(self, status):
-        return self.currentTasks[status]
+        return self.currentTasks.get(status, [])
+
+    def _stateLock(self):
+        lock = self.__dict__.get('stateLock')
+        if lock is None:
+            lock = self.__dict__.setdefault('stateLock', threading.RLock())
+        return lock
+
+    def _appendFinish(self, item):
+        with self._stateLock():
+            if getattr(self, 'finalized', False):
+                return False
+            self.finish.append(item)
+            return True
+
+    def completeCopy(self, copyItem):
+        """复制线程结束回调：移出进行中队列并记录结果（已被中止流程接管的不重复记录）。"""
+        with self._stateLock():
+            if self.doing.pop(copyItem.doingKey, None) is None:
+                return
+            if not getattr(self, 'finalized', False):
+                self.finish.append(copyItem.toRecord())
+
+    def checkTimeout(self):
+        timeout = getattr(self, 'timeoutSeconds', 0)
+        if (timeout and not getattr(self, 'timedOut', False) and not self.breakFlag
+                and time.time() - self.createTime >= timeout):
+            self.timedOut = True
+            self.breakFlag = True
+            logging.getLogger().warning(G('task_timeout_abort').format(self.taskId, round(timeout / 3600, 2)))
+        return getattr(self, 'timedOut', False)
+
+    def _submitReady(self):
+        """在锁内把等待队列中的任务移到进行中队列，返回需要启动的复制项。"""
+        started = []
+        with self._stateLock():
+            if self.scanFinish and not self.doing and not self.waiting:
+                return None
+            while len(self.doing) < MAX_ACTIVE_COPY and self.waiting and not self.breakFlag:
+                if self.firstSync is None:
+                    self.firstSync = time.time()
+                self.queueNum += 1
+                copyItem = self.waiting.popleft()
+                copyItem.doingKey = self.queueNum
+                self.doing[self.queueNum] = copyItem
+                started.append(copyItem)
+        return started
+
+    def _drainAfterBreak(self):
+        """中止/超时后，在有限时间内等待扫描线程与进行中的复制完成取消。"""
+        deadline = time.time() + ABORT_DRAIN_SECONDS
+        syncThread = getattr(self, 'syncThread', None)
+        if syncThread is not None and syncThread.is_alive():
+            syncThread.join(max(0.0, deadline - time.time()))
+        while time.time() < deadline:
+            with self._stateLock():
+                if not self.doing:
+                    return
+            time.sleep(0.5)
+        with self._stateLock():
+            leftovers = list(self.doing.values())
+            self.doing.clear()
+            for copyItem in leftovers:
+                self.finish.append(copyItem.toRecord(status=7, errMsg=G('copy_interrupted')))
 
     def taskSubmit(self):
         """
         队列检验与提交
         :return:
         """
-        while True:
-            if self.breakFlag:
-                break
-            time.sleep(0.5)
-            doingNums = len(self.doing.keys())
-            waitingNums = len(self.waiting)
-            if not self.scanFinish or doingNums != 0 or waitingNums != 0:
-                while doingNums < 20:
-                    if self.breakFlag:
-                        break
-                    if waitingNums == 0:
-                        break
-                    else:
-                        if self.firstSync is None:
-                            self.firstSync = time.time()
-                        self.queueNum += 1
-                        self.doing[self.queueNum] = self.waiting.pop(0)
-                        self.doing[self.queueNum].doingKey = self.queueNum
-                        self.doing[self.queueNum].doByThread()
-                        doingNums = len(self.doing.keys())
-                        waitingNums = len(self.waiting)
-            else:
-                break
-        tryTime = 0
-        while len(self.doing.keys()) > 0:
-            tryTime += 1
-            time.sleep(.5)
-            if tryTime > 3:
-                break
         try:
+            while True:
+                if self.checkTimeout() or self.breakFlag:
+                    break
+                time.sleep(0.5)
+                started = self._submitReady()
+                if started is None:
+                    break
+                for copyItem in started:
+                    copyItem.doByThread()
+            if self.breakFlag:
+                self._drainAfterBreak()
             if self.job.get('method') == 2 and self._allOperationsSuccessful():
                 self.finalizeMove()
             self.commitSourceSnapshot()
-            if self.finish:
-                jobMapper.addJobTaskItemMany(self.finish)
+            with self._stateLock():
+                self.finalized = True
+                finishItems = list(self.finish)
+            if finishItems:
+                jobMapper.addJobTaskItemMany(finishItems)
             self.updateTaskStatus()
         finally:
             self.jobClient.finishRun(self)
@@ -437,7 +549,7 @@ class JobTask:
                           status=7, errMsg=str(e), isPath=1)
 
     def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0,
-                 copyType=0, createTime=int(time.time())):
+                 copyType=0, createTime=None):
         """
         复制文件回调
         :param srcPath: 来源目录
@@ -450,9 +562,11 @@ class JobTask:
         :param errMsg: 错误信息
         :param isPath: 是否是目录，0-文件，1-目录
         :param copyType: 0-复制，2-移动
-        :param createTime:
+        :param createTime: 创建时间，默认为调用时刻
         """
-        self.finish.append({
+        if createTime is None:
+            createTime = int(time.time())
+        self._appendFinish({
             'taskId': self.taskId,
             'srcPath': srcPath,
             'dstPath': dstPath,
@@ -466,7 +580,7 @@ class JobTask:
             'createTime': createTime
         })
 
-    def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0, createTime=int(time.time())):
+    def delHook(self, dstPath, name, size, status=2, errMsg=None, isPath=0, createTime=None):
         """
         删除文件回调
         :param dstPath: 目标目录
@@ -475,9 +589,11 @@ class JobTask:
         :param status: 2-成功、7-失败
         :param errMsg: 错误信息
         :param isPath: 是否是目录，0-文件，1-目录
-        :param createTime: 创建时间
+        :param createTime: 创建时间，默认为调用时刻
         """
-        self.finish.append({
+        if createTime is None:
+            createTime = int(time.time())
+        self._appendFinish({
             'taskId': self.taskId,
             'srcPath': None,
             'dstPath': dstPath,
@@ -684,7 +800,8 @@ class JobTask:
         if self.breakFlag:
             return
         copyItem = CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self)
-        self.waiting.append(copyItem)
+        with self._stateLock():
+            self.waiting.append(copyItem)
 
     def hasFileSizeFilter(self):
         return self.job.get('minFileSize') is not None or self.job.get('maxFileSize') is not None
@@ -911,8 +1028,16 @@ class JobTask:
         """
         self.getCurrent()
         failOrOtherNum = len(self.currentTasks[7]) + len(self.currentTasks[-1])
-        status = 7 if self.breakFlag else 2 if failOrOtherNum == 0 else 3
-        taskService.updateJobTaskStatus(self.taskId, status, taskList=self.currentTasks, createTime=self.createTime)
+        errMsg = None
+        if getattr(self, 'timedOut', False):
+            status = 5
+            errMsg = G('task_timeout_abort').format(self.taskId, round(self.timeoutSeconds / 3600, 2))
+        elif self.breakFlag:
+            status = 7
+        else:
+            status = 2 if failOrOtherNum == 0 else 3
+        taskService.updateJobTaskStatus(self.taskId, status, errMsg, taskList=self.currentTasks,
+                                        createTime=self.createTime)
 
 
 class JobClient:
@@ -1031,11 +1156,11 @@ class JobClient:
                 raise Exception(G('cron_lost'))
         else:
             return
-        self.scheduled = BackgroundScheduler()
-        self.scheduledJob = self.scheduled.add_job(**params)
-        self.scheduled.start()
         if self.job['enable'] == 0:
-            self.scheduledJob.pause()
+            # 以暂停状态加入，避免加入与暂停之间被触发
+            params['next_run_time'] = None
+        self.scheduled = getScheduler()
+        self.scheduledJob = self.scheduled.add_job(**params)
 
     def resumeJob(self):
         """
@@ -1067,14 +1192,17 @@ class JobClient:
         if self.currentJobTask:
             self.currentJobTask.breakFlag = True
         if remove:
-            if self.scheduled is not None:
+            if self.scheduledJob is not None:
                 try:
-                    self.scheduled.shutdown(wait=False)
+                    self.scheduledJob.remove()
+                except JobLookupError:
+                    pass
                 except Exception as e:
                     logger = logging.getLogger()
                     logger.warning(G('stop_fail').format(str(e)))
                     logger.exception(e)
-                self.scheduled = None
+                self.scheduledJob = None
+            self.scheduled = None
         else:
             if self.scheduledJob is not None:
                 try:

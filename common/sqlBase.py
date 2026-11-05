@@ -1,31 +1,29 @@
+import functools
 import logging
 import sqlite3
-import time
+import threading
 
 from common.LNG import G
 from common.config import getConfig
 
+# 保留旧名称以兼容外部引用，已不再使用
 RUN_FLAG = False
+# 串行化所有数据库访问（可重入，允许已持锁的代码再次调用数据库函数）
+DB_LOCK = threading.RLock()
 
 
 def connect_sql(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        global RUN_FLAG
-        while RUN_FLAG:
-            time.sleep(0.073)
-        RUN_FLAG = True
-        conn = None
-        try:
-            cfg = getConfig()
-            conn = sqlite3.connect(cfg['db']['dbname'])
-            result = func(conn, *args, **kwargs)
-        except Exception as e:
-            raise Exception(e)
-        finally:
-            RUN_FLAG = False
-            if conn:
-                conn.close()
-        return result
+        with DB_LOCK:
+            conn = None
+            try:
+                cfg = getConfig()
+                conn = sqlite3.connect(cfg['db']['dbname'], timeout=30)
+                return func(conn, *args, **kwargs)
+            finally:
+                if conn:
+                    conn.close()
 
     return wrapper
 
@@ -91,8 +89,6 @@ def execute_insert(conn, query, params=()):
         logger = logging.getLogger()
         logger.exception(e)
         raise Exception(G('same_exists'))
-    except Exception as e:
-        raise Exception(e)
     finally:
         cursor.close()
     return lastId

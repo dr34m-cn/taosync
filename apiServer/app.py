@@ -380,22 +380,16 @@ class HealthHandler(BaseHandler):
 
 
 class SessionCreateHandler(BaseHandler):
-    def post(self):
+    async def post(self):
         try:
             item = self.store.create(self.request.remote_ip or "unknown")
         except RuntimeError as exc:
             raise tornado.web.HTTPError(429, reason=str(exc))
-        mode = "callback"
-        try:
-            qr_session = self.oauth.create_qr_session()
-            authorization_url = qr_session["authorization_url"]
-            item.provider_sid = qr_session["sid"]
-            mode = "qrcode"
-        except Exception as exc:
-            logging.getLogger(__name__).warning(
-                "Aliyun QR endpoint unavailable, using callback flow: %s", exc
-            )
-            authorization_url = self.oauth.authorization_url(item.state)
+        # The upstream QR request and QR rendering block; keep the event loop
+        # free for status polls and token refreshes from other users.
+        authorization_url, mode, qr_code = await tornado.ioloop.IOLoop.current().run_in_executor(
+            None, self._start_authorization, item
+        )
         self.write_json(
             201,
             {
@@ -403,12 +397,27 @@ class SessionCreateHandler(BaseHandler):
                 "poll_token": item.poll_token,
                 "status": item.status,
                 "authorization_url": authorization_url,
-                "qr_code": _qr_data_url(authorization_url),
+                "qr_code": qr_code,
                 "expires_in": max(0, int(item.expires_at - time.time())),
                 "poll_interval": 2,
                 "mode": mode,
             },
         )
+
+    def _start_authorization(self, item):
+        mode = "callback"
+        try:
+            qr_session = self.oauth.create_qr_session()
+            authorization_url = qr_session["authorization_url"]
+            with item.lock:
+                item.provider_sid = qr_session["sid"]
+            mode = "qrcode"
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Aliyun QR endpoint unavailable, using callback flow: %s", exc
+            )
+            authorization_url = self.oauth.authorization_url(item.state)
+        return authorization_url, mode, _qr_data_url(authorization_url)
 
 
 class SessionStatusHandler(BaseHandler):

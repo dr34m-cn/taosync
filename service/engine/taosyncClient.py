@@ -3,6 +3,7 @@ import threading
 import time
 import uuid
 
+from common.intervalGate import IntervalGate
 from mapper import storageMapper
 from service.alist.alistClient import checkExs
 from service.storage import storageService
@@ -138,7 +139,7 @@ class TaoSyncClient:
     def __init__(self, engineId):
         self.alistId = int(engineId)
         self.user = "TaoSync"
-        self.waits = {}
+        self.waitGate = IntervalGate()
         self.tasks = {}
         self.tasks_lock = threading.Lock()
         self.mounts = {}
@@ -200,11 +201,7 @@ class TaoSyncClient:
             return
         normalized = normalize_path(path)
         root = normalized.strip("/").split("/", 1)[0] if normalized != "/" else "/"
-        if root in self.waits:
-            elapsed = time.time() - self.waits[root]
-            if elapsed < scanInterval:
-                time.sleep(scanInterval - elapsed)
-        self.waits[root] = time.time()
+        self.waitGate.wait(root, scanInterval)
 
     def resolve(self, path):
         normalized = normalize_path(path, allow_root=False)

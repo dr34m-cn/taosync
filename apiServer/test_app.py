@@ -1,10 +1,14 @@
+import json
+import time
 import unittest
 from unittest import mock
 
+import tornado.testing
+
 try:
-    from .app import AliyunOAuthClient, SessionStore
+    from .app import AliyunOAuthClient, SessionStore, make_app
 except ImportError:  # pragma: no cover - unittest discovery may import this as a script module
-    from app import AliyunOAuthClient, SessionStore
+    from app import AliyunOAuthClient, SessionStore, make_app
 
 
 class Response:
@@ -86,6 +90,35 @@ class SessionStoreTest(unittest.TestCase):
         now[0] = 161.0
         with self.assertRaises(KeyError):
             store.get(item.session_id, item.poll_token)
+
+
+class SessionCreateNonBlockingTest(tornado.testing.AsyncHTTPTestCase):
+    def get_app(self):
+        oauth = mock.Mock()
+
+        def slow_qr_session():
+            time.sleep(0.5)
+            return {"sid": "sid-value", "authorization_url": "https://example.com/qr?sid=sid-value"}
+
+        oauth.create_qr_session.side_effect = slow_qr_session
+        self.store = SessionStore(ttl=300, max_sessions_per_ip=10)
+        return make_app({"server": {}}, oauth=oauth, store=self.store)
+
+    @tornado.testing.gen_test(timeout=10)
+    async def test_other_requests_are_served_while_upstream_qr_request_is_slow(self):
+        create = self.http_client.fetch(self.get_url("/v1/aliyun/sessions"), method="POST", body="{}")
+        start = time.monotonic()
+        health = await self.http_client.fetch(self.get_url("/health"))
+        elapsed = time.monotonic() - start
+        response = await create
+        self.assertEqual(200, health.code)
+        self.assertLess(elapsed, 0.4)
+        self.assertEqual(201, response.code)
+        data = json.loads(response.body)
+        self.assertEqual("qrcode", data["mode"])
+        self.assertTrue(data["qr_code"].startswith("data:image/png;base64,"))
+        item = self.store.sessions[data["session_id"]]
+        self.assertEqual("sid-value", item.provider_sid)
 
 
 if __name__ == "__main__":

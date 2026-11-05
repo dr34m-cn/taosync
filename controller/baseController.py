@@ -1,14 +1,39 @@
+import hmac
 import json
 import logging
 
 from tornado.web import RequestHandler
 
-from common import commonService
+from common import commonService, commonUtils
 from common.LNG import G, set_context_lang
 from common.config import getConfig
 from service.system import userService
 
 cookieName = 'tao_sync'
+
+
+def buildSessionCookie(user):
+    """Cookie 中只保存用户标识与会话版本，不再包含密码摘要。"""
+    return json.dumps({
+        'id': user['id'],
+        'userName': user['userName'],
+        'sv': commonUtils.sessionVersion(user),
+    })
+
+
+def resolveSessionUser(cookieUser):
+    """校验 Cookie 对应的用户，失败返回 None（旧版含密码摘要的 Cookie 需重新登录）。"""
+    if not isinstance(cookieUser, dict) or 'id' not in cookieUser or 'sv' not in cookieUser:
+        return None
+    try:
+        trueUser = userService.getUser(cookieUser['id'], None)
+    except Exception:
+        return None
+    if (not trueUser
+            or trueUser['userName'] != cookieUser.get('userName')
+            or not hmac.compare_digest(str(cookieUser['sv']), commonUtils.sessionVersion(trueUser))):
+        return None
+    return trueUser
 
 
 class BaseHandler(RequestHandler):
@@ -21,7 +46,19 @@ class BaseHandler(RequestHandler):
         )
 
     def get_current_user(self):
-        return json.loads(self._get_signed_user_cookie())
+        user = self._get_signed_user_cookie()
+        return json.loads(user) if user else None
+
+    def set_session_cookie(self, user):
+        self.set_signed_cookie(cookieName, buildSessionCookie(user),
+                               expires_days=getConfig()['server']['expires'],
+                               httponly=True, samesite='Lax')
+
+
+def _unauthorized(handler, msgKey):
+    handler.clear_cookie(cookieName)
+    handler.set_header('Content-Type', 'application/json; charset=UTF-8')
+    handler.write(commonService.result_map(G(msgKey), 401))
 
 
 def handle_request(func):
@@ -33,30 +70,23 @@ def handle_request(func):
         trueUser = None
         if not uri.startswith('/svr/noAuth'):
             if user is None:
-                self.clear_cookie(cookieName)
-                msg = commonService.result_map(G('sign_in'), 401)
-                self.set_header('Content-Type', 'application/json; charset=UTF-8')
-                self.write(msg)
+                _unauthorized(self, 'sign_in')
                 return
-            else:
+            try:
                 cUser = json.loads(user)
-                trueUser = userService.getUser(cUser['id'], None)
-                if ('passwd' not in cUser
-                        or 'userName' not in cUser
-                        or trueUser['passwd'] != cUser['passwd']
-                        or trueUser['userName'] != cUser['userName']):
-                    msg = commonService.result_map(G('login_expired'), 401)
-                    self.clear_cookie(cookieName)
-                    self.set_header('Content-Type', 'application/json; charset=UTF-8')
-                    self.write(msg)
-                    return
+            except (TypeError, ValueError):
+                cUser = None
+            trueUser = resolveSessionUser(cUser)
+            if trueUser is None:
+                _unauthorized(self, 'login_expired')
+                return
         try:
             req = commonService.get_post_data(self)
             req['__lang'] = set_context_lang(lang)
             if trueUser:
                 req['__user'] = trueUser.copy()
-                del req['__user']['passwd']
-                del req['__user']['sqlVersion']
+                req['__user'].pop('passwd', None)
+                req['__user'].pop('sqlVersion', None)
             msg = commonService.result_map(func(self, req))
         except Exception as e:
             msg = commonService.result_map(str(e), 500)

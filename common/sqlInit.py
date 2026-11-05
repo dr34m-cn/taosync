@@ -62,7 +62,7 @@ def init_sql(conn):
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
         cursor.execute("insert into user_list(userName, passwd) values ('admin', ?)",
-                       (commonUtils.passwd2md5(passwd), ))
+                       (commonUtils.hashPasswd(passwd), ))
         cursor.execute("create table alist_list("
                        "id integer primary key autoincrement,"
                        "remark text,"       # 备注
@@ -328,6 +328,16 @@ def init_sql(conn):
                        "add column fingerprint text DEFAULT NULL")
     cursor.execute("create unique index if not exists idx_alist_system_key "
                    "on alist_list(systemKey) where systemKey is not null")
+    # 查询索引：新库与任意旧版本升级都会执行，if not exists 保证幂等
+    for table, indexSql in (
+            ('job_task_item', "create index if not exists idx_job_task_item_task "
+                              "on job_task_item(taskId)"),
+            ('job_task', "create index if not exists idx_job_task_job "
+                         "on job_task(jobId, createTime)"),
+    ):
+        cursor.execute("select count(*) from sqlite_master where type='table' and name=?", (table,))
+        if cursor.fetchone()[0]:
+            cursor.execute(indexSql)
     cursor.execute("update alist_list set engineType='alist' where engineType is null")
     cursor.execute("select id from alist_list where systemKey='taosync' limit 1")
     if cursor.fetchone() is None:

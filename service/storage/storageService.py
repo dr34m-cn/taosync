@@ -93,6 +93,30 @@ def _aliyunAuthMode(config):
     return "service" if config.get("auth_service_url") and not config.get("client_secret") else "direct"
 
 
+def _aliyunEndpointIdentity(config, mode):
+    """Where stored Aliyun credentials are sent; secrets may only be reused for the same target."""
+    from service.storage.drivers.aliyun import AliyunDriveDriver
+
+    apiUrl = str(config.get("api_url") or AliyunDriveDriver.API_URL).strip().rstrip("/")
+    if mode == "service":
+        return (apiUrl,)
+    oauthUrl = str(config.get("oauth_url") or apiUrl + "/oauth/access_token").strip()
+    return (str(config.get("client_id") or "").strip(), apiUrl, oauthUrl)
+
+
+def _networkIdentity(driverType, config):
+    """Host/port/user a stored password authenticates against (SMB/FTP)."""
+    defaults = {"smb": 445, "ftp": 21}
+    host = str(config.get("host") or config.get("server") or "").strip().casefold()
+    try:
+        port = int(config.get("port") or defaults.get(driverType, 0))
+    except (TypeError, ValueError):
+        port = str(config.get("port")).strip()
+    username = str(config.get("username") or ("anonymous" if driverType == "ftp" else "")).strip()
+    domain = str(config.get("domain") or "").strip().casefold() if driverType == "smb" else ""
+    return host, port, username, domain
+
+
 def _prepareAliyunConfig(rawConfig, old=None):
     oldConfig = dict((old or {}).get("config") or {})
     oldMode = _aliyunAuthMode(oldConfig) if old is not None else None
@@ -107,9 +131,14 @@ def _prepareAliyunConfig(rawConfig, old=None):
     sameMode = old is not None and requestedMode == oldMode
     config = {**(oldConfig if sameMode else {}), **dict(rawConfig)}
     config["auth_mode"] = requestedMode
+    endpointChanged = False
     if sameMode:
+        endpointChanged = _aliyunEndpointIdentity(config, requestedMode) != _aliyunEndpointIdentity(
+            oldConfig, requestedMode
+        )
         # The frontend deliberately masks secrets while editing a mount. Keep
-        # the stored token set when the corresponding field is omitted.
+        # the stored token set when the corresponding field is omitted, but
+        # never forward stored secrets to a changed client_id/api_url/oauth_url.
         for field in (
             "client_secret",
             "refresh_token",
@@ -117,7 +146,11 @@ def _prepareAliyunConfig(rawConfig, old=None):
             "access_token",
             "expires_at",
         ):
-            if not rawConfig.get(field) and oldConfig.get(field):
+            if rawConfig.get(field):
+                continue
+            if endpointChanged:
+                config.pop(field, None)
+            elif oldConfig.get(field):
                 config[field] = oldConfig[field]
     if requestedMode == "service":
         from service.storage.aliyunAuth import _auth_server_url
@@ -129,11 +162,18 @@ def _prepareAliyunConfig(rawConfig, old=None):
         config["auth_service_url"] = configuredServer
         config["client_secret"] = ""
         if not config.get("refresh_token") or not config.get("refresh_proof"):
+            if endpointChanged:
+                raise ValueError("Aliyun api_url changed; scan authorization is required again")
             raise ValueError("Aliyun scan authorization is required")
     else:
         config["auth_service_url"] = ""
         config["refresh_proof"] = ""
         if not config.get("client_id") or not config.get("client_secret") or not config.get("refresh_token"):
+            if endpointChanged:
+                raise ValueError(
+                    "Aliyun client_id, api_url or oauth_url changed; "
+                    "client_secret and refresh_token must be entered again"
+                )
             raise ValueError("Aliyun client_id, client_secret and refresh_token are required")
     return config
 
@@ -257,9 +297,13 @@ def _smbRequestConfig(data):
 
     config = {**dict((old or {}).get("config") or {}), **dict(rawConfig)}
     # Passwords are masked by the frontend when an existing mount is edited.
-    # Preserve the stored value in that case, just like normal SMB updates.
-    if not config.get("password") and old is not None:
-        config["password"] = old["config"].get("password", "")
+    # Reuse the stored value only for the same host/port/user; a changed
+    # target must never receive the saved password.
+    if not rawConfig.get("password") and old is not None:
+        if _networkIdentity("smb", config) == _networkIdentity("smb", old["config"]):
+            config["password"] = old["config"].get("password", "")
+        else:
+            config["password"] = ""
     return config
 
 
@@ -316,9 +360,19 @@ def updateMount(data):
         config = _prepareAliyunConfig(raw_config, old=old)
     else:
         config = {**old["config"], **dict(raw_config)}
+        identityChanged = _networkIdentity(driverType, config) != _networkIdentity(
+            driverType, old["config"]
+        )
         for secret in SECRET_FIELDS.get(driverType, set()):
-            if not config.get(secret):
-                config[secret] = old["config"].get(secret, "")
+            if raw_config.get(secret):
+                continue
+            if identityChanged and old["config"].get(secret):
+                raise ValueError(
+                    "{} {} must be entered again when host, port or username changes".format(
+                        driverType.upper(), secret
+                    )
+                )
+            config[secret] = old["config"].get(secret, "")
     authFields = {
         "auth_mode", "auth_service_url", "client_id", "client_secret",
         "refresh_token", "api_url", "oauth_url"

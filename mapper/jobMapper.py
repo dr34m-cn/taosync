@@ -338,10 +338,14 @@ def deleteJobTaskByRunTime(runTime):
 
 
 def addJobTaskItemMany(jobTaskItemList):
+    now = int(time.time())
+    rows = [{**item, 'createTime': item.get('createTime') or now} for item in jobTaskItemList]
     sqlBase.execute_manny(
-        "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, alistTaskId, status, errMsg) "
-        "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg)",
-        jobTaskItemList)
+        "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, alistTaskId, status, "
+        "errMsg, createTime) "
+        "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg, "
+        ":createTime)",
+        rows)
 
 
 def getJobTaskItemList(req):

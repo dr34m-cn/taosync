@@ -21,6 +21,9 @@ without_token: 地址改变时令牌必填
 add_alist_client_fail: 新增 AList 客户端时失败，原因为：{}
 builtin_engine_protected: TaoSync 是内置引擎，不能编辑或删除
 task_may_delete: 任务未找到。可能是您手动到 AList 中删除了复制任务；或者 AList 因手动/异常崩溃被重启，导致任务记录丢失
+task_info_retry: "查询复制任务状态失败（第 {}/{} 次），稍后重试：{}"
+task_timeout_abort: "任务 {} 执行超过 {} 小时，已按超时中止"
+copy_interrupted: 任务结束时该复制仍未确认完成，已停止跟踪，请在引擎中核对结果
 do_job_err: 执行任务失败，原因为：{}
 src: 来源
 dst: 目标

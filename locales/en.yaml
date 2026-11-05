@@ -21,6 +21,9 @@ without_token: Token is required when address changes
 add_alist_client_fail: "Failed to add AList client, reason: {}"
 builtin_engine_protected: The built-in TaoSync engine cannot be edited or deleted
 task_may_delete: Task not found. You may have manually deleted the copy task in AList, or AList was restarted manually or abnormally.
+task_info_retry: "Failed to query copy task status (attempt {}/{}), will retry: {}"
+task_timeout_abort: "Task {} ran longer than {} hours and was stopped as timed out"
+copy_interrupted: The copy was still unconfirmed when the task ended and is no longer tracked; please verify the result in the engine
 do_job_err: "Task execution failed due to: {}"
 src: source
 dst: target

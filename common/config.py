@@ -46,6 +46,9 @@ def getConfig():
                 for keyItem in sCfg.keys():
                     if keyItem in tao:
                         sCfg[keyItem] = int(tao[keyItem])
+                # 文档中的配置项名为 task_timeout；旧的 timeout 键仍兼容
+                if 'task_timeout' in tao:
+                    sCfg['timeout'] = int(tao['task_timeout'])
                 for keyItem in textCfg.keys():
                     if keyItem in tao:
                         textCfg[keyItem] = tao.get(keyItem, raw=True).strip()

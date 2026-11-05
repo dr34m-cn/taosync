@@ -1,3 +1,5 @@
+import hmac
+import threading
 import time
 
 from common import commonUtils, config
@@ -5,24 +7,34 @@ from common.LNG import G
 from mapper import userMapper
 
 """
-密码错误记录，记录错误时间戳
+密码错误记录：按客户端（登录时为来源 IP，改密时为用户）分别记录错误时间戳，
+避免任意访问者输错密码导致管理员本人也被锁定
 """
-ERR_PWD = []
+ERR_PWD = {}
+ERR_PWD_LOCK = threading.Lock()
+ERR_PWD_WINDOW = 300
+ERR_PWD_MAX = 3
 
 
-def checkPwdTime():
-    global ERR_PWD
+def _errKey(clientKey):
+    return str(clientKey) if clientKey else '__global__'
+
+
+def checkPwdTime(clientKey=None):
     timeNow = int(time.time())
-    for item in ERR_PWD[:]:
-        if item + 300 < timeNow:
-            ERR_PWD.remove(item)
-    if len(ERR_PWD) > 3:
-        raise Exception(G('passwd_wrong_max_time'))
+    key = _errKey(clientKey)
+    with ERR_PWD_LOCK:
+        for itemKey in list(ERR_PWD.keys()):
+            ERR_PWD[itemKey] = [item for item in ERR_PWD[itemKey] if item + ERR_PWD_WINDOW >= timeNow]
+            if not ERR_PWD[itemKey]:
+                del ERR_PWD[itemKey]
+        if len(ERR_PWD.get(key, [])) > ERR_PWD_MAX:
+            raise Exception(G('passwd_wrong_max_time'))
 
 
-def addPwdError():
-    global ERR_PWD
-    ERR_PWD.append(int(time.time()))
+def addPwdError(clientKey=None):
+    with ERR_PWD_LOCK:
+        ERR_PWD.setdefault(_errKey(clientKey), []).append(int(time.time()))
 
 
 def getUser(userId, userName=None):
@@ -35,24 +47,29 @@ def getUser(userId, userName=None):
     return userMapper.getUserByName(userName) if not userId else userMapper.getUserById(userId)
 
 
-def checkPwd(userId, passwd, userName=None):
+def checkPwd(userId, passwd, userName=None, clientKey=None):
     """
-    检查密码是否正确
+    检查密码是否正确；旧版 MD5 摘要在校验成功后自动升级为 PBKDF2
     :param userId: 用户id
     :param passwd: 密码
     :param userName: 用户名
+    :param clientKey: 错误次数限制的维度（例如来源 IP）
     :return: 用户信息
     """
-    checkPwdTime()
+    checkPwdTime(clientKey)
     try:
         user = getUser(userId, userName)
-        if commonUtils.passwd2md5(passwd) == user['passwd']:
-            return user
-        else:
+        if not commonUtils.verifyPasswd(passwd, user['passwd']):
             raise Exception(G('passwd_wrong'))
     except Exception as e:
-        addPwdError()
+        addPwdError(clientKey)
         raise e
+    if commonUtils.passwdNeedsRehash(user['passwd']):
+        newHash = commonUtils.hashPasswd(passwd)
+        userMapper.resetPasswd(user['id'], newHash)
+        user = dict(user)
+        user['passwd'] = newHash
+    return user
 
 
 def editPasswd(userId, passwd, oldPasswd):
@@ -62,8 +79,8 @@ def editPasswd(userId, passwd, oldPasswd):
     :param passwd: 新密码
     :param oldPasswd: 旧密码
     """
-    checkPwd(userId, oldPasswd)
-    userMapper.resetPasswd(userId, commonUtils.passwd2md5(passwd))
+    checkPwd(userId, oldPasswd, clientKey=f'user:{userId}')
+    userMapper.resetPasswd(userId, commonUtils.hashPasswd(passwd))
 
 
 def resetPasswd(userName, key, passwd=None):
@@ -76,10 +93,10 @@ def resetPasswd(userName, key, passwd=None):
     """
     cfg = config.getConfig()
     user = userMapper.getUserByName(userName.strip())
-    if key.strip() != cfg['server']['passwdStr']:
+    if not hmac.compare_digest(key.strip().encode('utf-8'), cfg['server']['passwdStr'].encode('utf-8')):
         raise Exception(G('key_wrong'))
     if passwd is None:
         passwd = commonUtils.generatePasswd(8)
-        userMapper.resetPasswd(user['id'], commonUtils.passwd2md5(passwd))
+        userMapper.resetPasswd(user['id'], commonUtils.hashPasswd(passwd))
         return passwd
-    userMapper.resetPasswd(user['id'], commonUtils.passwd2md5(passwd.strip()))
+    userMapper.resetPasswd(user['id'], commonUtils.hashPasswd(passwd.strip()))

@@ -2,11 +2,10 @@
 @Author：dr34m
 @Date  ：2024/7/4 13:57 
 """
-import time
-
 import requests
 
 from common.fileFingerprint import fileFingerprint
+from common.intervalGate import IntervalGate
 from common.LNG import G
 
 
@@ -43,8 +42,8 @@ class AlistClient:
         self.user = None
         self.alistId = alistId
         self.token = token
-        # key-根目录，val-上次操作时间，或计划下次操作时间，用于间隔等待
-        self.waits = {}
+        # 按根目录排队的扫描间隔控制
+        self.waitGate = IntervalGate()
         self.getUser()
 
     def req(self, method, url, data=None, params=None):
@@ -121,20 +120,16 @@ class AlistClient:
 
     def checkWait(self, path, scanInterval=0):
         """
-        检查是否等待
+        检查是否等待：同一顶层目录下的请求按 scanInterval 秒均匀排队（多线程共享）
         :param path: 路径
         :param scanInterval: 间隔
         :return:
         """
-        if scanInterval != 0:
-            pathFirst = path.split('/', maxsplit=2)[1]
-            if pathFirst in self.waits:
-                timeC = time.time() - self.waits[pathFirst]
-                if timeC < scanInterval:
-                    self.waits[pathFirst] = time.time() + timeC
-                    time.sleep(scanInterval - timeC)
-                    return
-            self.waits[pathFirst] = time.time()
+        if not scanInterval:
+            return
+        parts = str(path).split('/', maxsplit=2)
+        pathFirst = parts[1] if len(parts) > 1 else parts[0]
+        self.waitGate.wait(pathFirst, scanInterval)
 
     def fileListApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """
