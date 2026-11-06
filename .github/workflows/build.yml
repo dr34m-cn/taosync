@@ -235,7 +235,7 @@ jobs:
       matrix:
         os:
           - macos-15-intel
-          - macos-14
+          - macos-15
     runs-on: ${{ matrix.os }}
     needs: [get-version, build-frontend]
     env:
