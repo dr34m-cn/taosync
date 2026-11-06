@@ -14,7 +14,8 @@ from service.syncJob import jobService, taskService
 
 
 class Alist(BaseHandler):
-    executor = ThreadPoolExecutor(1)
+    # 浏览目录可能较慢（远端网盘、OpenList 本地存储等），多线程避免一个引擎阻塞其他引擎（#218）
+    executor = ThreadPoolExecutor(8)
 
     @run_on_executor
     @handle_request

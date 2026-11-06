@@ -77,7 +77,7 @@ def virtualPathsOverlap(firstPath, secondPath):
 
 
 class CopyItem:
-    def __init__(self, srcPath, dstPath, fileName, fileSize, method, jobTask):
+    def __init__(self, srcPath, dstPath, fileName, fileSize, method, jobTask, canVerify=False):
         self.jobTask = jobTask
         self.alistClient = self.jobTask.alistClient
         self.taskId = self.jobTask.taskId
@@ -92,6 +92,8 @@ class CopyItem:
         self.errMsg = None
         self.createTime = int(time.time())
         self.doingKey = None
+        # 已知目标处原本没有同大小文件：引擎报错时可通过检查目标确认是否实际送达
+        self.canVerify = canVerify
 
     def doByThread(self):
         doThread = threading.Thread(target=self.doIt)
@@ -111,7 +113,21 @@ class CopyItem:
                 self.status = 2
             elif self.status != 4:
                 self.checkAndGetStatus()
+                if self.status == 7 and self.canVerify and not self.jobTask.breakFlag:
+                    self.verifyDelivered()
         self.endIt()
+
+    def verifyDelivered(self):
+        """引擎报告失败但文件可能已送达（如 OpenList 天翼云盘上传后解析时间出错，#240）。"""
+        try:
+            _entries, details = self.jobTask.readDirectory(self.dstPath, 0, self.jobTask.job['scanIntervalT'])
+        except Exception:
+            return
+        detail = details.get(self.fileName)
+        if detail is not None and not detail.get('isDir') and detail.get('size') == self.fileSize:
+            logging.getLogger().warning(G('copy_verified_after_engine_error').format(self.errMsg))
+            self.errMsg = G('copy_verified_after_engine_error').format(self.errMsg)
+            self.status = 2
 
     def checkAndGetStatus(self):
         """
@@ -131,7 +147,7 @@ class CopyItem:
                         self.errMsg = str(e)
                 break
             cuTime = time.time()
-            time.sleep(0.61 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
+            self.waitForChange(0.61 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
             try:
                 taskInfo = self.alistClient.taskInfo(self.alistTaskId)
                 failures = 0
@@ -163,6 +179,17 @@ class CopyItem:
                     break
                 except Exception:
                     break
+
+    def waitForChange(self, interval):
+        """等待下一次状态查询；支持完成通知的引擎（内置 TaoSync）在任务结束时立即返回。"""
+        waiter = getattr(self.alistClient, 'waitTask', None)
+        if callable(waiter) and self.alistTaskId is not None:
+            try:
+                waiter(self.alistTaskId, interval)
+                return
+            except Exception:
+                pass
+        time.sleep(interval)
 
     def endIt(self):
         # Move-mode source files are deleted by JobTask only after every target
@@ -361,6 +388,7 @@ class JobTask:
                 return
             if not getattr(self, 'finalized', False):
                 self.finish.append(copyItem.toRecord())
+        self._wake()
 
     def checkTimeout(self):
         timeout = getattr(self, 'timeoutSeconds', 0)
@@ -413,7 +441,7 @@ class JobTask:
             while True:
                 if self.checkTimeout() or self.breakFlag:
                     break
-                time.sleep(0.5)
+                self._waitWake(0.5)
                 started = self._submitReady()
                 if started is None:
                     break
@@ -421,7 +449,10 @@ class JobTask:
                     copyItem.doByThread()
             if self.breakFlag:
                 self._drainAfterBreak()
-            if self.job.get('method') == 2 and self._allOperationsSuccessful():
+            if self._jobRemoved():
+                return
+            if self.job.get('method') == 2 and not self.breakFlag and self.sourceScanAttempted:
+                # 逐个文件判断：所有目标都已验证送达的文件才删除源文件，失败的文件不再阻塞其他文件
                 self.finalizeMove()
             self.commitSourceSnapshot()
             with self._stateLock():
@@ -429,9 +460,36 @@ class JobTask:
                 finishItems = list(self.finish)
             if finishItems:
                 jobMapper.addJobTaskItemMany(finishItems)
-            self.updateTaskStatus()
+            try:
+                self.updateTaskStatus()
+            except Exception as e:
+                if not self._jobRemoved():
+                    logging.getLogger().exception(e)
         finally:
+            if self._jobRemoved():
+                # 作业在运行中被删除：清理本任务可能在删除之后写入的记录
+                try:
+                    jobMapper.deleteJobTaskByTaskId(self.taskId)
+                except Exception as e:
+                    logging.getLogger().exception(e)
             self.jobClient.finishRun(self)
+
+    def _jobRemoved(self):
+        return getattr(getattr(self, 'jobClient', None), 'removed', False) is True
+
+    def _wakeEvent(self):
+        event = self.__dict__.get('wakeEvent')
+        if event is None:
+            event = self.__dict__.setdefault('wakeEvent', threading.Event())
+        return event
+
+    def _wake(self):
+        self._wakeEvent().set()
+
+    def _waitWake(self, timeout):
+        event = self._wakeEvent()
+        event.wait(timeout)
+        event.clear()
 
     def _allOperationsSuccessful(self):
         return (not self.breakFlag
@@ -453,8 +511,14 @@ class JobTask:
         return rootPath + parent + '/', name
 
     def finalizeMove(self):
-        """Delete each eligible source file once after all targets are ready."""
+        """Delete each source file once every target holds a verified copy.
+
+        Files are decided one by one: a file that failed for any target keeps
+        its source, but no longer blocks other files that were fully delivered.
+        """
         freshSourceDirectories = {}
+        targetDirectories = {}
+        movedPaths = set()
         destinationRoots = {
             self.normalizeRoot(item) for item in self.job['dstPath'].split(':')
         }
@@ -464,6 +528,9 @@ class JobTask:
             srcPath, fileName = self.entryLocation(self.job['srcPath'], entry['path'])
             matching = [item for item in self.finish
                         if item['type'] == 2 and item['srcPath'] == srcPath and item['fileName'] == fileName]
+            if any(item['status'] != 2 for item in matching):
+                # At least one target failed: the failed item already explains why; keep the source.
+                continue
             expectedDestinations = {
                 self.entryLocation(root, entry['path'])[0]
                 for root in destinationRoots
@@ -477,6 +544,11 @@ class JobTask:
                 self.markMoveDeleteFailure(
                     matching, srcPath, fileName, entry['size'], G('move_delivery_incomplete')
                 )
+                continue
+            verifyError = self.verifyTargetCopies(sorted(expectedDestinations), fileName, entry['size'],
+                                                  targetDirectories)
+            if verifyError is not None:
+                self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], verifyError)
                 continue
             try:
                 if srcPath not in freshSourceDirectories:
@@ -494,6 +566,7 @@ class JobTask:
                 )
                 continue
             if freshEntry is None:
+                movedPaths.add(entry['path'])
                 if not matching:
                     self.copyHook(srcPath, None, fileName, entry['size'], status=2, copyType=2)
                 continue
@@ -514,8 +587,82 @@ class JobTask:
                 errMsg = G('copy_success_but_delete_fail').format(str(e))
                 self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], errMsg)
             else:
+                movedPaths.add(entry['path'])
                 if not matching:
                     self.copyHook(srcPath, None, fileName, entry['size'], status=2, copyType=2)
+        self.removeMovedDirectories(movedPaths)
+
+    def verifyTargetCopies(self, destinations, fileName, size, cache):
+        """Re-list each target directory and confirm the copy exists with the source size."""
+        for dstDir in destinations:
+            try:
+                if dstDir not in cache:
+                    _entries, details = self.readDirectory(dstDir, 0, self.job['scanIntervalT'])
+                    cache[dstDir] = details
+                detail = cache[dstDir].get(fileName)
+            except Exception as e:
+                return G('move_target_verify_failed').format(dstDir + fileName, str(e))
+            if detail is None or detail.get('isDir') or detail.get('size') != size:
+                found = '-' if detail is None else ('dir' if detail.get('isDir') else detail.get('size'))
+                return G('move_target_verify_failed').format(
+                    dstDir + fileName, G('move_target_size_mismatch').format(size, found))
+        return None
+
+    def removeMovedDirectories(self, movedPaths):
+        """Remove source subdirectories emptied by this run (#215).
+
+        A directory is removed only when at least one file below it was moved
+        in this run, nothing below it failed, and a fresh listing shows that it
+        holds no files any more (only empty subdirectories). Size-filtered,
+        excluded or failed files therefore keep their directories, and empty
+        directories that never contained a moved file are left alone.
+        """
+        self.removedSourceDirectories = set()
+        if self.breakFlag or not movedPaths:
+            return
+        root = self.normalizeRoot(self.job['srcPath'])
+        blocked = set()
+        for item in list(self.finish):
+            if item['status'] == 2 or not item.get('srcPath') or not str(item['srcPath']).startswith(root):
+                continue
+            location = str(item['srcPath'])[len(root):].strip('/')
+            if item.get('fileName') and not item.get('isPath'):
+                location = '/'.join(part for part in (location, item['fileName']) if part)
+            blocked.add(location)
+
+        def isBlocked(path):
+            return any(other == path or other.startswith(path + '/') for other in blocked)
+
+        candidates = {}
+        for path in movedPaths:
+            parts = path.split('/')[:-1]
+            for depth in range(1, len(parts) + 1):
+                candidates['/'.join(parts[:depth])] = True
+        for path in sorted(candidates, key=lambda item: (-item.count('/'), item)):
+            if self.breakFlag:
+                return
+            if isBlocked(path) or any(path.startswith(done + '/') for done in self.removedSourceDirectories):
+                continue
+            parent, name = self.entryLocation(root, path)
+            try:
+                if not self._holdsOnlyEmptyDirectories(parent + name + '/'):
+                    continue
+                self.alistClient.deleteFile(parent, [name], 0)
+            except Exception as e:
+                self.copyHook(parent + name + '/', None, None, None, status=7,
+                              errMsg=G('move_remove_dir_fail').format(str(e)), isPath=1, copyType=2)
+                continue
+            self.removedSourceDirectories.add(path)
+            self.copyHook(parent + name + '/', None, None, None, status=2, isPath=1, copyType=2)
+
+    def _holdsOnlyEmptyDirectories(self, directory, depth=0):
+        if depth > 64:
+            return False
+        children, _ = self.readDirectory(directory, 0, 0)
+        for child in children:
+            if not child.endswith('/') or not self._holdsOnlyEmptyDirectories(directory + child, depth + 1):
+                return False
+        return True
 
     def markMoveDeleteFailure(self, matching, srcPath, fileName, fileSize, errMsg):
         if matching:
@@ -527,20 +674,23 @@ class JobTask:
                           errMsg=errMsg, copyType=2)
 
     def commitSourceSnapshot(self):
-        if not self._allOperationsSuccessful():
+        if not self._allOperationsSuccessful() or self._jobRemoved():
             return
         entries = list(self.sourceSnapshot.values())
         if self.job.get('method') == 2:
             # Successfully moved files no longer exist at the source. Retain
             # directories and size-filtered files in the committed view.
+            removedDirs = getattr(self, 'removedSourceDirectories', set())
             entries = [entry for entry in entries
-                       if entry['isDir'] or not self.fileSizeAllowed(entry['size'])]
+                       if (entry['isDir'] or not self.fileSizeAllowed(entry['size']))
+                       and not any(entry['path'] == d or entry['path'].startswith(d + '/') for d in removedDirs)]
         try:
             expectedIdentity = getattr(
                 self, 'sourceSnapshotIdentity', jobMapper.sourceSnapshotIdentity(self.job)
             )
             jobMapper.replaceSourceSnapshot(
-                self.job['id'], entries, expectedIdentity=expectedIdentity
+                self.job['id'], entries, expectedIdentity=expectedIdentity,
+                fullScan=getattr(self, 'fullCompare', True)
             )
         except Exception as e:
             logger = logging.getLogger()
@@ -622,13 +772,17 @@ class JobTask:
             if any(pathsOverlap(srcPath, dstPath) for dstPath in dstPathList):
                 raise ValueError(G('source_target_overlap'))
             storedSnapshot = jobMapper.getSourceSnapshot(self.job['id'])
-            if storedSnapshot['meta']['initialized'] == 1:
+            meta = storedSnapshot['meta']
+            if meta['initialized'] == 1:
                 self.previousSourceSnapshot = {
                     item['path']: item for item in storedSnapshot['entries']
                 }
             else:
                 self.previousSourceSnapshot = None
-            if self.job.get('sourceMode') == 1 and storedSnapshot['meta']['initialized'] == 1:
+            incremental = (self.job.get('sourceMode') == 1 and meta['initialized'] == 1
+                           and not self.fullScanDue(meta))
+            self.fullCompare = not incremental
+            if incremental:
                 if self.scanSourceTree(srcPath, spec, srcPath):
                     self.syncFromSourceSnapshot(storedSnapshot['entries'], dstPathList)
             else:
@@ -638,9 +792,25 @@ class JobTask:
             logger = logging.getLogger()
             logger.exception(e)
             self.sourceScanFailed = True
+            self.recordRootFailure(str(e), True)
             self.copyHook(srcPath, None, None, None, status=7, errMsg=str(e), isPath=1)
         finally:
             self.scanFinish = True
+            self._wake()
+
+    @staticmethod
+    def fullScanDue(meta):
+        """源目录模式下按配置周期做一次完整比对，以修复目标端被手动删改的内容。"""
+        try:
+            hours = float(getConfig()['server'].get('source_full_scan_hours', 24) or 0)
+        except (TypeError, ValueError, KeyError):
+            hours = 24
+        if hours <= 0:
+            return False
+        last = meta.get('fullScanTime')
+        if not last:
+            return True
+        return time.time() - float(last) >= hours * 3600
 
     def scanSourceTree(self, path, spec, rootPath):
         """Scan the complete source tree without reading any target directory."""
@@ -680,6 +850,11 @@ class JobTask:
         removed = [entry for path, entry in previous.items()
                    if path not in current or current[path]['isDir'] != entry['isDir']]
 
+        if (self.job['method'] == 1 and previous and not current):
+            # 与普通模式一致：源目录整体变空时不按快照删除目标
+            self.protectEmptySource(self.normalizeRoot(self.job['srcPath']), ':'.join(dstPathList))
+            return
+
         for dstRoot in dstPathList:
             failedDirectoryPrefixes = []
             if self.job['method'] == 1:
@@ -709,7 +884,11 @@ class JobTask:
                         and not self.removeSnapshotDirectoryConflict(dstRoot, entry['path'], previous)):
                     continue
                 srcPath, _ = self.entryLocation(self.job['srcPath'], entry['path'])
-                self.copyFile(srcPath, parentPath, fileName, entry['size'])
+                prior = previous.get(entry['path'])
+                # 不扫描目标时只能依据快照推断目标原状态；移动模式不做推断，避免误删源文件
+                canVerify = self.job['method'] != 2 and (
+                    prior is None or prior['isDir'] or prior['size'] != entry['size'])
+                self.copyFile(srcPath, parentPath, fileName, entry['size'], canVerify=canVerify)
 
     def removeSnapshotDirectoryConflict(self, dstRoot, relativePath, previous):
         """Remove only empty, previously tracked directories blocking a file."""
@@ -777,15 +956,28 @@ class JobTask:
     def deleteSnapshotEntries(self, dstRoot, removedEntries):
         """Apply source removals known from the prior snapshot to a full-sync target."""
         # Without a target scan, a removed directory may contain excluded or
-        # independently-created target files. Delete only tracked files and
-        # retain directory shells.
+        # independently-created target files. Delete tracked files first, then
+        # remove tracked directories only when they are empty on the target.
         for entry in removedEntries:
             if entry['isDir'] or not self.fileSizeAllowed(entry['size']):
                 continue
             parentPath, name = self.entryLocation(dstRoot, entry['path'])
             self.delFile(parentPath, name, entry['size'])
+        directories = sorted((entry for entry in removedEntries if entry['isDir']),
+                             key=lambda item: (-item['path'].count('/'), item['path']))
+        for entry in directories:
+            if self.breakFlag:
+                return
+            parentPath, name = self.entryLocation(dstRoot, entry['path'])
+            try:
+                children, _ = self.readDirectory(parentPath + name + '/', 0, self.job['scanIntervalT'])
+            except Exception:
+                # 已不存在或无法读取：保留现状，不视为失败
+                continue
+            if not children:
+                self.delFile(parentPath, name + '/', None)
 
-    def copyFile(self, srcPath, dstPath, fileName, fileSize):
+    def copyFile(self, srcPath, dstPath, fileName, fileSize, canVerify=False):
         """
         复制文件
         vm.job['method']: 0-仅新增，1-全同步，2-移动模式
@@ -799,9 +991,10 @@ class JobTask:
         """
         if self.breakFlag:
             return
-        copyItem = CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self)
+        copyItem = CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self, canVerify=canVerify)
         with self._stateLock():
             self.waiting.append(copyItem)
+        self._wake()
 
     def hasFileSizeFilter(self):
         return self.job.get('minFileSize') is not None or self.job.get('maxFileSize') is not None
@@ -833,7 +1026,7 @@ class JobTask:
             errMsg = str(e)
         self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath, createTime)
 
-    def listDir(self, path, firstDst, spec, rootPath, isSrc=True):
+    def listDir(self, path, firstDst, spec, rootPath, isSrc=True, recordError=True):
         """
         列出目录
         self.job['useCacheT']: 扫描目标目录时，是否使用缓存，0-不使用，1-使用
@@ -857,13 +1050,17 @@ class JobTask:
                 self.recordSourceEntries(path, rootPath, entries, details)
             return entries
         except Exception as e:
+            if isSrc and firstDst:
+                self.sourceScanAttempted = True
+                self.sourceScanFailed = True
+            if not recordError:
+                raise
             logger = logging.getLogger()
             errMsg = G('scan_error').format(G('src' if isSrc else 'dst'), str(e))
             logger.error(errMsg)
             logger.exception(e)
-            if isSrc and firstDst:
-                self.sourceScanAttempted = True
-                self.sourceScanFailed = True
+            if path == rootPath:
+                self.recordRootFailure(errMsg, isSrc)
             self.copyHook(path if isSrc else None, None if isSrc else path, None, None, status=7, errMsg=errMsg,
                           isPath=1)
             raise e
@@ -951,10 +1148,33 @@ class JobTask:
             return
         try:
             srcFiles = self.listDir(srcPath, firstDst, spec, srcRootPath)
-            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False)
         except Exception:
             # 已在listDir做出日志打印等操作，此处啥都不用做
             return
+        isTargetRoot = dstPath == dstRootPath
+        try:
+            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, recordError=not isTargetRoot)
+        except Exception as e:
+            if not isTargetRoot:
+                return
+            dstFiles = self.recoverMissingTargetRoot(srcPath, dstPath, spec, dstRootPath, firstDst, e)
+            if dstFiles is None:
+                return
+        if self.job['method'] == 1:
+            if srcPath == srcRootPath and not srcFiles and dstFiles:
+                # 源根目录为空而目标仍有内容：常见于硬盘/NAS 掉线后只剩空挂载点，拒绝清空目标
+                self.protectEmptySource(srcPath, dstPath)
+                return
+            # 先删除目标多余项，再排队复制：在不区分大小写的目标上（Windows/SMB/macOS），
+            # 仅大小写不同的同名项若先复制后删除，会把刚复制的文件删掉；同名文件/目录类型冲突也需先清理
+            for dstKey in dstFiles.keys():
+                if self.breakFlag:
+                    return
+                if dstKey not in srcFiles:
+                    if dstKey.endswith('/') and self.hasFileSizeFilter():
+                        self.deleteTargetOnlyDir(dstPath + dstKey, spec, dstRootPath, firstDst)
+                    elif dstKey.endswith('/') or self.fileSizeAllowed(dstFiles[dstKey]):
+                        self.delFile(dstPath, dstKey, dstFiles[dstKey])
         for key in srcFiles.keys():
             # 如果是文件
             if not key.endswith('/'):
@@ -966,7 +1186,8 @@ class JobTask:
                             srcPath, srcRootPath, key
                         )
                         or key not in dstFiles or dstFiles[key] != srcFiles[key]):
-                    self.copyFile(srcPath, dstPath, key, srcFiles[key])
+                    self.copyFile(srcPath, dstPath, key, srcFiles[key],
+                                  canVerify=key not in dstFiles or dstFiles[key] != srcFiles[key])
             # 如果是目录
             else:
                 # 目标目录没有这个目录
@@ -977,13 +1198,40 @@ class JobTask:
                 else:
                     self.syncWithHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath,
                                       firstDst)
-        if self.job['method'] == 1:
-            for dstKey in dstFiles.keys():
-                if dstKey not in srcFiles:
-                    if dstKey.endswith('/') and self.hasFileSizeFilter():
-                        self.deleteTargetOnlyDir(dstPath + dstKey, spec, dstRootPath, firstDst)
-                    elif dstKey.endswith('/') or self.fileSizeAllowed(dstFiles[dstKey]):
-                        self.delFile(dstPath, dstKey, dstFiles[dstKey])
+
+    def recordRootFailure(self, errMsg, isSrc):
+        """记录根目录级别的失败，任务最终以“失败”结束而不是“部分失败”。"""
+        if isSrc:
+            if getattr(self, 'fatalError', None) is None:
+                self.fatalError = errMsg
+        else:
+            self.failedTargetRoots = getattr(self, 'failedTargetRoots', 0) + 1
+            if getattr(self, 'targetRootError', None) is None:
+                self.targetRootError = errMsg
+
+    def protectEmptySource(self, srcPath, dstPath):
+        errMsg = G('source_empty_protect').format(srcPath, dstPath)
+        logging.getLogger().warning(errMsg)
+        self.sourceScanFailed = True
+        self.recordRootFailure(errMsg, True)
+        self.copyHook(srcPath, dstPath, None, None, status=7, errMsg=errMsg, isPath=1)
+
+    def recoverMissingTargetRoot(self, srcPath, dstPath, spec, dstRootPath, firstDst, error):
+        """目标根目录无法列出时尝试创建它；仍无法列出则按目标扫描失败记录。"""
+        if not self.breakFlag:
+            try:
+                self.alistClient.mkdir(dstPath, self.job['scanIntervalT'])
+                dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, recordError=False)
+            except Exception:
+                pass
+            else:
+                if not dstFiles:
+                    self.copyHook(srcPath, dstPath, None, None, status=2, isPath=1)
+                return dstFiles
+        errMsg = G('scan_error').format(G('dst'), str(error))
+        self.recordRootFailure(errMsg, False)
+        self.copyHook(None, dstPath, None, None, status=7, errMsg=errMsg, isPath=1)
+        return None
 
     def syncWithOutHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
         """
@@ -1020,7 +1268,7 @@ class JobTask:
             if key.endswith('/'):
                 self.syncWithOutHave(srcPath + key, dstPath + key, spec, srcRootPath, dstRootPath, firstDst)
             elif self.fileSizeAllowed(srcFiles[key]):
-                self.copyFile(srcPath, dstPath, key, srcFiles[key])
+                self.copyFile(srcPath, dstPath, key, srcFiles[key], canVerify=True)
 
     def updateTaskStatus(self):
         """
@@ -1029,11 +1277,18 @@ class JobTask:
         self.getCurrent()
         failOrOtherNum = len(self.currentTasks[7]) + len(self.currentTasks[-1])
         errMsg = None
+        dstCount = len([item for item in str(self.job.get('dstPath') or '').split(':') if item]) or 1
         if getattr(self, 'timedOut', False):
             status = 5
             errMsg = G('task_timeout_abort').format(self.taskId, round(self.timeoutSeconds / 3600, 2))
         elif self.breakFlag:
             status = 7
+        elif getattr(self, 'fatalError', None):
+            status = 6
+            errMsg = self.fatalError
+        elif getattr(self, 'failedTargetRoots', 0) >= dstCount:
+            status = 6
+            errMsg = self.targetRootError
         else:
             status = 2 if failOrOtherNum == 0 else 3
         taskService.updateJobTaskStatus(self.taskId, status, errMsg, taskList=self.currentTasks,
@@ -1060,6 +1315,8 @@ class JobClient:
         self.scheduledJob = None
         self.jobDoing = False
         self.runLock = threading.Lock()
+        # 作业已被删除（运行中的任务据此清理自身记录）
+        self.removed = False
         # 正在执行中的作业信息；仅在内存中，不入库，高速读写；执行完毕后批量入库，如果遇到异常终止，不会补偿入库
         # 单项结构 {
         #   'taskId':   所属任务id

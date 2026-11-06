@@ -30,7 +30,8 @@ def getConfig():
             'console_level': 2,
             'log_save': 7,
             'task_save': 0,
-            'timeout': 72
+            'timeout': 72,
+            'source_full_scan_hours': 24
         }
         textCfg = {
             'aliyun_auth_server': ''
@@ -68,6 +69,7 @@ def getConfig():
                 sCfg['log_save'] = int(os.getenv('TAO_LOG_SAVE', 7))
                 sCfg['task_save'] = int(os.getenv('TAO_TASK_SAVE', 0))
                 sCfg['timeout'] = int(os.getenv('TAO_TASK_TIMEOUT', 72))
+                sCfg['source_full_scan_hours'] = int(os.getenv('TAO_SOURCE_FULL_SCAN_HOURS', 24))
                 textCfg['aliyun_auth_server'] = os.getenv('TAO_ALIYUN_AUTH_SERVER', '').strip()
             except Exception as e:
                 logger = logging.getLogger()

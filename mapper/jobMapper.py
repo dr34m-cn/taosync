@@ -159,13 +159,14 @@ def deleteJob(conn, jobId):
 def getSourceSnapshot(conn, jobId):
     conn.execute("begin")
     metaRow = conn.execute(
-        "select jobId, initialized, scanTime, entryCount "
+        "select jobId, initialized, scanTime, entryCount, fullScanTime "
         "from job_source_snapshot_meta where jobId=?", (jobId,)).fetchone()
-    meta = dict(zip(('jobId', 'initialized', 'scanTime', 'entryCount'), metaRow)) if metaRow else {
+    meta = dict(zip(('jobId', 'initialized', 'scanTime', 'entryCount', 'fullScanTime'), metaRow)) if metaRow else {
         'jobId': int(jobId),
         'initialized': 0,
         'scanTime': None,
         'entryCount': 0,
+        'fullScanTime': None,
     }
     entryRows = conn.execute(
         "select path, isDir, size, fingerprint from job_source_snapshot "
@@ -181,7 +182,7 @@ def getSourceSnapshot(conn, jobId):
 
 
 @sqlBase.connect_sql
-def replaceSourceSnapshot(conn, jobId, entries, expectedIdentity=None):
+def replaceSourceSnapshot(conn, jobId, entries, expectedIdentity=None, fullScan=True):
     rowsByPath = {}
     for entry in entries:
         path = entry['path']
@@ -219,12 +220,14 @@ def replaceSourceSnapshot(conn, jobId, entries, expectedIdentity=None):
             conn.executemany(
                 "insert into job_source_snapshot(jobId, path, isDir, size, fingerprint) "
                 "values (?, ?, ?, ?, ?)", rows)
+        # fullScanTime 只在完整比对（扫描了目标）后更新，增量运行保留原值
         conn.execute(
-            "insert into job_source_snapshot_meta(jobId, initialized, scanTime, entryCount) "
-            "values (?, 1, ?, ?) "
+            "insert into job_source_snapshot_meta(jobId, initialized, scanTime, entryCount, fullScanTime) "
+            "values (?, 1, ?, ?, ?) "
             "on conflict(jobId) do update set initialized=1, "
-            "scanTime=excluded.scanTime, entryCount=excluded.entryCount",
-            (jobId, scanTime, len(rows)),
+            "scanTime=excluded.scanTime, entryCount=excluded.entryCount, "
+            "fullScanTime=coalesce(excluded.fullScanTime, job_source_snapshot_meta.fullScanTime)",
+            (jobId, scanTime, len(rows), scanTime if fullScan else None),
         )
         conn.commit()
     except Exception:
@@ -324,6 +327,29 @@ def updateJobTaskStatusByStatus():
 def updateJobTaskStatusByStatusAndJobId(jobId):
     # 用于任务禁用，更新所有未完成的任务为中止
     sqlBase.execute_update("update job_task set status=4 where status in (0, 1) and jobId=?", (jobId,))
+
+
+@sqlBase.connect_sql
+def deleteOrphanRows(conn):
+    """清理所属作业/任务已不存在的记录（例如旧版本在作业运行中被删除时遗留）。"""
+    try:
+        conn.execute("begin immediate")
+        removed = 0
+        for sql in (
+                "delete from job_task where not exists (select 1 from job where job.id = job_task.jobId)",
+                "delete from job_task_item where not exists "
+                "(select 1 from job_task where job_task.id = job_task_item.taskId)",
+                "delete from job_source_snapshot where not exists "
+                "(select 1 from job where job.id = job_source_snapshot.jobId)",
+                "delete from job_source_snapshot_meta where not exists "
+                "(select 1 from job where job.id = job_source_snapshot_meta.jobId)",
+        ):
+            removed += conn.execute(sql).rowcount
+        conn.commit()
+        return removed
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def deleteJobTaskByTaskId(taskId):

@@ -42,6 +42,7 @@ class _CopyTask:
         self.lock = threading.Lock()
         self.thread = None
         self.delete_when_done = False
+        self.finished = threading.Event()
 
     def start(self):
         self.thread = threading.Thread(target=self._run, name="taosync-copy-" + self.id[:8], daemon=True)
@@ -108,6 +109,7 @@ class _CopyTask:
         finally:
             with self.lock:
                 delete_when_done = self.delete_when_done
+            self.finished.set()
             if delete_when_done:
                 self.client._forgetTask(self.id, self)
 
@@ -243,7 +245,10 @@ class TaoSyncClient:
                 cached = self.entry_cache.get(cache_key)
             if cached and time.monotonic() - cached[0] < self.cache_ttl:
                 return [dict(item) for item in cached[1]]
-        entries = self.getDriver(mount).list(relative, details=True)
+        try:
+            entries = self.getDriver(mount).list(relative, details=True)
+        except FileNotFoundError:
+            raise FileNotFoundError("directory not found: " + normalized)
         with self.entry_cache_lock:
             self.entry_cache[cache_key] = (time.monotonic(), [dict(item) for item in entries])
         return entries
@@ -359,6 +364,13 @@ class TaoSyncClient:
 
     def taskInfo(self, taskId):
         return self._task(taskId).info()
+
+    def waitTask(self, taskId, timeout):
+        """Block until the copy task finishes or the timeout elapses."""
+        with self.tasks_lock:
+            task = self.tasks.get(str(taskId))
+        if task is not None:
+            task.finished.wait(timeout)
 
     def copyTaskDone(self):
         with self.tasks_lock:

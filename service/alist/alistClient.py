@@ -2,11 +2,21 @@
 @Author：dr34m
 @Date  ：2024/7/4 13:57 
 """
+import threading
+import time
+
 import requests
 
 from common.fileFingerprint import fileFingerprint
 from common.intervalGate import IntervalGate
 from common.LNG import G
+
+
+# OpenList/AList 中不缓存目录列表的驱动（driver config NoCache）。对这些存储发送 refresh=true 没有
+# 刷新缓存的作用，但 OpenList 本地存储开启“目录大小”后，每次 refresh 都会重新计算整个存储的目录大小，
+# 导致列目录耗时数分钟（#218）。
+NO_CACHE_DRIVERS = {'local'}
+STORAGE_CACHE_SECONDS = 300
 
 
 def checkExs(path, rts, spec):
@@ -44,6 +54,10 @@ class AlistClient:
         self.token = token
         # 按根目录排队的扫描间隔控制
         self.waitGate = IntervalGate()
+        # 挂载路径 -> 驱动名，用于判断是否需要 refresh
+        self.storageDrivers = None
+        self.storageDriversTime = 0.0
+        self.storageLock = threading.Lock()
         self.getUser()
 
     def req(self, method, url, data=None, params=None):
@@ -131,6 +145,37 @@ class AlistClient:
         pathFirst = parts[1] if len(parts) > 1 else parts[0]
         self.waitGate.wait(pathFirst, scanInterval)
 
+    def _storageDriverMap(self):
+        now = time.monotonic()
+        with self.storageLock:
+            if self.storageDrivers is not None and now - self.storageDriversTime < STORAGE_CACHE_SECONDS:
+                return self.storageDrivers
+        drivers = {}
+        try:
+            data = self.get('/api/admin/storage/list') or {}
+            for item in data.get('content') or []:
+                mount = '/' + str(item.get('mount_path') or '').strip('/')
+                drivers[mount] = str(item.get('driver') or '').strip().lower()
+        except Exception:
+            # 非管理员令牌或旧版本接口不可用：保持原有行为（总是 refresh）
+            drivers = {}
+        with self.storageLock:
+            self.storageDrivers = drivers
+            self.storageDriversTime = now
+        return drivers
+
+    def shouldRefresh(self, path, useCache=0):
+        """未开启缓存时请求 refresh；但对不缓存的存储（如本地存储）跳过，避免触发昂贵的重新计算。"""
+        if useCache == 1:
+            return False
+        normalized = '/' + str(path).strip('/')
+        best = None
+        for mount, driver in self._storageDriverMap().items():
+            if normalized == mount or normalized.startswith(mount.rstrip('/') + '/'):
+                if best is None or len(mount) > len(best[0]):
+                    best = (mount, driver)
+        return not (best is not None and best[1] in NO_CACHE_DRIVERS)
+
     def fileListApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """
         目录列表
@@ -157,7 +202,7 @@ class AlistClient:
         self.checkWait(path, scanInterval)
         res = self.post('/api/fs/list', data={
             'path': path,
-            'refresh': useCache != 1
+            'refresh': self.shouldRefresh(path, useCache)
         })['content']
         if res is not None:
             rts = {
@@ -187,7 +232,7 @@ class AlistClient:
         """
         res = self.post('/api/fs/list', data={
             'path': path,
-            'refresh': True
+            'refresh': self.shouldRefresh(path)
         })['content']
         if res is not None:
             return [{'path': item['name']} for item in res if item['is_dir']]

@@ -53,6 +53,12 @@ def initJob():
     :return:
     """
     logger = logging.getLogger()
+    try:
+        removed = jobMapper.deleteOrphanRows()
+        if removed:
+            logger.info(f"已清理 {removed} 条无主任务记录")
+    except Exception as e:
+        logger.exception(e)
     jobMapper.updateJobTaskStatusByStatus()
     jobList = jobMapper.getJobList()
     for item in jobList:
@@ -158,6 +164,9 @@ def editJobClient(job):
     client = getJobClientById(jobId)
     if client.job['enable'] == 1 and client.job['isCron'] != 2:
         raise Exception(G('disable_then_edit'))
+    if client.runLock.locked():
+        # 运行中（含禁用后仍在收尾）的作业不允许编辑，否则会静默中止当前任务并可能与新任务重叠
+        raise Exception(G('job_running_cannot_edit'))
     clearSnapshot = any(client.job.get(key) != job.get(key) for key in SOURCE_SNAPSHOT_FIELDS)
     oldJob = client.job.copy()
     client.stopJob(remove=True)
@@ -227,6 +236,8 @@ def removeJobClient(jobId):
     """
     jobId = int(jobId)
     client = getJobClientById(jobId)
+    # 先标记，运行中的任务结束时据此跳过入库并清理自身记录
+    client.removed = True
     client.stopJob(remove=True)
     jobMapper.deleteJob(jobId)
     global jobClientList

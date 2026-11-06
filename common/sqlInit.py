@@ -123,7 +123,8 @@ def init_sql(conn):
                        "jobId integer primary key,"
                        "initialized integer DEFAULT 0,"
                        "scanTime integer DEFAULT NULL,"
-                       "entryCount integer DEFAULT 0"
+                       "entryCount integer DEFAULT 0,"
+                       "fullScanTime integer DEFAULT NULL"  # 最近一次完整比对（扫描目标）的时间
                        ")")
         cursor.execute("create table job_source_snapshot("
                        "jobId integer not null,"
@@ -326,6 +327,11 @@ def init_sql(conn):
     if 'fingerprint' not in snapshotColumns:
         cursor.execute("alter table job_source_snapshot "
                        "add column fingerprint text DEFAULT NULL")
+    cursor.execute("pragma table_info(job_source_snapshot_meta)")
+    snapshotMetaColumns = {row[1] for row in cursor.fetchall()}
+    if 'fullScanTime' not in snapshotMetaColumns:
+        cursor.execute("alter table job_source_snapshot_meta "
+                       "add column fullScanTime integer DEFAULT NULL")
     cursor.execute("create unique index if not exists idx_alist_system_key "
                    "on alist_list(systemKey) where systemKey is not null")
     # 查询索引：新库与任意旧版本升级都会执行，if not exists 保证幂等

@@ -147,7 +147,7 @@ class FileSizeFilterSyncTest(unittest.TestCase):
         task.breakFlag = False
         task.copy_operations = []
         task.delete_operations = []
-        task.copyFile = lambda src, dst, name, size: task.copy_operations.append(
+        task.copyFile = lambda src, dst, name, size, **_kwargs: task.copy_operations.append(
             (src, dst, name, size)
         )
         task.delFile = lambda path, name, size: task.delete_operations.append(
@@ -164,7 +164,7 @@ class FileSizeFilterSyncTest(unittest.TestCase):
             'at-max.bin': 200,
             'above.bin': 201,
         }
-        task.listDir = lambda _path, _first, _spec, _root, isSrc=True: (
+        task.listDir = lambda _path, _first, _spec, _root, isSrc=True, **_kwargs: (
             source if isSrc else {}
         )
 
@@ -179,7 +179,7 @@ class FileSizeFilterSyncTest(unittest.TestCase):
         task = self._task(method=1)
         source = {'filtered.bin': 99}
         target = {'filtered.bin': 150}
-        task.listDir = lambda _path, _first, _spec, _root, isSrc=True: (
+        task.listDir = lambda _path, _first, _spec, _root, isSrc=True, **_kwargs: (
             source if isSrc else target
         )
 
@@ -198,11 +198,11 @@ class FileSizeFilterSyncTest(unittest.TestCase):
             'at-max.bin': 200,
             'above.bin': 201,
         }
-        task.listDir = lambda _path, _first, _spec, _root, isSrc=True: (
+        task.listDir = lambda _path, _first, _spec, _root, isSrc=True, **_kwargs: (
             source if isSrc else target
         )
 
-        task.syncWithHave('/src/', '/dst/', None, '/src/', '/dst/', True)
+        task.syncWithHave('/src/', '/dst/', None, '/', '/', True)  # below the job root: empty-source guard N/A
 
         self.assertEqual(
             [item[1] for item in task.delete_operations],
@@ -224,11 +224,11 @@ class FileSizeFilterSyncTest(unittest.TestCase):
                 'above.bin': 201,
             },
         }
-        task.listDir = lambda path, _first, _spec, _root, isSrc=True: listings[
+        task.listDir = lambda path, _first, _spec, _root, isSrc=True, **_kwargs: listings[
             (path, isSrc)
         ]
 
-        task.syncWithHave('/src/', '/dst/', None, '/src/', '/dst/', True)
+        task.syncWithHave('/src/', '/dst/', None, '/', '/', True)  # below the job root: empty-source guard N/A
 
         self.assertEqual(
             task.delete_operations,
@@ -259,11 +259,11 @@ class FileSizeFilterSyncTest(unittest.TestCase):
         task = self._task(method=1, min_size=None, max_size=None)
         source = {}
         target = {'extra/': {}}
-        task.listDir = lambda _path, _first, _spec, _root, isSrc=True: (
+        task.listDir = lambda _path, _first, _spec, _root, isSrc=True, **_kwargs: (
             source if isSrc else target
         )
 
-        task.syncWithHave('/src/', '/dst/', None, '/src/', '/dst/', True)
+        task.syncWithHave('/src/', '/dst/', None, '/', '/', True)  # below the job root: empty-source guard N/A
 
         self.assertEqual(task.delete_operations, [('/dst/', 'extra/', {})])
 
