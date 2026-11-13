@@ -4,6 +4,8 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py ./
+RUN mkdir -p /app/data
 
+VOLUME ["/app/data"]
 EXPOSE 8030
-CMD ["python", "app.py", "--config", "/app/config.yaml"]
+CMD ["python", "app.py"]

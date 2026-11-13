@@ -584,7 +584,7 @@ def make_app(config, oauth=None, store=None):
 
 def main():
     parser = argparse.ArgumentParser(description="TaoSync public OAuth service")
-    parser.add_argument("--config", default=str(Path(__file__).with_name("config.yaml")))
+    parser.add_argument("--config", default="data/config.yaml")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config = load_config(args.config)
