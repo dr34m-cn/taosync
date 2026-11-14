@@ -1,6 +1,7 @@
 name: 构建
 
 on:
+  workflow_dispatch:
   push:
     branches: [ 'main' ]
     paths: [ 'version.txt' ]
@@ -121,7 +122,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           outputs: |
-            type=docker
+            type=docker,name=taosync-extract:${{ env.PLATFORM_PAIR }}
             type=image,name=${{ env.DOCKER_USER }}/${{ env.DOCKER_NAME }},push-by-digest=true,name-canonical=true,push=true
 
       - name: 导出digest
@@ -139,9 +140,13 @@ jobs:
 
       - name: 从镜像中提取可执行文件
         run: |
-          docker create --name tmp ${{ steps.build-image.outputs.imageid }} /bin/true
-          docker cp tmp:/app/${{ env.APP_NAME }} ${{ env.APP_NAME }}
-          tar czf "$APP_NAME-$VERSION-$PLATFORM_PAIR.tar.gz" ${{ env.APP_NAME }}
+          set -euo pipefail
+          container="extract-${PLATFORM_PAIR}"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker create --name "$container" --platform "${{ matrix.platform }}" \
+            "taosync-extract:${PLATFORM_PAIR}" /bin/true
+          docker cp "$container:/app/$APP_NAME" "$APP_NAME"
+          tar czf "$APP_NAME-$VERSION-$PLATFORM_PAIR.tar.gz" "$APP_NAME"
 
       - name: 上传可执行文件到artifact
         uses: actions/upload-artifact@v4
