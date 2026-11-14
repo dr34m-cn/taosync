@@ -44,35 +44,181 @@ I originally created this project to preserve photos of Taotao as she grows up, 
 
 <summary>Click to view screenshots</summary>
 
-TaoSync is updated frequently, so these screenshots are for reference only. Refer to the current interface for the latest design.
-
-#### Job Details
-
-![Job details](./README/作业详情.jpg)
-
-#### Engine Management
-
-![Engine list](./README/引擎列表.png)
-
-#### Edit Engine
-
-![Edit engine](./README/引擎编辑.png)
-
-#### Create Job
-
-![Create job](./README/新建作业.jpg)
-
-#### Job List
-
-![Job list](./README/作业列表.png)
-
-#### Task Details
-
-![Task details](./README/任务详情.png)
-
-#### Notification Settings
-
-![Notification settings](./README/通知配置.jpg)
+<table>
+  <thead>
+    <tr>
+      <th width="78%">Desktop</th>
+      <th width="22%">Mobile</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><th colspan="2" align="left">Job Management</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/jobs-desktop.png"><img src="./README/screenshots/jobs-desktop.png" alt="Job Management - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/jobs-mobile.png"><img src="./README/screenshots/jobs-mobile.png" alt="Job Management - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Dark Mode</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/jobs-dark-desktop.png"><img src="./README/screenshots/jobs-dark-desktop.png" alt="Dark Mode - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/jobs-dark-mobile.png"><img src="./README/screenshots/jobs-dark-mobile.png" alt="Dark Mode - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Job Configuration Overview</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-options-desktop.png"><img src="./README/screenshots/job-options-desktop.png" alt="Job Configuration Overview - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-options-mobile.png"><img src="./README/screenshots/job-options-mobile.png" alt="Job Configuration Overview - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Create Job</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-create-desktop.png"><img src="./README/screenshots/job-create-desktop.png" alt="Create Job - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-create-mobile.png"><img src="./README/screenshots/job-create-mobile.png" alt="Create Job - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Edit Job</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-edit-desktop.png"><img src="./README/screenshots/job-edit-desktop.png" alt="Edit Job - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-edit-mobile.png"><img src="./README/screenshots/job-edit-mobile.png" alt="Edit Job - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Scanning and Filters</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-filters-desktop.png"><img src="./README/screenshots/job-filters-desktop.png" alt="Scanning and Filters - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-filters-mobile.png"><img src="./README/screenshots/job-filters-mobile.png" alt="Scanning and Filters - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Select Sync Directory</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/path-picker-desktop.png"><img src="./README/screenshots/path-picker-desktop.png" alt="Select Sync Directory - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/path-picker-mobile.png"><img src="./README/screenshots/path-picker-mobile.png" alt="Select Sync Directory - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Live Sync Progress</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-live-desktop.png"><img src="./README/screenshots/job-live-desktop.png" alt="Live Sync Progress - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-live-mobile.png"><img src="./README/screenshots/job-live-mobile.png" alt="Live Sync Progress - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Task History</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-history-desktop.png"><img src="./README/screenshots/job-history-desktop.png" alt="Task History - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-history-mobile.png"><img src="./README/screenshots/job-history-mobile.png" alt="Task History - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Task File Details</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/task-files-desktop.png"><img src="./README/screenshots/task-files-desktop.png" alt="Task File Details - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/task-files-mobile.png"><img src="./README/screenshots/task-files-mobile.png" alt="Task File Details - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">File Path Details</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/task-paths-desktop.png"><img src="./README/screenshots/task-paths-desktop.png" alt="File Path Details - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/task-paths-mobile.png"><img src="./README/screenshots/task-paths-mobile.png" alt="File Path Details - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Filter Failed Files</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/task-filter-desktop.png"><img src="./README/screenshots/task-filter-desktop.png" alt="Filter Failed Files - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/task-filter-mobile.png"><img src="./README/screenshots/task-filter-mobile.png" alt="Filter Failed Files - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Engine Management</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/engines-desktop.png"><img src="./README/screenshots/engines-desktop.png" alt="Engine Management - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/engines-mobile.png"><img src="./README/screenshots/engines-mobile.png" alt="Engine Management - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Add Engine</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/engine-create-desktop.png"><img src="./README/screenshots/engine-create-desktop.png" alt="Add Engine - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/engine-create-mobile.png"><img src="./README/screenshots/engine-create-mobile.png" alt="Add Engine - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Edit Engine</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/engine-edit-desktop.png"><img src="./README/screenshots/engine-edit-desktop.png" alt="Edit Engine - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/engine-edit-mobile.png"><img src="./README/screenshots/engine-edit-mobile.png" alt="Edit Engine - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Directory Management</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directories-desktop.png"><img src="./README/screenshots/directories-desktop.png" alt="Directory Management - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directories-mobile.png"><img src="./README/screenshots/directories-mobile.png" alt="Directory Management - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Add Directory</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-create-desktop.png"><img src="./README/screenshots/directory-create-desktop.png" alt="Add Directory - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-create-mobile.png"><img src="./README/screenshots/directory-create-mobile.png" alt="Add Directory - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Local Directory Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-local-desktop.png"><img src="./README/screenshots/directory-local-desktop.png" alt="Local Directory Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-local-mobile.png"><img src="./README/screenshots/directory-local-mobile.png" alt="Local Directory Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Browse Local Directories</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/local-browser-desktop.png"><img src="./README/screenshots/local-browser-desktop.png" alt="Browse Local Directories - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/local-browser-mobile.png"><img src="./README/screenshots/local-browser-mobile.png" alt="Browse Local Directories - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">SMB Directory Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-smb-desktop.png"><img src="./README/screenshots/directory-smb-desktop.png" alt="SMB Directory Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-smb-mobile.png"><img src="./README/screenshots/directory-smb-mobile.png" alt="SMB Directory Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Discover Network Devices</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/smb-devices-desktop.png"><img src="./README/screenshots/smb-devices-desktop.png" alt="Discover Network Devices - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/smb-devices-mobile.png"><img src="./README/screenshots/smb-devices-mobile.png" alt="Discover Network Devices - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Discover Shared Directories</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/smb-shares-desktop.png"><img src="./README/screenshots/smb-shares-desktop.png" alt="Discover Shared Directories - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/smb-shares-mobile.png"><img src="./README/screenshots/smb-shares-mobile.png" alt="Discover Shared Directories - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">FTP Directory Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-ftp-desktop.png"><img src="./README/screenshots/directory-ftp-desktop.png" alt="FTP Directory Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-ftp-mobile.png"><img src="./README/screenshots/directory-ftp-mobile.png" alt="FTP Directory Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">SFTP Directory Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-sftp-desktop.png"><img src="./README/screenshots/directory-sftp-desktop.png" alt="SFTP Directory Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-sftp-mobile.png"><img src="./README/screenshots/directory-sftp-mobile.png" alt="SFTP Directory Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Browse SFTP Directories</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/sftp-browser-desktop.png"><img src="./README/screenshots/sftp-browser-desktop.png" alt="Browse SFTP Directories - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/sftp-browser-mobile.png"><img src="./README/screenshots/sftp-browser-mobile.png" alt="Browse SFTP Directories - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Aliyun Drive Directory Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-aliyun-desktop.png"><img src="./README/screenshots/directory-aliyun-desktop.png" alt="Aliyun Drive Directory Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-aliyun-mobile.png"><img src="./README/screenshots/directory-aliyun-mobile.png" alt="Aliyun Drive Directory Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Notification Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/notifications-desktop.png"><img src="./README/screenshots/notifications-desktop.png" alt="Notification Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/notifications-mobile.png"><img src="./README/screenshots/notifications-mobile.png" alt="Notification Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Edit Notification</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/notification-edit-desktop.png"><img src="./README/screenshots/notification-edit-desktop.png" alt="Edit Notification - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/notification-edit-mobile.png"><img src="./README/screenshots/notification-edit-mobile.png" alt="Edit Notification - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Custom Notification</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/notification-webhook-desktop.png"><img src="./README/screenshots/notification-webhook-desktop.png" alt="Custom Notification - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/notification-webhook-mobile.png"><img src="./README/screenshots/notification-webhook-mobile.png" alt="Custom Notification - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">System Settings</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/settings-desktop.png"><img src="./README/screenshots/settings-desktop.png" alt="System Settings - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/settings-mobile.png"><img src="./README/screenshots/settings-mobile.png" alt="System Settings - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Change Password</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/change-password-desktop.png"><img src="./README/screenshots/change-password-desktop.png" alt="Change Password - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/change-password-mobile.png"><img src="./README/screenshots/change-password-mobile.png" alt="Change Password - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Sign In</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/login-desktop.png"><img src="./README/screenshots/login-desktop.png" alt="Sign In - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/login-mobile.png"><img src="./README/screenshots/login-mobile.png" alt="Sign In - Mobile" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">Reset Password</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/reset-password-desktop.png"><img src="./README/screenshots/reset-password-desktop.png" alt="Reset Password - Desktop" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/reset-password-mobile.png"><img src="./README/screenshots/reset-password-mobile.png" alt="Reset Password - Mobile" width="100%" /></a></td>
+    </tr>
+  </tbody>
+</table>
 
 </details>
 

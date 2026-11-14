@@ -41,38 +41,183 @@
 **如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
 <details>
-
 <summary>点击展开截图</summary>
 
-由于更新频繁，截图仅供参考，以实际为准
-
-#### 作业详情
-
-![作业详情](./README/作业详情.jpg)
-
-#### 引擎管理
-
-![引擎列表](./README/引擎列表.png)
-
-#### 引擎编辑
-
-![引擎编辑](./README/引擎编辑.png)
-
-#### 新建作业
-
-![新建作业](./README/新建作业.jpg)
-
-#### 作业列表
-
-![作业列表](./README/作业列表.png)
-
-#### 任务详情
-
-![任务详情](./README/任务详情.png)
-
-#### 通知配置
-
-![通知配置](./README/通知配置.jpg)
+<table>
+  <thead>
+    <tr>
+      <th width="78%">PC</th>
+      <th width="22%">手机</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><th colspan="2" align="left">作业管理</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/jobs-desktop.png"><img src="./README/screenshots/jobs-desktop.png" alt="作业管理 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/jobs-mobile.png"><img src="./README/screenshots/jobs-mobile.png" alt="作业管理 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">深色模式</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/jobs-dark-desktop.png"><img src="./README/screenshots/jobs-dark-desktop.png" alt="深色模式 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/jobs-dark-mobile.png"><img src="./README/screenshots/jobs-dark-mobile.png" alt="深色模式 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">作业配置概览</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-options-desktop.png"><img src="./README/screenshots/job-options-desktop.png" alt="作业配置概览 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-options-mobile.png"><img src="./README/screenshots/job-options-mobile.png" alt="作业配置概览 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">新建作业</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-create-desktop.png"><img src="./README/screenshots/job-create-desktop.png" alt="新建作业 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-create-mobile.png"><img src="./README/screenshots/job-create-mobile.png" alt="新建作业 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">编辑作业</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-edit-desktop.png"><img src="./README/screenshots/job-edit-desktop.png" alt="编辑作业 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-edit-mobile.png"><img src="./README/screenshots/job-edit-mobile.png" alt="编辑作业 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">扫描与过滤配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-filters-desktop.png"><img src="./README/screenshots/job-filters-desktop.png" alt="扫描与过滤配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-filters-mobile.png"><img src="./README/screenshots/job-filters-mobile.png" alt="扫描与过滤配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">选择同步目录</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/path-picker-desktop.png"><img src="./README/screenshots/path-picker-desktop.png" alt="选择同步目录 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/path-picker-mobile.png"><img src="./README/screenshots/path-picker-mobile.png" alt="选择同步目录 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">实时同步进度</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-live-desktop.png"><img src="./README/screenshots/job-live-desktop.png" alt="实时同步进度 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-live-mobile.png"><img src="./README/screenshots/job-live-mobile.png" alt="实时同步进度 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">任务历史</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/job-history-desktop.png"><img src="./README/screenshots/job-history-desktop.png" alt="任务历史 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/job-history-mobile.png"><img src="./README/screenshots/job-history-mobile.png" alt="任务历史 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">任务文件明细</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/task-files-desktop.png"><img src="./README/screenshots/task-files-desktop.png" alt="任务文件明细 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/task-files-mobile.png"><img src="./README/screenshots/task-files-mobile.png" alt="任务文件明细 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">文件路径详情</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/task-paths-desktop.png"><img src="./README/screenshots/task-paths-desktop.png" alt="文件路径详情 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/task-paths-mobile.png"><img src="./README/screenshots/task-paths-mobile.png" alt="文件路径详情 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">筛选失败文件</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/task-filter-desktop.png"><img src="./README/screenshots/task-filter-desktop.png" alt="筛选失败文件 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/task-filter-mobile.png"><img src="./README/screenshots/task-filter-mobile.png" alt="筛选失败文件 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">引擎管理</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/engines-desktop.png"><img src="./README/screenshots/engines-desktop.png" alt="引擎管理 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/engines-mobile.png"><img src="./README/screenshots/engines-mobile.png" alt="引擎管理 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">新增引擎</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/engine-create-desktop.png"><img src="./README/screenshots/engine-create-desktop.png" alt="新增引擎 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/engine-create-mobile.png"><img src="./README/screenshots/engine-create-mobile.png" alt="新增引擎 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">编辑引擎</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/engine-edit-desktop.png"><img src="./README/screenshots/engine-edit-desktop.png" alt="编辑引擎 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/engine-edit-mobile.png"><img src="./README/screenshots/engine-edit-mobile.png" alt="编辑引擎 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">目录管理</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directories-desktop.png"><img src="./README/screenshots/directories-desktop.png" alt="目录管理 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directories-mobile.png"><img src="./README/screenshots/directories-mobile.png" alt="目录管理 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">新增目录</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-create-desktop.png"><img src="./README/screenshots/directory-create-desktop.png" alt="新增目录 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-create-mobile.png"><img src="./README/screenshots/directory-create-mobile.png" alt="新增目录 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">本地目录配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-local-desktop.png"><img src="./README/screenshots/directory-local-desktop.png" alt="本地目录配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-local-mobile.png"><img src="./README/screenshots/directory-local-mobile.png" alt="本地目录配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">浏览本地目录</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/local-browser-desktop.png"><img src="./README/screenshots/local-browser-desktop.png" alt="浏览本地目录 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/local-browser-mobile.png"><img src="./README/screenshots/local-browser-mobile.png" alt="浏览本地目录 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">SMB 目录配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-smb-desktop.png"><img src="./README/screenshots/directory-smb-desktop.png" alt="SMB 目录配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-smb-mobile.png"><img src="./README/screenshots/directory-smb-mobile.png" alt="SMB 目录配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">发现局域网设备</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/smb-devices-desktop.png"><img src="./README/screenshots/smb-devices-desktop.png" alt="发现局域网设备 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/smb-devices-mobile.png"><img src="./README/screenshots/smb-devices-mobile.png" alt="发现局域网设备 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">发现共享目录</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/smb-shares-desktop.png"><img src="./README/screenshots/smb-shares-desktop.png" alt="发现共享目录 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/smb-shares-mobile.png"><img src="./README/screenshots/smb-shares-mobile.png" alt="发现共享目录 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">FTP 目录配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-ftp-desktop.png"><img src="./README/screenshots/directory-ftp-desktop.png" alt="FTP 目录配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-ftp-mobile.png"><img src="./README/screenshots/directory-ftp-mobile.png" alt="FTP 目录配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">SFTP 目录配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-sftp-desktop.png"><img src="./README/screenshots/directory-sftp-desktop.png" alt="SFTP 目录配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-sftp-mobile.png"><img src="./README/screenshots/directory-sftp-mobile.png" alt="SFTP 目录配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">浏览 SFTP 目录</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/sftp-browser-desktop.png"><img src="./README/screenshots/sftp-browser-desktop.png" alt="浏览 SFTP 目录 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/sftp-browser-mobile.png"><img src="./README/screenshots/sftp-browser-mobile.png" alt="浏览 SFTP 目录 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">阿里云盘目录配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/directory-aliyun-desktop.png"><img src="./README/screenshots/directory-aliyun-desktop.png" alt="阿里云盘目录配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/directory-aliyun-mobile.png"><img src="./README/screenshots/directory-aliyun-mobile.png" alt="阿里云盘目录配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">通知配置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/notifications-desktop.png"><img src="./README/screenshots/notifications-desktop.png" alt="通知配置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/notifications-mobile.png"><img src="./README/screenshots/notifications-mobile.png" alt="通知配置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">编辑通知</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/notification-edit-desktop.png"><img src="./README/screenshots/notification-edit-desktop.png" alt="编辑通知 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/notification-edit-mobile.png"><img src="./README/screenshots/notification-edit-mobile.png" alt="编辑通知 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">自定义通知</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/notification-webhook-desktop.png"><img src="./README/screenshots/notification-webhook-desktop.png" alt="自定义通知 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/notification-webhook-mobile.png"><img src="./README/screenshots/notification-webhook-mobile.png" alt="自定义通知 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">系统设置</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/settings-desktop.png"><img src="./README/screenshots/settings-desktop.png" alt="系统设置 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/settings-mobile.png"><img src="./README/screenshots/settings-mobile.png" alt="系统设置 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">修改密码</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/change-password-desktop.png"><img src="./README/screenshots/change-password-desktop.png" alt="修改密码 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/change-password-mobile.png"><img src="./README/screenshots/change-password-mobile.png" alt="修改密码 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">登录</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/login-desktop.png"><img src="./README/screenshots/login-desktop.png" alt="登录 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/login-mobile.png"><img src="./README/screenshots/login-mobile.png" alt="登录 - 手机" width="100%" /></a></td>
+    </tr>
+    <tr><th colspan="2" align="left">重置密码</th></tr>
+    <tr>
+      <td valign="top"><a href="./README/screenshots/reset-password-desktop.png"><img src="./README/screenshots/reset-password-desktop.png" alt="重置密码 - PC" width="100%" /></a></td>
+      <td valign="top"><a href="./README/screenshots/reset-password-mobile.png"><img src="./README/screenshots/reset-password-mobile.png" alt="重置密码 - 手机" width="100%" /></a></td>
+    </tr>
+  </tbody>
+</table>
 
 </details>
 
