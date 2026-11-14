@@ -111,7 +111,7 @@ jobs:
           build-args: |
             WHEEL_CACHE_DIR=wheels/${{ env.WHEEL_CACHE_KEY }}/${{ env.PLATFORM_PAIR }}
           outputs: |
-            type=docker
+            type=docker,name=taosync-wheels-extract:${{ env.PLATFORM_PAIR }}
             type=image,name=${{ env.DOCKER_USER }}/${{ env.DOCKER_NAME }},push-by-digest=true,name-canonical=true,push=true
 
       - name: 导出digest
@@ -129,12 +129,14 @@ jobs:
 
       - name: 从镜像中提取wheel缓存
         run: |
+          set -euo pipefail
           container="extract-${PLATFORM_PAIR}"
           output="wheels-${PLATFORM_PAIR}"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
           mkdir -p "$output"
-          docker create --name "$container" "${{ steps.build-image.outputs.imageid }}" /bin/true
+          docker create --name "$container" --platform "${{ matrix.platform }}" \
+            "taosync-wheels-extract:${PLATFORM_PAIR}" /bin/true
           docker cp "$container:/wheels/." "$output/"
-          docker rm "$container"
 
       - name: 上传wheel缓存
         uses: actions/upload-artifact@v4
