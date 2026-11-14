@@ -2,14 +2,26 @@ import ntpath
 import stat
 import threading
 import uuid
+from contextlib import contextmanager
+from functools import wraps
 
 from common.fileFingerprint import fileFingerprint
 
 from .base import StorageDriver, check_cancel, normalize_path
 
 
+def _smb_operation(operation):
+    @wraps(operation)
+    def wrapped(self, *args, **kwargs):
+        with self._connection():
+            return operation(self, *args, **kwargs)
+
+    return wrapped
+
+
 class SmbDriver(StorageDriver):
     driver_type = "smb"
+    _MAX_IDLE_CONNECTIONS = 4
 
     def __init__(self, config):
         self.server = str(config.get("host") or config.get("server") or "").strip()
@@ -31,14 +43,52 @@ class SmbDriver(StorageDriver):
         self.root = "\\\\{}\\{}".format(self.server, self.share)
         if root:
             self.root += "\\" + root
-        # smbclient's default pool is process-global and reuses sessions by
-        # server and username, even after a password edit. Isolate each mount.
-        self.connection_cache = {}
-        self.session_lock = threading.Lock()
-        self.session_ready = False
+        # A credit window belongs to a connection. Lease it to one operation
+        # so scans and transfers cannot exhaust each other's credits.
+        self._connection_local = threading.local()
+        self._pool_lock = threading.Lock()
+        self._idle_connections = []
+        self._pool_generation = 0
+
+    @contextmanager
+    def _connection(self):
+        if getattr(self._connection_local, "cache", None) is not None:
+            yield
+            return
+        with self._pool_lock:
+            cache = self._idle_connections.pop() if self._idle_connections else {}
+            generation = self._pool_generation
+        self._connection_local.cache = cache
+        reusable = False
+        try:
+            yield
+            reusable = True
+        finally:
+            del self._connection_local.cache
+            with self._pool_lock:
+                if (
+                    reusable
+                    and generation == self._pool_generation
+                    and len(self._idle_connections) < self._MAX_IDLE_CONNECTIONS
+                ):
+                    self._idle_connections.append(cache)
+                    cache = None
+            if cache is not None:
+                self._close_cache(cache)
+
+    @staticmethod
+    def _close_cache(cache):
+        for connection in list(cache.values()):
+            try:
+                # Logoff is another credit-consuming request and may fail on
+                # the exhausted connection we are trying to dispose of.
+                connection.disconnect(close=False)
+            except Exception:
+                pass
+        cache.clear()
 
     def _connection_kwargs(self):
-        kwargs = {"port": self.port, "connection_cache": self.connection_cache}
+        kwargs = {"port": self.port, "connection_cache": self._connection_local.cache}
         if self.username:
             kwargs["username"] = self.username
             kwargs["password"] = self.password
@@ -49,22 +99,28 @@ class SmbDriver(StorageDriver):
             import smbclient
         except ImportError as exc:
             raise RuntimeError("SMB support requires the smbprotocol package") from exc
-        if not self.session_ready:
-            with self.session_lock:
-                if not self.session_ready:
-                    smbclient.register_session(self.server, **self._connection_kwargs())
-                    self.session_ready = True
+        session = smbclient.register_session(self.server, **self._connection_kwargs())
+        connection = session.connection
+        with connection.sequence_lock:
+            available = connection.sequence_window["high"] - connection.sequence_window["low"]
+        if available == 0:
+            self._close_cache(self._connection_local.cache)
+            session = smbclient.register_session(self.server, **self._connection_kwargs())
+            connection = session.connection
+            with connection.sequence_lock:
+                available = connection.sequence_window["high"] - connection.sequence_window["low"]
+        if 0 < available < 3:
+            # smbclient.stat() compounds CREATE, QUERY_INFO and CLOSE.
+            connection.echo(sid=session.session_id, credit_request=64)
         return smbclient
 
     def close(self):
-        try:
-            import smbclient
-
-            smbclient.reset_connection_cache(
-                fail_on_error=False, connection_cache=self.connection_cache
-            )
-        finally:
-            self.session_ready = False
+        with self._pool_lock:
+            caches = self._idle_connections
+            self._idle_connections = []
+            self._pool_generation += 1
+        for cache in caches:
+            self._close_cache(cache)
 
     def __del__(self):
         try:
@@ -106,6 +162,7 @@ class SmbDriver(StorageDriver):
             if getattr(info, "st_file_attributes", 0) & 0x400:
                 raise ValueError("SMB symbolic links and reparse points are not supported")
 
+    @_smb_operation
     def list(self, path, details=False):
         client = self._client()
         remote = self._remote(path)
@@ -134,12 +191,14 @@ class SmbDriver(StorageDriver):
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
 
+    @_smb_operation
     def mkdir(self, path):
         client = self._client()
         remote = self._remote(path)
         self._assert_no_reparse(client, remote, allow_missing=True)
         client.makedirs(remote, exist_ok=True, **self._connection_kwargs())
 
+    @_smb_operation
     def delete(self, path):
         client = self._client()
         remote = self._remote(path, allow_root=False)
@@ -166,6 +225,7 @@ class SmbDriver(StorageDriver):
                 client.remove(child, **kwargs)
         client.rmdir(remote, **kwargs)
 
+    @_smb_operation
     def download(self, path, target, progress=None, cancel=None):
         client = self._client()
         remote = self._remote(path, allow_root=False)
@@ -188,6 +248,7 @@ class SmbDriver(StorageDriver):
         if progress and size == 0:
             progress(1.0)
 
+    @_smb_operation
     def upload(self, path, source, size=None, progress=None, cancel=None):
         client = self._client()
         destination = self._remote(path, allow_root=False)

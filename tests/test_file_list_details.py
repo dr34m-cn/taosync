@@ -104,7 +104,8 @@ class SmbFileListDetailTests(unittest.TestCase):
             yield [entry]
 
         client = SimpleNamespace(scandir=scan_entries)
-        driver = SmbDriver.__new__(SmbDriver)
+        driver = SmbDriver({'host': 'server', 'share': 'share'})
+        self.addCleanup(driver.close)
         driver._client = lambda: client
         driver._remote = lambda path: path
         driver._assert_no_reparse = lambda *_args, **_kwargs: None
