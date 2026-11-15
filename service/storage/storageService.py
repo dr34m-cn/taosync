@@ -443,7 +443,7 @@ def updateMount(data):
     old = storageMapper.getMountById(mountId)
     _requireTaoSync(old["engineId"])
     concurrency = validateCopyConcurrency(data.get("copyConcurrency", old.get("copyConcurrency", 5)))
-    if set(data) <= {"id", "copyConcurrency", "__user"}:
+    if set(data) - {"__user", "__lang"} <= {"id", "copyConcurrency"}:
         updateMountCopyConcurrency(
             mountId, concurrency,
             persist=lambda: storageMapper.updateCopyConcurrency(mountId, concurrency),

@@ -147,6 +147,21 @@ def _config(**updates):
 
 
 class SftpDriverTests(unittest.TestCase):
+    def test_file_metadata_uses_stat_and_preserves_path_guards(self):
+        driver, fake, connected = self._mounted()
+        fake.nodes['/srv/file'] = {'kind': 'file', 'data': b'data', 'mtime': 123}
+        fake.nodes['/srv/link'] = {'kind': 'link'}
+        with connected:
+            expected = next(item for item in driver.list('/', details=True) if item['name'] == 'file')
+            with patch.object(fake, 'listdir_attr', side_effect=AssertionError('directory scan')):
+                self.assertEqual(driver.file_metadata('/file'), expected)
+                with self.assertRaises(FileNotFoundError):
+                    driver.file_metadata('/missing')
+                with self.assertRaises(ValueError):
+                    driver.file_metadata('/link')
+                with self.assertRaises(ValueError):
+                    driver.file_metadata('/../file')
+
     def _mounted(self, fake=None, **config):
         fake = fake or _FakeSftp()
         driver = SftpDriver(_config(**config))

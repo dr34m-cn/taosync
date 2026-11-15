@@ -313,6 +313,20 @@ class SftpDriver(StorageDriver):
         result.sort(key=lambda item: (not item["is_dir"], item["name"].casefold()))
         return result
 
+    def file_metadata(self, path):
+        with self._connect() as sftp:
+            remote = self._resolve(sftp, path, allow_root=False)
+            info = sftp.lstat(remote)
+            if stat.S_ISDIR(info.st_mode):
+                raise IsADirectoryError(path)
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError("SFTP special files are not supported")
+            return {
+                "name": posixpath.basename(remote), "is_dir": False, "size": int(info.st_size),
+                "modified_at": getattr(info, "st_mtime", None),
+                "fingerprint": fileFingerprint("sftp", getattr(info, "st_mtime", None)),
+            }
+
     def mkdir(self, path):
         with self._connect() as sftp:
             remote = self._resolve(sftp, path, allow_missing=True)

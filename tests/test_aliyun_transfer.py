@@ -278,6 +278,32 @@ class UploadTests(unittest.TestCase):
 
 
 class RapidUploadTests(unittest.TestCase):
+    def test_rapid_success_does_not_complete_or_rollback_on_cleanup_failure(self):
+        self.driver._remove_duplicates.side_effect = RuntimeError('cleanup unavailable')
+        source = self.hashed_source()
+        with self.assertRaisesRegex(RuntimeError, 'cleanup unavailable'):
+            stream_transfer(source, '/source', self.driver, '/file', len(self.payload))
+        self.assertFalse(any(url.endswith('/complete') for url, *_ in self.requests))
+        self.driver._abort_upload.assert_not_called()
+        self.driver.session.put.assert_not_called()
+
+    def test_rapid_success_survives_cancellation_after_create(self):
+        cancel = threading.Event()
+        request = self.request
+
+        def finish(*args, **kwargs):
+            response = request(*args, **kwargs)
+            if response.json().get('rapid_upload'):
+                cancel.set()
+            return response
+
+        self.driver.session.request.side_effect = finish
+        source = self.hashed_source()
+        stream_transfer(source, '/source', self.driver, '/file', len(self.payload), cancel=cancel)
+        self.driver._abort_upload.assert_not_called()
+        self.driver._remove_duplicates.assert_called_once()
+        self.assertFalse(any(url.endswith('/complete') for url, *_ in self.requests))
+
     def setUp(self):
         self.driver = make_driver()
         self.addCleanup(self.driver.session.close)
@@ -307,6 +333,7 @@ class RapidUploadTests(unittest.TestCase):
                 status, result = 401, {'code': 'AccessTokenExpired'}
             elif 'proof_code' in json and self.rapid_match:
                 result['rapid_upload'] = True
+                result.pop('upload_id')
             else:
                 result['part_info_list'] = [{'part_number': 1, 'upload_url': 'https://example.test/part'}]
         return Mock(status_code=status, headers={}, json=lambda: result, text='')
@@ -333,6 +360,7 @@ class RapidUploadTests(unittest.TestCase):
         offset = int(hashlib.md5(b'first-access-token').hexdigest()[:16], 16) % len(self.payload)
         self.assertEqual(proof['proof_code'], base64.b64encode(self.payload[offset:offset + 8]).decode())
         self.driver.session.put.assert_not_called()
+        self.assertFalse(any(url.endswith('/complete') for url, *_ in self.requests))
         self.assertEqual(source.tell(), len(self.payload))
         self.assertEqual(progress, [1.0])
         self.assertIsNone(self.driver.upload_context.cached_source)

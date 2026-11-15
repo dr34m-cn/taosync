@@ -1,4 +1,5 @@
 import io
+import stat
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -57,7 +58,8 @@ class _Client:
             self.stat_hook(path, connection)
         if path.endswith("destination"):
             raise FileNotFoundError(path)
-        return SimpleNamespace(st_size=len(self.payload), st_mode=0, st_file_attributes=0)
+        mode = stat.S_IFREG if path.endswith("source") else stat.S_IFDIR
+        return SimpleNamespace(st_size=len(self.payload), st_mode=mode, st_file_attributes=0)
 
     @contextmanager
     def scandir(self, path, **kwargs):

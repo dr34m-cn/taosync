@@ -51,7 +51,7 @@ def updateClient(alist):
     alistId = alist['id']
     if 'copyConcurrency' in alist:
         engineService.validateCopyConcurrency(alist['copyConcurrency'])
-        if set(alist) <= {'id', 'copyConcurrency', '__user'}:
+        if set(alist) - {'__user', '__lang'} <= {'id', 'copyConcurrency'}:
             engineService.updateCopyConcurrency(alistId, alist['copyConcurrency'])
             return
     if alist['remark'] is not None and alist['remark'].strip() == '':

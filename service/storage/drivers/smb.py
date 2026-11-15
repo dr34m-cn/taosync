@@ -196,6 +196,26 @@ class SmbDriver(StorageDriver):
         return result
 
     @_smb_operation
+    def file_metadata(self, path):
+        client = self._client()
+        remote = self._remote(path, allow_root=False)
+        self._assert_no_reparse(client, remote)
+        info = client.stat(remote, follow_symlinks=False, **self._connection_kwargs())
+        if stat.S_ISDIR(info.st_mode):
+            raise IsADirectoryError(path)
+        if not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+            raise ValueError("SMB special files and reparse points are not supported")
+        mtime_ns = getattr(info, "st_mtime_ns", None)
+        if mtime_ns is None and getattr(info, "st_mtime", None) is not None:
+            mtime_ns = int(info.st_mtime * 1_000_000_000)
+        return {
+            "name": ntpath.basename(remote), "is_dir": False, "size": info.st_size,
+            "modified_at": getattr(info, "st_mtime", None),
+            "created_at": getattr(info, "st_ctime", None),
+            "fingerprint": fileFingerprint("smb", getattr(info, "st_ino", None), mtime_ns),
+        }
+
+    @_smb_operation
     def mkdir(self, path):
         client = self._client()
         remote = self._remote(path)

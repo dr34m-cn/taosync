@@ -207,6 +207,7 @@ class SourceSnapshotDatabaseTests(unittest.TestCase):
                     "initialized": 0,
                     "scanTime": None,
                     "entryCount": 0,
+                    "fullScanTime": None,
                 },
                 "entries": [],
             },
@@ -227,7 +228,7 @@ class SourceSnapshotDatabaseTests(unittest.TestCase):
         snapshot = jobMapper.getSourceSnapshot(jobId)
 
         self.assertEqual(meta["entryCount"], 2)
-        self.assertEqual(snapshot["meta"], meta)
+        self.assertEqual(snapshot["meta"], {**meta, "fullScanTime": meta["scanTime"]})
         self.assertEqual(
             snapshot["entries"],
             [

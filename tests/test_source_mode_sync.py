@@ -44,6 +44,7 @@ class FakeEngine:
         self.copyCalls.append(call)
         if call in self.failCopies:
             raise RuntimeError('copy failed')
+        self.listings.setdefault(dstPath, {})[fileName] = self.listings[srcPath][fileName]
         return None
 
     def mkdir(self, path, scanInterval=0):
@@ -73,24 +74,10 @@ def makeTask(engine, method=0, dstPath='/dst/', sourceMode=1):
     owner = SimpleNamespace(
         job=job, jobDoing=True, currentJobTask=None, finishRun=mock.Mock()
     )
-    task = jobClient.JobTask.__new__(jobClient.JobTask)
-    task.taskId = 99
-    task.jobClient = owner
-    task.job = job
-    task.alistClient = engine
-    task.createTime = time.time()
-    task.finish = []
-    task.doing = {}
-    task.waiting = []
-    task.lastWatching = 0.0
-    task.queueNum = 0
-    task.scanFinish = False
-    task.firstSync = None
-    task.breakFlag = False
-    task.sourceSnapshot = {}
-    task.sourceScanAttempted = False
-    task.sourceScanFailed = False
-    task.currentTasks = {}
+    with mock.patch.object(jobClient.engineService, 'getClientById', return_value=engine), \
+            mock.patch.object(jobClient.engineService, 'getCopyLimiter', return_value=jobClient.engineService.CopyLimiter(5)), \
+            mock.patch.object(jobClient, 'taskTimeoutSeconds', return_value=0):
+        task = jobClient.JobTask(99, owner)
     owner.currentJobTask = task
     return task
 
@@ -110,7 +97,8 @@ class SourceModeSyncTest(unittest.TestCase):
     @staticmethod
     def initialized(entries):
         return {
-            'meta': {'jobId': 42, 'initialized': 1, 'scanTime': 1, 'entryCount': len(entries)},
+            'meta': {'jobId': 42, 'initialized': 1, 'scanTime': 1, 'entryCount': len(entries),
+                     'fullScanTime': time.time()},
             'entries': entries,
         }
 
@@ -161,10 +149,12 @@ class SourceModeSyncTest(unittest.TestCase):
         self.assertEqual(engine.copyCalls, [('/src/', '/dst/', 'same-size.txt')])
         self.assertNotIn('/dst/', engine.listCalls)
 
-    def test_full_mode_applies_tracked_removals_without_target_scan(self):
-        engine = FakeEngine({'/src/': {}})
+    def test_full_mode_only_checks_removed_target_directory_shells(self):
+        engine = FakeEngine({'/src/': {'kept.txt': 1},
+                             '/dst-a/gone-dir/': {}, '/dst-b/gone-dir/': {}})
         task = makeTask(engine, method=1, dstPath='/dst-a/:/dst-b/')
         stored = self.initialized([
+            {'path': 'kept.txt', 'isDir': 0, 'size': 1},
             {'path': 'gone.txt', 'isDir': 0, 'size': 5},
             {'path': 'gone-dir', 'isDir': 1, 'size': None},
             {'path': 'gone-dir/child.txt', 'isDir': 0, 'size': 6},
@@ -172,12 +162,14 @@ class SourceModeSyncTest(unittest.TestCase):
 
         self.runTask(task, stored)
 
-        self.assertEqual(engine.listCalls, ['/src/'])
+        self.assertEqual(engine.listCalls, ['/src/', '/dst-a/gone-dir/', '/dst-b/gone-dir/'])
         self.assertCountEqual(engine.deleteCalls, [
             ('/dst-a/', ('gone.txt',)),
             ('/dst-a/gone-dir/', ('child.txt',)),
             ('/dst-b/', ('gone.txt',)),
             ('/dst-b/gone-dir/', ('child.txt',)),
+            ('/dst-a/', ('gone-dir',)),
+            ('/dst-b/', ('gone-dir',)),
         ])
 
     def test_failed_copy_does_not_advance_snapshot(self):
@@ -473,7 +465,7 @@ class SourceModeEditTest(unittest.TestCase):
         }
 
     def runEdit(self, oldJob, newJob, updateSideEffect=None):
-        oldClient = SimpleNamespace(job=oldJob, stopJob=mock.Mock())
+        oldClient = SimpleNamespace(job=oldJob, stopJob=mock.Mock(), runLock=threading.Lock())
         newClient = SimpleNamespace(jobId=8, stopJob=mock.Mock())
         restoredClient = SimpleNamespace(jobId=8, stopJob=mock.Mock())
         originalClients = jobService.jobClientList

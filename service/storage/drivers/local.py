@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import stat
 import uuid
 
 from common.fileFingerprint import fileFingerprint
@@ -92,6 +93,24 @@ class LocalDriver(StorageDriver):
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
 
+    def file_metadata(self, path):
+        target = self._resolve(path, allow_root=False)
+        info = os.stat(target, follow_symlinks=False)
+        if stat.S_ISDIR(info.st_mode):
+            raise IsADirectoryError(path)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("local special files are not supported")
+        # Match existing Windows DirEntry fingerprints (device/inode are zero)
+        # so the optimization does not invalidate saved source snapshots.
+        device = 0 if os.name == "nt" else getattr(info, "st_dev", None)
+        inode = 0 if os.name == "nt" else getattr(info, "st_ino", None)
+        return {
+            "name": os.path.basename(target), "is_dir": False, "size": info.st_size,
+            "modified_at": info.st_mtime,
+            "created_at": getattr(info, "st_birthtime", info.st_ctime if os.name == "nt" else None),
+            "fingerprint": fileFingerprint("local", device, inode, getattr(info, "st_mtime_ns", None)),
+        }
+
     def mkdir(self, path):
         os.makedirs(self._resolve(path), exist_ok=True)
 
@@ -162,7 +181,7 @@ class LocalDriver(StorageDriver):
             except OSError:
                 pass
 
-    def copy(self, source_path, destination_path, size=None, progress=None, cancel=None):
+    def copy(self, source_path, destination_path, size=None, progress=None, cancel=None, metadata=None):
         source = self._resolve(source_path, allow_root=False)
         destination = self._resolve(destination_path, allow_root=False)
         if os.path.isdir(destination):

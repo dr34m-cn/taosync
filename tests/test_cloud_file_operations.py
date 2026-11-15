@@ -1,4 +1,5 @@
 import io
+import stat
 import os
 import tempfile
 import threading
@@ -167,9 +168,11 @@ class SourceMetadataTests(unittest.TestCase):
         entry = Mock(name='file')
         entry.name = 'file'
         entry.is_dir.return_value = False
-        entry.stat.return_value = SimpleNamespace(st_size=10, st_ctime=1577836800, st_mtime=1609459200,
+        entry.stat.return_value = SimpleNamespace(st_mode=stat.S_IFREG, st_file_attributes=0,
+                                                  st_size=10, st_ctime=1577836800, st_mtime=1609459200,
                                                   st_mtime_ns=1609459200000000000, st_ino=1)
         client = Mock()
+        client.stat.return_value = entry.stat.return_value
         client.scandir.return_value = nullcontext([entry])
         client.open_file.return_value = nullcontext(io.BytesIO(b'0123456789'))
         with patch.object(driver, '_connection', side_effect=lambda: nullcontext()), patch.object(
@@ -178,6 +181,7 @@ class SourceMetadataTests(unittest.TestCase):
             driver, '_assert_no_reparse'
         ), patch.object(driver, '_entry_is_reparse', return_value=False):
             metadata = driver.file_metadata('/file')
+            client.scandir.assert_not_called()
             self.assertEqual(metadata['created_at'], 1577836800)
             self.assertEqual(metadata['modified_at'], 1609459200)
             self.assertEqual(driver.read_range('/file', 4, 3), b'456')

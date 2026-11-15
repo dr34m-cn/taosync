@@ -767,7 +767,7 @@ class AliyunDriveDriver(StorageDriver):
         part_size = max(self.PART_SIZE, math.ceil(size / self.MAX_PARTS) if size else self.PART_SIZE)
         part_count = max(1, math.ceil(size / part_size) if size else 1)
         part_info = [{"part_number": index + 1} for index in range(part_count)]
-        created, source, source_consumed = self._create_upload(
+        created, source, _source_consumed = self._create_upload(
             {
                 "drive_id": self.drive_id,
                 "parent_file_id": parent["file_id"],
@@ -782,6 +782,14 @@ class AliyunDriveDriver(StorageDriver):
         file_id = created["file_id"]
         upload_id = created.get("upload_id")
         self.upload_context.file_id = file_id
+        if created.get("rapid_upload"):
+            # The create response already committed the file; there is no
+            # multipart upload session to complete or abort.
+            self.upload_context.completed = True
+            self._remove_duplicates(parent["file_id"], name, file_id)
+            if progress:
+                progress(1.0)
+            return
         self.upload_context.upload_id = upload_id
         uploaded_parts = created.get("part_info_list") or []
         if not created.get("rapid_upload"):
@@ -875,19 +883,6 @@ class AliyunDriveDriver(StorageDriver):
                     reader.close()
             if total_done != size:
                 raise IOError("source stream ended before the expected file size")
-        elif not source_consumed:
-            # A rapid-upload response still consumes the source stream when
-            # TaoSync is piping a different backend, otherwise the producer can
-            # block on a full pipe and report a false transfer failure.
-            consumed = 0
-            while consumed < size:
-                check_cancel(cancel)
-                chunk = source.read(min(1024 * 1024, size - consumed))
-                if not chunk:
-                    raise IOError("source stream ended before the expected file size")
-                consumed += len(chunk)
-                if progress:
-                    progress(consumed / size if size else 1.0)
         check_cancel(cancel)
         completed = self._request(
             "/adrive/v1.0/openFile/complete",
@@ -935,7 +930,7 @@ class AliyunDriveDriver(StorageDriver):
             raise RuntimeError("Aliyun returned an incomplete part URL list")
         return parts
 
-    def copy(self, source_path, destination_path, size=None, progress=None, cancel=None):
+    def copy(self, source_path, destination_path, size=None, progress=None, cancel=None, metadata=None):
         source_path = normalize_path(source_path, allow_root=False)
         destination_path = normalize_path(destination_path, allow_root=False)
         if source_path == destination_path:

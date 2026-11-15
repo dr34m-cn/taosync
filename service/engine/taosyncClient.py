@@ -85,6 +85,7 @@ class _CopyTask:
                     size=size,
                     progress=self._report,
                     cancel=self.cancel_event,
+                    metadata=metadata,
                 )
             else:
                 stream_transfer(

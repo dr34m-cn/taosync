@@ -83,9 +83,9 @@ class StorageDriver:
     def rename(self, path, name, cancel=None):
         raise NotImplementedError
 
-    def copy(self, source_path, destination_path, size=None, progress=None, cancel=None):
+    def copy(self, source_path, destination_path, size=None, progress=None, cancel=None, metadata=None):
         """Portable copy fallback used when a backend has no native copy API."""
-        stream_transfer(self, source_path, self, destination_path, size, progress, cancel)
+        stream_transfer(self, source_path, self, destination_path, size, progress, cancel, metadata)
 
 
 class _SourceReader:

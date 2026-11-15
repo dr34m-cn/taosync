@@ -9,13 +9,15 @@ from unittest.mock import patch
 from service.alist.alistClient import AlistClient
 from service.engine.taosyncClient import TaoSyncClient
 from service.storage.drivers.smb import SmbDriver
+from service.storage.drivers.local import LocalDriver
+from service.storage.drivers.base import StorageDriver
 
 
 class AlistFileListDetailTests(unittest.TestCase):
     @staticmethod
     def client():
-        client = AlistClient.__new__(AlistClient)
-        client.waits = {}
+        with patch.object(AlistClient, 'getUser'):
+            client = AlistClient('http://alist.test', 'test-token')
         return client
 
     def test_detail_api_adds_opaque_fingerprint_and_legacy_api_keeps_shape(self):
@@ -38,7 +40,8 @@ class AlistFileListDetailTests(unittest.TestCase):
             ]
         }
         client = self.client()
-        with patch.object(client, 'post', return_value=response):
+        with patch.object(client, 'post', return_value=response), \
+                patch.object(client, '_storageDriverMap', return_value={}):
             details = client.fileListDetailApi('/source/')
             legacy = client.fileListApi('/source/')
 
@@ -49,6 +52,39 @@ class AlistFileListDetailTests(unittest.TestCase):
 
 
 class TaoSyncFileListDetailTests(unittest.TestCase):
+    def test_same_mount_stream_copy_reads_metadata_once(self):
+        with tempfile.TemporaryDirectory() as root:
+            Path(root, 'source').write_bytes(b'payload')
+            mounts = [{'id': 1, 'name': 'local', 'driverType': 'local',
+                       'config': {'root_path': root}}]
+            with patch('service.engine.taosyncClient.storageMapper.getMountList', return_value=mounts):
+                client = TaoSyncClient(1)
+            driver = client.mounts['local']['driver']
+            driver.mkdir('/target')
+            with patch.object(driver, 'copy', StorageDriver.copy.__get__(driver)), \
+                    patch.object(driver, 'file_metadata', wraps=driver.file_metadata) as metadata:
+                task_id = client.copyFile('/local', '/local/target', 'source')
+                client.waitTask(task_id, 5)
+                self.assertEqual(client.taskInfo(task_id)['state'], 2)
+                metadata.assert_called_once_with('/source')
+            self.assertEqual(Path(root, 'target', 'source').read_bytes(), b'payload')
+
+    def test_local_file_metadata_does_not_scan_siblings(self):
+        with tempfile.TemporaryDirectory() as root:
+            Path(root, 'file').write_bytes(b'data')
+            Path(root, 'folder').mkdir()
+            driver = LocalDriver({'root_path': root})
+            expected = next(item for item in driver.list('/', details=True) if item['name'] == 'file')
+            with patch.object(driver, 'list', side_effect=AssertionError('directory scan')), \
+                    patch('os.scandir', side_effect=AssertionError('directory scan')):
+                self.assertEqual(driver.file_metadata('/file'), expected)
+                with self.assertRaises(FileNotFoundError):
+                    driver.file_metadata('/missing')
+                with self.assertRaises(IsADirectoryError):
+                    driver.file_metadata('/folder')
+                with self.assertRaises(ValueError):
+                    driver.file_metadata('/../file')
+
     def test_local_details_track_same_size_replacement_without_changing_legacy_api(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
