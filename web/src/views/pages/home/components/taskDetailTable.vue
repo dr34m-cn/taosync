@@ -24,6 +24,11 @@ const params = ref({
   pageNum: 1,
 });
 
+// Live records have no database ID; progress and status change on every poll.
+const rowKey = (row) => row.id != null ? `id:${row.id}` : JSON.stringify([
+  row.createTime, row.type, row.isPath, row.srcPath, row.dstPath,
+]);
+
 const handleSizeChange = (val) => {
   params.value.pageSize = val;
   emit("pageChange", params.value);
@@ -36,7 +41,7 @@ const handleCurrentChange = (val) => {
 
 <template>
   <div class="task-detail-table">
-    <el-table class="detail-table" :data="taskItemData.dataList" height="calc(100% - 48px)" v-loading="loading" :empty-text="$t('empty')">
+    <el-table class="detail-table" :data="taskItemData.dataList" :row-key="rowKey" height="calc(100% - 48px)" v-loading="loading" :empty-text="$t('empty')">
       <el-table-column type="expand">
         <template #default="props">
           <div class="form-box">

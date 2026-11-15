@@ -38,11 +38,13 @@ const chartOptions = computed(() => {
       trigger: "item",
     },
     legend: {
+      id: "task-status",
       top: "5%",
       left: "center",
     },
     series: [
       {
+        id: "task-count",
         name: t("task.total"),
         type: "pie",
         radius: ["75%", "90%"],
@@ -52,6 +54,7 @@ const chartOptions = computed(() => {
         data: numData,
       },
       {
+        id: "task-size",
         name: t("taskDetail.fileSize"),
         type: "pie",
         radius: [0, "65%"],

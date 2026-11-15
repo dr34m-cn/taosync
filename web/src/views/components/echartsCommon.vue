@@ -42,7 +42,7 @@ const disposeChart = () => {
 };
 watch(() => props.options, (newOptions) => {
     if (chartInstance && newOptions) {
-        chartInstance.setOption(newOptions, true);
+        chartInstance.setOption(newOptions);
     }
 }, { deep: true });
 watch(isDark, async () => {

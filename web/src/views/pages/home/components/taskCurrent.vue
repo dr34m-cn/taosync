@@ -101,18 +101,20 @@ const getTaskList = () => {
     return;
   }
   loadingTask.value = true;
+  const status = cuTaskSelect.value;
   jobGetTaskCurrent({
     id: props.jobId,
-    status: cuTaskSelect.value,
+    status,
   })
     .then((res) => {
-      cuTaskList.value = res.data || [];
-      loadingTask.value = false;
+      if (cuTaskSelect.value === status) {
+        cuTaskList.value = res.data || [];
+      }
     })
-    .catch(() => {
-      setTimeout(() => {
-        loadingTask.value = false;
-      }, 9973);
+    .catch(() => {})
+    .finally(() => {
+      loadingTask.value = false;
+      if (cuTaskSelect.value !== status) getTaskList();
     });
 };
 
@@ -324,7 +326,7 @@ watch(isMobile, () => {
               {{ $t("current.other") }}
             </div>
           </div>
-          <taskDetailTable class="current-box-task-right" :taskItemData="toTable" @pageChange="pageChange" />
+          <taskDetailTable :key="cuTaskSelect" class="current-box-task-right" :taskItemData="toTable" @pageChange="pageChange" />
         </div>
       </div>
     </div>
