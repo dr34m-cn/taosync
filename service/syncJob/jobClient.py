@@ -251,7 +251,8 @@ class JobTask:
         self.jobClient = vm
         self.job = self.jobClient.job
         self.alistClient = engineService.getClientById(self.job['alistId'])
-        self.copyLimiter = engineService.getCopyLimiter(self.job['alistId'])
+        self.directoryCopyLimits = isinstance(self.alistClient, engineService.TaoSyncClient)
+        self.copyLimiter = None if self.directoryCopyLimits else engineService.getCopyLimiter(self.job['alistId'])
         self.createTime = time.time()
         # 保护 finish/doing/waiting：扫描线程、提交线程、复制线程与查询接口会同时访问
         self.stateLock = threading.RLock()
@@ -434,15 +435,33 @@ class JobTask:
         with self._stateLock():
             if self.scanFinish and not self.doing and not self.waiting:
                 return None
-            limiter = getattr(self, 'copyLimiter', None)
-            limit = limiter.limit if limiter is not None else MAX_ACTIVE_COPY
-            while len(self.doing) < limit and self.waiting and not self.breakFlag:
-                if limiter is not None and not limiter.tryAcquire():
+            directoryLimits = getattr(self, 'directoryCopyLimits', False)
+            engineLimiter = getattr(self, 'copyLimiter', None)
+            limit = engineLimiter.limit if engineLimiter is not None else MAX_ACTIVE_COPY
+            # Inspect each queued item once, so a full destination does not
+            # block copies to another directory later in the same queue.
+            remaining = len(self.waiting)
+            while remaining and self.waiting and not self.breakFlag:
+                if not directoryLimits and len(self.doing) >= limit:
                     break
+                remaining -= 1
+                copyItem = self.waiting.popleft()
+                limiter = engineLimiter
+                if directoryLimits:
+                    try:
+                        mount, _ = self.alistClient.resolve(copyItem.dstPath)
+                        limiter = engineService.getMountCopyLimiter(mount['id'])
+                    except Exception as exc:
+                        self.finish.append(copyItem.toRecord(status=7, errMsg=str(exc)))
+                        continue
+                if limiter is not None and not limiter.tryAcquire():
+                    self.waiting.append(copyItem)
+                    if not directoryLimits:
+                        break
+                    continue
                 if self.firstSync is None:
                     self.firstSync = time.time()
                 self.queueNum += 1
-                copyItem = self.waiting.popleft()
                 copyItem.copyLimiter = limiter
                 copyItem.doingKey = self.queueNum
                 self.doing[self.queueNum] = copyItem

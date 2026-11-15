@@ -286,6 +286,40 @@ class JobTaskStateTest(unittest.TestCase):
             task.waiting.append(CopyItem('/src/', '/dst/', str(index), 10, 0, task))
         self.assertEqual(len(task._submitReady()), 8)
 
+    def test_directory_limits_are_shared_across_jobs_but_independent_between_targets(self):
+        from service.engine.engineService import CopyLimiter
+
+        limiters = {1: CopyLimiter(2), 2: CopyLimiter(4)}
+        first = _bare_task(scanFinish=False, directoryCopyLimits=True)
+        second = _bare_task(scanFinish=False, directoryCopyLimits=True)
+        for task in (first, second):
+            task.alistClient.resolve.side_effect = lambda path: ({'id': 1 if path.startswith('/A/') else 2}, '/')
+            for destination in ('/A/sub/', '/B/'):
+                for index in range(8):
+                    task.waiting.append(CopyItem('/src/', destination, str(index), 10, 0, task))
+        with mock.patch.object(jobClient.engineService, 'getMountCopyLimiter', side_effect=limiters.__getitem__):
+            started = first._submitReady()
+            self.assertEqual([item.dstPath for item in started], ['/A/sub/'] * 2 + ['/B/'] * 4)
+            self.assertEqual(second._submitReady(), [])
+            first.breakFlag = True
+            started[0].doIt()
+            self.assertEqual([item.dstPath for item in second._submitReady()], ['/A/sub/'])
+            limiters[2].limit = 6
+            self.assertEqual([item.dstPath for item in second._submitReady()], ['/B/'] * 2)
+            limiters[1].limit = 1
+            self.assertEqual(second._submitReady(), [])
+
+    def test_missing_destination_is_failed_without_losing_or_blocking_other_items(self):
+        from service.engine.engineService import CopyLimiter
+
+        task = _bare_task(scanFinish=False, directoryCopyLimits=True)
+        task.waiting.extend(CopyItem('/src/', path, 'file', 1, 0, task) for path in ('/missing/', '/good/'))
+        task.alistClient.resolve.side_effect = [FileNotFoundError('missing directory'), ({'id': 2}, '/')]
+        with mock.patch.object(jobClient.engineService, 'getMountCopyLimiter', return_value=CopyLimiter(5)):
+            self.assertEqual(len(task._submitReady()), 1)
+        self.assertEqual(task.finish[0]['status'], 7)
+        self.assertEqual(task.finish[0]['dstPath'], '/missing/')
+
     def test_completed_copy_moves_from_doing_to_finish(self):
         task = _bare_task()
         item = CopyItem('/src/', '/dst/', 'ok.bin', 5, 0, task)

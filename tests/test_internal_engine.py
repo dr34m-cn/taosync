@@ -70,6 +70,33 @@ class SqlInitializationTests(unittest.TestCase):
 
             self._assert_builtin_engine(database)
 
+    def test_existing_directory_gains_its_own_limit_and_later_initialization_preserves_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / 'mount-upgrade.db'
+            self._initialize(database)
+            with closing(sqlite3.connect(database)) as connection:
+                connection.executescript("""
+                    drop table storage_mount;
+                    create table storage_mount(
+                        id integer primary key autoincrement, engineId integer not null,
+                        name text not null, driverType text not null, config text not null,
+                        enabled integer default 1, createTime integer default 0,
+                        unique(engineId, name)
+                    );
+                    insert into storage_mount(engineId, name, driverType, config)
+                    values (1, 'archive', 'local', '{"root_path":"/archive"}');
+                """)
+                connection.commit()
+            self._initialize(database)
+            with closing(sqlite3.connect(database)) as connection:
+                self.assertEqual(connection.execute('select copyConcurrency from storage_mount').fetchone()[0], 5)
+                connection.execute('update storage_mount set copyConcurrency=8')
+                connection.commit()
+            self._initialize(database)
+            with closing(sqlite3.connect(database)) as connection:
+                self.assertEqual(connection.execute('select copyConcurrency, config from storage_mount').fetchone(),
+                                 (8, '{"root_path":"/archive"}'))
+
     def test_legacy_database_migrates_builtin_engine_and_empty_mount_table(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "legacy.db"

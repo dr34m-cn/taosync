@@ -43,7 +43,8 @@ def normalize_path(path, allow_root=True):
 
 def child_path(directory, name):
     directory = normalize_path(directory)
-    if not name or "/" in str(name) or "\\" in str(name) or str(name) in (".", ".."):
+    if (not name or "/" in str(name) or "\\" in str(name) or str(name) in (".", "..")
+            or any(ord(char) < 32 for char in str(name))):
         raise ValueError("invalid file name")
     return normalize_path(posixpath.join(directory, str(name)))
 
@@ -52,6 +53,7 @@ class StorageDriver:
     """Small common contract shared by local, network and cloud drivers."""
 
     driver_type = "base"
+    supports_random_read = False
 
     def list(self, path, details=False):
         raise NotImplementedError
@@ -68,53 +70,85 @@ class StorageDriver:
     def upload(self, path, source, size=None, progress=None, cancel=None):
         raise NotImplementedError
 
+    def file_metadata(self, path):
+        parent, name = posixpath.split(normalize_path(path, allow_root=False))
+        for entry in self.list(parent or "/", details=True):
+            if entry["name"] == name and not entry["is_dir"]:
+                return dict(entry)
+        raise FileNotFoundError(path)
+
+    def move(self, source_path, destination_path, size=None, progress=None, cancel=None):
+        raise NotImplementedError
+
+    def rename(self, path, name, cancel=None):
+        raise NotImplementedError
+
     def copy(self, source_path, destination_path, size=None, progress=None, cancel=None):
         """Portable copy fallback used when a backend has no native copy API."""
         stream_transfer(self, source_path, self, destination_path, size, progress, cancel)
 
 
+class _SourceReader:
+    def __init__(self, driver, path, cancel, errors, metadata):
+        self.driver, self.path, self.cancel = driver, path, cancel
+        self.errors = errors
+        self.metadata = dict(metadata or {})
+        self.can_read_range = isinstance(driver, StorageDriver) and driver.supports_random_read is True
+        self.pipe = None
+        self.producer = None
+
+    def read_range(self, offset, length):
+        check_cancel(self.cancel)
+        return self.driver.read_range(self.path, offset, length, cancel=self.cancel)
+
+    def read(self, size=-1):
+        check_cancel(self.cancel)
+        if self.pipe is None:
+            read_fd, write_fd = os.pipe()
+            self.pipe = os.fdopen(read_fd, "rb", buffering=0)
+
+            def produce():
+                try:
+                    with os.fdopen(write_fd, "wb", buffering=0) as target:
+                        self.driver.download(self.path, target, None, self.cancel)
+                except BaseException as exc:
+                    self.errors.append(exc)
+                    self.cancel.internal.set()
+
+            self.producer = threading.Thread(target=produce, name="taosync-transfer-source", daemon=True)
+            self.producer.start()
+        return self.pipe.read(size)
+
+    def close(self):
+        if self.pipe is not None:
+            self.pipe.close()
+
+
 def stream_transfer(source_driver, source_path, destination_driver, destination_path,
-                    size, progress=None, cancel=None):
+                    size, progress=None, cancel=None, metadata=None):
     """Stream a cross-backend transfer through a bounded OS pipe."""
     check_cancel(cancel)
-    read_fd, write_fd = os.pipe()
     source_errors = []
     internal_cancel = threading.Event()
     transfer_cancel = _CombinedCancel(cancel, internal_cancel)
 
-    def produce():
-        try:
-            with os.fdopen(write_fd, "wb", buffering=0) as target:
-                source_driver.download(
-                    source_path,
-                    target,
-                    None,
-                    transfer_cancel,
-                )
-        except BaseException as exc:
-            source_errors.append(exc)
-            internal_cancel.set()
-
-    producer = threading.Thread(target=produce, name="taosync-transfer-source", daemon=True)
-    producer.start()
+    if metadata is None and isinstance(source_driver, StorageDriver):
+        metadata = source_driver.file_metadata(source_path)
+    source = _SourceReader(source_driver, source_path, transfer_cancel, source_errors, metadata)
     destination_error = None
     try:
-        with os.fdopen(read_fd, "rb", buffering=0) as source:
-            destination_driver.upload(
-                destination_path,
-                source,
-                size,
-                progress,
-                transfer_cancel,
-            )
+        destination_driver.upload(destination_path, source, size, progress, transfer_cancel)
     except BaseException as exc:
         destination_error = exc
         internal_cancel.set()
     finally:
+        source.close()
         # A backend may be blocked in a socket read and therefore cannot be
         # interrupted by an Event alone. Keep the join bounded.
-        producer.join(timeout=5)
-    producer_stuck = producer.is_alive()
+        if source.producer is not None:
+            source.producer.join(timeout=5)
+    producer = source.producer
+    producer_stuck = producer is not None and producer.is_alive()
     if producer_stuck:
         internal_cancel.set()
         producer.join(timeout=1)
@@ -130,6 +164,8 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
     if destination_error is None and (
         source_error is None or isinstance(source_error, TransferCancelled)
     ):
+        if metadata is not None:
+            metadata.update(source.metadata)
         return
     # An external cancellation must win over a destination-side EOF/length
     # error, but a normal destination failure must not be masked by the

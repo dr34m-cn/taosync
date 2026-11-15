@@ -308,6 +308,8 @@ def init_sql(conn):
         cursor.execute("alter table storage_mount add column configVersion integer DEFAULT 1")
     if 'authVersion' not in mountColumns:
         cursor.execute("alter table storage_mount add column authVersion integer DEFAULT 1")
+    if 'copyConcurrency' not in mountColumns:
+        cursor.execute("alter table storage_mount add column copyConcurrency integer NOT NULL DEFAULT 5")
     cursor.execute("select count(*) from sqlite_master where type='table' and name='job'")
     if cursor.fetchone()[0]:
         cursor.execute("pragma table_info(job)")

@@ -35,6 +35,7 @@ import {
   View,
 } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
+import CloudFiles from "./CloudFiles.vue";
 
 const { t } = useI18n();
 const alistList = ref([]);
@@ -48,8 +49,11 @@ const formRef = ref();
 const concurrencyShow = ref(false);
 const concurrencyLoading = ref(false);
 const concurrencyData = ref({ id: null, copyConcurrency: 5 });
+const concurrencyMountName = ref("");
 
 const directoryShow = ref(false);
+const cloudFilesShow = ref(false);
+const cloudFilesMount = ref(null);
 const directoryLoading = ref(false);
 const directoryList = ref([]);
 const currentEngine = ref(null);
@@ -132,6 +136,7 @@ const driverConfigKeys = {
     "root_folder_id",
     "root_folder_path",
     "remove_way",
+    "rapid_upload",
   ],
 };
 
@@ -183,6 +188,7 @@ const driverDefaults = (driverType) => {
       root_folder_id: "root",
       root_folder_path: "/",
       remove_way: "trash",
+      rapid_upload: true,
     },
   };
   return { ...defaults[driverType] };
@@ -608,17 +614,19 @@ const editShowDialog = (row) => {
   editShow.value = true;
 };
 
-const openConcurrency = (row) => {
+const openConcurrency = (row, directory = false) => {
   concurrencyData.value = { id: row.id, copyConcurrency: row.copyConcurrency || 5 };
+  concurrencyMountName.value = directory ? row.name : "";
   concurrencyShow.value = true;
 };
 
 const saveConcurrency = async () => {
   concurrencyLoading.value = true;
   try {
-    await alistPut(concurrencyData.value);
+    const directory = Boolean(concurrencyMountName.value);
+    await (directory ? storagePut(concurrencyData.value) : alistPut(concurrencyData.value));
     concurrencyShow.value = false;
-    await getAlistList();
+    await (directory ? getDirectoryList() : getAlistList());
   } finally {
     concurrencyLoading.value = false;
   }
@@ -722,6 +730,7 @@ const addMount = () => {
     engineId: currentEngine.value.id,
     name: "",
     driverType: "local",
+    copyConcurrency: 5,
     config: driverDefaults("local"),
   };
   mountShow.value = true;
@@ -737,6 +746,7 @@ const editMount = (mount) => {
     engineId: mount.engineId,
     name: mount.name,
     driverType: mount.driverType,
+    copyConcurrency: mount.copyConcurrency || 5,
     secretState: { ...(mount.secretState || {}) },
     config: {
       ...driverDefaults(mount.driverType),
@@ -1101,6 +1111,7 @@ const mountPayload = () => {
     engineId: mountData.value.engineId,
     name: mountData.value.name.trim(),
     driverType: mountData.value.driverType,
+    copyConcurrency: mountData.value.copyConcurrency,
     config,
   };
 };
@@ -1223,7 +1234,7 @@ onBeforeUnmount(() => {
               {{ $t("common.delete") }}
             </el-button>
           </template>
-          <el-tooltip :content="$t('engine.copyConcurrency')">
+          <el-tooltip v-if="!isTaoSync(item)" :content="$t('engine.copyConcurrency')">
             <el-button size="small" :icon="Setting" :aria-label="$t('engine.copyConcurrency')" @click="openConcurrency(item)" />
           </el-tooltip>
         </div>
@@ -1234,7 +1245,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <el-dialog v-model="concurrencyShow" :title="$t('engine.copyConcurrency')" width="min(420px, calc(100vw - 24px))" :append-to-body="true">
+    <el-dialog v-model="concurrencyShow" :title="concurrencyMountName ? $t('engine.directoryCopyConcurrency', { name: concurrencyMountName }) : $t('engine.copyConcurrency')" width="min(420px, calc(100vw - 24px))" :append-to-body="true">
       <el-form label-position="top">
         <el-form-item :label="$t('engine.copyConcurrency')">
           <el-input-number v-model="concurrencyData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" />
@@ -1298,11 +1309,19 @@ onBeforeUnmount(() => {
                 <div class="mount-title">
                   <strong>{{ mount.name }}</strong>
                   <el-tag size="small" effect="plain">{{ driverLabel(mount.driverType) }}</el-tag>
+                  <el-tag size="small" type="info">{{ $t('engine.copyConcurrencyValue', { count: mount.copyConcurrency || 5 }) }}</el-tag>
                 </div>
                 <div class="mount-summary">{{ mountSummary(mount) }}</div>
               </div>
             </div>
-            <div class="mount-actions">
+            <div class="mount-actions" :class="{ 'has-cloud-files': mount.driverType === 'aliyun' }">
+              <el-tooltip v-if="mount.driverType === 'aliyun'" :content="$t('engine.cloudFiles')">
+                <el-button size="small" :icon="FolderOpened" :aria-label="$t('engine.cloudFiles')"
+                  @click="cloudFilesMount = mount; cloudFilesShow = true" />
+              </el-tooltip>
+              <el-tooltip :content="$t('engine.copyConcurrency')">
+                <el-button size="small" :icon="Setting" :aria-label="$t('engine.copyConcurrency')" @click="openConcurrency(mount, true)" />
+              </el-tooltip>
               <el-button size="small" type="primary" :icon="Edit" @click="editMount(mount)">{{ $t("common.edit") }}</el-button>
               <el-button
                 size="small"
@@ -1318,6 +1337,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </el-dialog>
+
+    <CloudFiles v-model="cloudFilesShow" :engine-id="currentEngine?.id" :mount="cloudFilesMount" :directories="directoryList" />
 
     <el-dialog
       v-model="mountShow"
@@ -1343,6 +1364,10 @@ onBeforeUnmount(() => {
             <el-select v-model="mountData.driverType" :disabled="mountEditFlag" @change="handleDriverChange">
               <el-option v-for="driverType in driverTypes" :key="driverType" :label="driverLabel(driverType)" :value="driverType" />
             </el-select>
+          </el-form-item>
+
+          <el-form-item prop="copyConcurrency" :label="$t('engine.copyConcurrency')">
+            <el-input-number v-model="mountData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" />
           </el-form-item>
 
           <template v-if="mountData.driverType === 'local'">
@@ -1643,6 +1668,9 @@ onBeforeUnmount(() => {
                 :placeholder="$t('engine.rootFolder')"
                 @change="selectAliyunRoot"
               />
+            </el-form-item>
+            <el-form-item prop="config.rapid_upload" :label="$t('engine.rapidUpload')">
+              <el-switch v-model="mountData.config.rapid_upload" :aria-label="$t('engine.rapidUpload')" />
             </el-form-item>
             <el-form-item class="form-span-2" prop="config.remove_way" :label="$t('engine.removeWay')">
               <el-radio-group v-model="mountData.config.remove_way">
@@ -2054,9 +2082,14 @@ onBeforeUnmount(() => {
 
 :global(.directory-dialog .mount-title) {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   color: var(--text-primary);
+}
+
+:global(.directory-dialog .mount-title strong) {
+  overflow-wrap: anywhere;
 }
 
 :global(.directory-dialog .mount-summary) {
@@ -2462,12 +2495,17 @@ onBeforeUnmount(() => {
 
   :global(.directory-dialog .mount-actions) {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 32px repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   :global(.directory-dialog .mount-actions .el-button) {
     width: 100%;
     margin: 0;
+  }
+
+  :global(.directory-dialog .mount-actions.has-cloud-files) {
+    grid-template-columns: repeat(2, 32px) repeat(2, minmax(0, 1fr));
   }
 
   :global(.mount-editor-dialog .mount-form-grid) {

@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 
 import requests
 from urllib3.connection import HTTPSConnection
@@ -19,11 +20,53 @@ from urllib3.util import connection as urllib3_connection
 
 from common.fileFingerprint import fileFingerprint
 
-from .base import StorageDriver, TransferCancelled, check_cancel, normalize_path
+from .base import StorageDriver, TransferCancelled, check_cancel, child_path, normalize_path
 
 
 _GLOBAL_RATE_LOCK = threading.Lock()
 _GLOBAL_RATE_STATES = {}
+
+
+class AliyunAPIError(RuntimeError):
+    def __init__(self, message, code=""):
+        super().__init__(message)
+        self.code = code
+
+
+class _PrefixReader:
+    def __init__(self, prefix, source):
+        self.prefix = prefix
+        self.source = source
+
+    def read(self, size=-1):
+        if not self.prefix:
+            return self.source.read(size)
+        if size is None or size < 0:
+            data, self.prefix = self.prefix, b""
+            return data + self.source.read()
+        data, self.prefix = self.prefix[:size], self.prefix[size:]
+        return data
+
+
+def _sha1(value):
+    return value.upper() if isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{40}", value) else None
+
+
+def _upload_times(metadata):
+    result = {}
+    for field in ("created_at", "modified_at"):
+        value = metadata.get(field)
+        if value is None:
+            continue
+        try:
+            instant = (datetime.fromisoformat(value.replace("Z", "+00:00"))
+                       if isinstance(value, str) else datetime.fromtimestamp(value, timezone.utc))
+            if instant.tzinfo is None:
+                instant = instant.replace(tzinfo=timezone.utc)
+            result["local_" + field] = instant.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        except (ValueError, TypeError, OverflowError, OSError):
+            continue
+    return result
 
 
 class _UploadHTTPSConnection(HTTPSConnection):
@@ -143,6 +186,8 @@ class _PartReader:
 
 
 class AliyunDriveDriver(StorageDriver):
+    supports_random_read = True
+    supports_native_move = True
     """Aliyun Drive Open API driver.
 
     It uses the public OAuth/OpenFile endpoints rather than private web-client
@@ -194,6 +239,9 @@ class AliyunDriveDriver(StorageDriver):
         self.remove_way = str(self.config.get("remove_way") or "trash")
         if self.remove_way not in ("trash", "delete"):
             raise ValueError("invalid Aliyun remove_way")
+        self.rapid_upload = self.config.get("rapid_upload", True)
+        if not isinstance(self.rapid_upload, bool):
+            raise ValueError("Aliyun rapid_upload must be a boolean")
         self.save_config = save_config
         self.load_config = load_config
         self.auth_version = int(auth_version) if auth_version is not None else None
@@ -347,12 +395,13 @@ class AliyunDriveDriver(StorageDriver):
         self._wait_rate(kind)
         self._refresh_access_token()
         request_token = self.access_token
+        request_data = data(request_token) if callable(data) else data
         try:
             response = self.session.request(
                 method,
                 self.api_url + endpoint,
-                json=data,
-                headers={"Authorization": "Bearer " + self.access_token},
+                json=request_data,
+                headers={"Authorization": "Bearer " + request_token},
                 timeout=(30, 120),
             )
         except requests.RequestException as exc:
@@ -380,7 +429,7 @@ class AliyunDriveDriver(StorageDriver):
                 time.sleep(max(retry_after, 2 ** attempt))
                 return self._request(endpoint, data, method, auth_retry, attempt + 1)
         if response.status_code >= 400 or code:
-            raise RuntimeError(_api_error("Aliyun API request failed", response, result))
+            raise AliyunAPIError(_api_error("Aliyun API request failed", response, result), code)
         return result
 
     def _ensure_drive(self):
@@ -423,7 +472,7 @@ class AliyunDriveDriver(StorageDriver):
             if not marker:
                 return files
 
-    def _resolve(self, path, allow_root=True):
+    def _resolve(self, path, allow_root=True, forbidden_id=None):
         path = normalize_path(path, allow_root=allow_root)
         current = {
             "file_id": self.root_folder_id,
@@ -431,37 +480,54 @@ class AliyunDriveDriver(StorageDriver):
             "name": "root",
             "size": 0,
         }
+        if forbidden_id and current["file_id"] == forbidden_id:
+            raise ValueError("a directory cannot be moved into itself")
         for part in path.strip("/").split("/") if path != "/" else []:
+            if current.get("type") != "folder":
+                raise NotADirectoryError(path)
             matches = [item for item in self._list_id(current["file_id"]) if item.get("name") == part]
             if not matches:
                 raise FileNotFoundError(path)
             # Preserve the newest item if an older API operation left duplicate
             # names in the same directory.
             current = sorted(matches, key=lambda item: item.get("updated_at") or "")[-1]
+            if forbidden_id and current["file_id"] == forbidden_id:
+                raise ValueError("a directory cannot be moved into itself")
         return current
 
     def list(self, path, details=False):
         parent = self._resolve(path)
         if parent.get("type") != "folder":
             raise NotADirectoryError(path)
-        result = []
-        for item in self._list_id(parent["file_id"]):
-            is_dir = item.get("type") == "folder"
-            entry = {
-                "name": item.get("name") or item.get("file_name"),
-                "is_dir": is_dir,
-                "size": None if is_dir else int(item.get("size") or 0),
-            }
-            if details:
-                entry["fingerprint"] = fileFingerprint(
-                        "aliyun",
-                        item.get("file_id"),
-                        item.get("updated_at"),
-                        item.get("content_hash") or item.get("crc64_hash"),
-                    )
-            result.append(entry)
+        result = [self._entry(item, details) for item in self._list_id(parent["file_id"])]
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
+
+    @staticmethod
+    def _entry(item, details):
+        is_dir = item.get("type") == "folder"
+        entry = {
+            "name": item.get("name") or item.get("file_name"),
+            "is_dir": is_dir,
+            "size": None if is_dir else int(item.get("size") or 0),
+        }
+        if details:
+            entry["created_at"] = item.get("local_created_at") or item.get("created_at")
+            entry["modified_at"] = item.get("local_modified_at") or item.get("updated_at")
+            if str(item.get("content_hash_name") or "sha1").lower() == "sha1":
+                entry["sha1"] = _sha1(item.get("content_hash"))
+            entry["fingerprint"] = fileFingerprint(
+                "aliyun", item.get("file_id"), item.get("updated_at"),
+                item.get("content_hash") or item.get("crc64_hash"),
+            )
+        return entry
+
+    def file_metadata(self, path):
+        # Match download/read_range's duplicate-name resolution exactly.
+        item = self._resolve(path, allow_root=False)
+        if item.get("type") == "folder":
+            raise IsADirectoryError(path)
+        return self._entry(item, True)
 
     def mkdir(self, path):
         path = normalize_path(path)
@@ -528,6 +594,36 @@ class AliyunDriveDriver(StorageDriver):
         if progress:
             progress(1.0)
 
+    def read_range(self, path, offset, length, cancel=None):
+        check_cancel(cancel)
+        item = self._resolve(path, allow_root=False)
+        if item.get("type") == "folder":
+            raise IsADirectoryError(path)
+        data = self._request("/adrive/v1.0/openFile/getDownloadUrl", {
+            "drive_id": self.drive_id, "file_id": item["file_id"], "expire_sec": 14400,
+        })
+        if not data.get("url"):
+            raise RuntimeError("Aliyun did not return a download URL")
+        end = offset + length - 1
+        response = self.session.get(data["url"], headers={"Range": "bytes={}-{}".format(offset, end)},
+                                    stream=True, timeout=(30, 300))
+        try:
+            response.raise_for_status()
+            expected = "bytes {}-{}/".format(offset, end)
+            if response.status_code != 206 or not response.headers.get("Content-Range", "").startswith(expected):
+                raise IOError("Aliyun did not honor the requested byte range")
+            result = bytearray()
+            for chunk in response.iter_content(length):
+                check_cancel(cancel)
+                result.extend(chunk)
+                if len(result) > length:
+                    raise IOError("Aliyun returned an invalid byte range")
+            if len(result) != length:
+                raise IOError("Aliyun range download ended before the expected size")
+            return bytes(result)
+        finally:
+            response.close()
+
     def upload(self, path, source, size=None, progress=None, cancel=None):
         path = normalize_path(path, allow_root=False)
         with self._destination_lock(path):
@@ -539,6 +635,10 @@ class AliyunDriveDriver(StorageDriver):
                     self._abort_upload(context.file_id)
                 raise
             finally:
+                cached_source = getattr(self.upload_context, "cached_source", None)
+                if cached_source is not None:
+                    cached_source.close()
+                self.upload_context.cached_source = None
                 self.upload_context.file_id = None
                 self.upload_context.upload_id = None
                 self.upload_context.completed = False
@@ -555,10 +655,102 @@ class AliyunDriveDriver(StorageDriver):
         except Exception:
             pass
 
+    @staticmethod
+    def _read_exact(source, length, cancel):
+        chunks = []
+        while length:
+            check_cancel(cancel)
+            chunk = source.read(min(1024 * 1024, length))
+            if not chunk:
+                raise IOError("source stream ended before the expected file size")
+            chunks.append(chunk)
+            length -= len(chunk)
+        return b"".join(chunks)
+
+    def _create_upload(self, data, source, size, cancel):
+        endpoint = "/adrive/v1.0/openFile/create"
+        check_cancel(cancel)
+        metadata = getattr(source, "metadata", {})
+        content_hash = _sha1(metadata.get("sha1"))
+        range_read = None
+        if getattr(source, "can_read_range", False) is True:
+            range_read = source.read_range
+        elif callable(getattr(source, "seekable", None)) and source.seekable():
+            origin = source.tell()
+
+            def range_read(offset, length):
+                position = source.tell()
+                try:
+                    source.seek(origin + offset)
+                    return self._read_exact(source, length, cancel)
+                finally:
+                    source.seek(position)
+
+        if self.rapid_upload and content_hash and size > 0 and range_read is not None:
+            created = self._request(endpoint, self._proof_data(data, content_hash, range_read, size, cancel))
+            return created, source, bool(created.get("rapid_upload"))
+        if not self.rapid_upload or size <= 100 * 1024:
+            return self._request(endpoint, data), source, False
+
+        prefix = self._read_exact(source, 1024, cancel)
+        source = _PrefixReader(prefix, source)
+        try:
+            created = self._request(endpoint, {
+                **data, "pre_hash": hashlib.sha1(prefix).hexdigest().upper(),
+            })
+            return created, source, False
+        except AliyunAPIError as exc:
+            if exc.code != "PreHashMatched":
+                raise
+
+        # Only pre-hash matches need a complete local cache. It allows both
+        # token-dependent proof reads and normal-upload fallback from SMB pipes.
+        cached = tempfile.TemporaryFile(mode="w+b")
+        self.upload_context.cached_source = cached
+        digest = None if content_hash else hashlib.sha1()
+        remaining = size
+        while remaining:
+            chunk = self._read_exact(source, min(1024 * 1024, remaining), cancel)
+            cached.write(chunk)
+            if digest is not None:
+                digest.update(chunk)
+            remaining -= len(chunk)
+        content_hash = content_hash or digest.hexdigest().upper()
+        metadata["sha1"] = content_hash
+
+        def cached_range(offset, length):
+            cached.seek(offset)
+            proof = self._read_exact(cached, length, cancel)
+            cached.seek(0)
+            return proof
+
+        created = self._request(endpoint, self._proof_data(data, content_hash, cached_range, size, cancel))
+        cached.seek(0)
+        return created, cached, True
+
+    def _proof_data(self, data, content_hash, read_range, size, cancel):
+        def proof_data(token):
+            check_cancel(cancel)
+            offset = int(hashlib.md5(token.encode("utf-8")).hexdigest()[:16], 16) % size
+            length = min(8, size - offset)
+            proof = read_range(offset, length)
+            check_cancel(cancel)
+            if len(proof) != length:
+                raise IOError("source stream ended before the expected file size")
+            return {
+                **data,
+                "content_hash": content_hash,
+                "content_hash_name": "sha1",
+                "proof_version": "v1",
+                "proof_code": base64.b64encode(proof).decode("ascii"),
+            }
+        return proof_data
+
     def _upload_impl(self, path, source, size=None, progress=None, cancel=None):
         self.upload_context.file_id = None
         self.upload_context.upload_id = None
         self.upload_context.completed = False
+        self.upload_context.cached_source = None
         path = normalize_path(path, allow_root=False)
         parent_path, name = posixpath.split(path)
         parent = self._resolve(parent_path or "/")
@@ -570,11 +762,12 @@ class AliyunDriveDriver(StorageDriver):
             size = source.tell() - current
             source.seek(current)
         size = int(size)
+        if size < 0:
+            raise ValueError("file size must not be negative")
         part_size = max(self.PART_SIZE, math.ceil(size / self.MAX_PARTS) if size else self.PART_SIZE)
         part_count = max(1, math.ceil(size / part_size) if size else 1)
         part_info = [{"part_number": index + 1} for index in range(part_count)]
-        created = self._request(
-            "/adrive/v1.0/openFile/create",
+        created, source, source_consumed = self._create_upload(
             {
                 "drive_id": self.drive_id,
                 "parent_file_id": parent["file_id"],
@@ -583,7 +776,8 @@ class AliyunDriveDriver(StorageDriver):
                 "size": size,
                 "check_name_mode": "ignore",
                 "part_info_list": part_info,
-            },
+                **_upload_times(getattr(source, "metadata", {})),
+            }, source, size, cancel,
         )
         file_id = created["file_id"]
         upload_id = created.get("upload_id")
@@ -681,7 +875,7 @@ class AliyunDriveDriver(StorageDriver):
                     reader.close()
             if total_done != size:
                 raise IOError("source stream ended before the expected file size")
-        else:
+        elif not source_consumed:
             # A rapid-upload response still consumes the source stream when
             # TaoSync is piping a different backend, otherwise the producer can
             # block on a full pipe and report a false transfer failure.
@@ -776,6 +970,59 @@ class AliyunDriveDriver(StorageDriver):
             self._remove_duplicates(destination_parent["file_id"], name, keep_id)
             if progress:
                 progress(1.0)
+
+    def can_move_to(self, destination):
+        if not isinstance(destination, AliyunDriveDriver) or self.api_url != destination.api_url:
+            return False
+        self._ensure_drive()
+        destination._ensure_drive()
+        return self.drive_id == destination.drive_id
+
+    def move(self, source_path, destination_path, size=None, progress=None, cancel=None):
+        return self.move_to(source_path, self, destination_path, progress, cancel)
+
+    def move_to(self, source_path, destination, destination_path, progress=None, cancel=None):
+        if not self.can_move_to(destination):
+            raise ValueError("cloud moves require the same Aliyun drive")
+        source_path = normalize_path(source_path, allow_root=False)
+        destination_path = normalize_path(destination_path, allow_root=False)
+        parent_path, name = posixpath.split(destination_path)
+        child_path(parent_path, name)
+        with destination._destination_lock(destination_path):
+            check_cancel(cancel)
+            source = self._resolve(source_path, allow_root=False)
+            parent = destination._resolve(parent_path or "/", forbidden_id=source["file_id"])
+            if parent.get("type") != "folder":
+                raise NotADirectoryError(parent_path)
+            matches = [item for item in destination._list_id(parent["file_id"]) if item.get("name") == name]
+            if any(item.get("file_id") != source["file_id"] for item in matches):
+                raise FileExistsError(destination_path)
+            if any(item.get("file_id") == source["file_id"] for item in matches):
+                if progress:
+                    progress(1.0)
+                return
+            check_cancel(cancel)
+            if (source.get("parent_file_id") == parent["file_id"]
+                    or (self is destination and posixpath.dirname(source_path) == parent_path)):
+                self._request("/adrive/v1.0/openFile/update", {
+                    "drive_id": self.drive_id, "file_id": source["file_id"],
+                    "name": name, "check_name_mode": "refuse",
+                })
+            else:
+                self._request("/adrive/v1.0/openFile/move", {
+                    "drive_id": self.drive_id, "file_id": source["file_id"],
+                    "to_parent_file_id": parent["file_id"], "new_name": name,
+                    "check_name_mode": "refuse",
+                })
+            # The cloud has committed the operation. A late cancellation must
+            # not delete the moved object or report it as cancelled.
+            if progress:
+                progress(1.0)
+
+    def rename(self, path, name, cancel=None):
+        path = normalize_path(path, allow_root=False)
+        destination = child_path(posixpath.dirname(path), name)
+        return self.move(path, destination, cancel=cancel)
 
 
 def _response_json(response):

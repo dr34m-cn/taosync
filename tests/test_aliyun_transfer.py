@@ -1,5 +1,6 @@
 import io
 import hashlib
+import base64
 import socket
 import threading
 import unittest
@@ -9,10 +10,10 @@ from unittest.mock import Mock, patch
 import requests
 
 from service.storage.drivers.aliyun import (
-    AliyunDriveDriver, _PartReader, _TransferAdapter, _UploadHTTPSConnection,
+    AliyunAPIError, AliyunDriveDriver, _PartReader, _TransferAdapter, _UploadHTTPSConnection,
     _UploadHTTPSConnectionPool,
 )
-from service.storage.drivers.base import TransferCancelled
+from service.storage.drivers.base import StorageDriver, TransferCancelled, stream_transfer
 from service.storage import storageService
 from service.engine import engineService
 
@@ -276,6 +277,264 @@ class UploadTests(unittest.TestCase):
             driver.session.close()
 
 
+class RapidUploadTests(unittest.TestCase):
+    def setUp(self):
+        self.driver = make_driver()
+        self.addCleanup(self.driver.session.close)
+        self.payload = bytes(range(256)) * 513
+        self.driver.access_token = 'first-access-token'
+        self.driver._wait_rate = Mock()
+        self.driver._refresh_access_token = Mock()
+        self.requests = []
+        self.uploaded = []
+        # Exercise the real API error and token retry paths.
+        self.driver._request = AliyunDriveDriver._request.__get__(self.driver)
+        self.driver.session.request = Mock(side_effect=self.request)
+        self.driver.session.put = Mock(side_effect=self.put)
+        self.prehash_match = True
+        self.rapid_match = True
+        self.expire_proof_token = False
+
+    def request(self, method, url, json, headers, **kwargs):
+        self.requests.append((url, json, headers['Authorization']))
+        result = {'file_id': 'new-file', 'upload_id': 'upload'}
+        status = 200
+        if url.endswith('/create'):
+            if 'pre_hash' in json and self.prehash_match:
+                status, result = 409, {'code': 'PreHashMatched'}
+            elif 'proof_code' in json and self.expire_proof_token:
+                self.expire_proof_token = False
+                status, result = 401, {'code': 'AccessTokenExpired'}
+            elif 'proof_code' in json and self.rapid_match:
+                result['rapid_upload'] = True
+            else:
+                result['part_info_list'] = [{'part_number': 1, 'upload_url': 'https://example.test/part'}]
+        return Mock(status_code=status, headers={}, json=lambda: result, text='')
+
+    def put(self, url, data, **kwargs):
+        content = bytearray()
+        while chunk := data.read(8192):
+            content.extend(chunk)
+        self.uploaded.append(bytes(content))
+        return Mock(status_code=200)
+
+    def test_prehash_match_uses_sha1_and_possession_proof_without_put(self):
+        source = io.BytesIO(self.payload)
+        progress = []
+        self.driver.upload('/file', source, len(self.payload), progress.append)
+        creates = [item for item in self.requests if item[0].endswith('/create')]
+        self.assertEqual(len(creates), 2)
+        self.assertEqual(creates[0][1]['pre_hash'], hashlib.sha1(self.payload[:1024]).hexdigest().upper())
+        proof = creates[1][1]
+        self.assertNotIn('pre_hash', proof)
+        self.assertEqual(proof['content_hash'], hashlib.sha1(self.payload).hexdigest().upper())
+        self.assertEqual(proof['content_hash_name'], 'sha1')
+        self.assertEqual(proof['proof_version'], 'v1')
+        offset = int(hashlib.md5(b'first-access-token').hexdigest()[:16], 16) % len(self.payload)
+        self.assertEqual(proof['proof_code'], base64.b64encode(self.payload[offset:offset + 8]).decode())
+        self.driver.session.put.assert_not_called()
+        self.assertEqual(source.tell(), len(self.payload))
+        self.assertEqual(progress, [1.0])
+        self.assertIsNone(self.driver.upload_context.cached_source)
+        self.driver._remove_duplicates.assert_called_once_with('parent', 'file', 'new-file')
+
+    def hashed_source(self, sha1=None):
+        payload = self.payload
+
+        class Source(StorageDriver):
+            supports_random_read = True
+
+            def read_range(source, path, offset, length, cancel=None):
+                source.ranges.append((offset, length))
+                return payload[offset:offset + length]
+
+            def download(source, path, target, progress=None, cancel=None):
+                source.downloads += 1
+                target.write(payload)
+
+            def list(source, path, details=False):
+                return [{'name': 'source', 'is_dir': False, 'size': len(payload),
+                         'sha1': sha1 or hashlib.sha1(payload).hexdigest(),
+                         'created_at': '2020-01-02T03:04:05+08:00', 'modified_at': 1609459200}]
+
+        source = Source()
+        source.downloads, source.ranges = 0, []
+        return source
+
+    def test_existing_sha1_reads_only_proof_bytes_and_never_downloads_source(self):
+        source = self.hashed_source()
+        metadata = source.file_metadata('/source')
+        with patch('service.storage.drivers.aliyun.hashlib.sha1') as hash_file, patch(
+            'service.storage.drivers.aliyun.tempfile.TemporaryFile'
+        ) as cache:
+            stream_transfer(source, '/source', self.driver, '/file', len(self.payload), metadata=metadata)
+        hash_file.assert_not_called()
+        cache.assert_not_called()
+        self.assertEqual(source.downloads, 0)
+        self.assertEqual(len(source.ranges), 1)
+        self.assertLessEqual(source.ranges[0][1], 8)
+        create = self.requests[0][1]
+        self.assertEqual(create['content_hash'], hashlib.sha1(self.payload).hexdigest().upper())
+        self.assertEqual(create['local_created_at'], '2020-01-01T19:04:05.000Z')
+        self.assertEqual(create['local_modified_at'], '2021-01-01T00:00:00.000Z')
+        self.driver.session.put.assert_not_called()
+
+    def test_existing_sha1_miss_starts_one_stream_and_uploads_original_bytes(self):
+        self.rapid_match = False
+        source = self.hashed_source()
+        stream_transfer(source, '/source', self.driver, '/file', len(self.payload))
+        self.assertEqual(source.downloads, 1)
+        self.assertEqual(self.uploaded, [self.payload])
+        self.assertEqual(len([item for item in self.requests if item[0].endswith('/create')]), 1)
+
+    def test_original_times_are_also_sent_when_rapid_upload_is_disabled(self):
+        self.driver.rapid_upload = False
+        source = self.hashed_source()
+        stream_transfer(source, '/source', self.driver, '/file', len(self.payload))
+        create = self.requests[0][1]
+        self.assertNotIn('content_hash', create)
+        self.assertEqual(create['local_created_at'], '2020-01-01T19:04:05.000Z')
+        self.assertEqual(create['local_modified_at'], '2021-01-01T00:00:00.000Z')
+        self.assertEqual(source.ranges, [])
+        self.assertEqual(self.uploaded, [self.payload])
+
+    def test_existing_sha1_recalculates_range_proof_after_token_refresh(self):
+        self.expire_proof_token = True
+        self.driver._refresh_access_token.side_effect = lambda force=False, **kwargs: setattr(
+            self.driver, 'access_token', 'new-token' if force else self.driver.access_token)
+        source = self.hashed_source()
+        stream_transfer(source, '/source', self.driver, '/file', len(self.payload))
+        self.assertEqual(source.downloads, 0)
+        self.assertEqual(len(source.ranges), 2)
+        for _, data, authorization in self.requests:
+            if 'proof_code' not in data:
+                continue
+            offset = int(hashlib.md5(authorization.removeprefix('Bearer ').encode()).hexdigest()[:16], 16) % len(self.payload)
+            self.assertEqual(data['proof_code'], base64.b64encode(self.payload[offset:offset + 8]).decode())
+
+    def test_invalid_source_sha1_falls_back_to_calculating_the_actual_hash(self):
+        source = self.hashed_source('not-a-sha1')
+        metadata = source.file_metadata('/source')
+        stream_transfer(source, '/source', self.driver, '/file', len(self.payload), metadata=metadata)
+        self.assertEqual(source.downloads, 1)
+        self.assertEqual(metadata['sha1'], hashlib.sha1(self.payload).hexdigest().upper())
+        self.assertEqual(len([item for item in self.requests if item[0].endswith('/create')]), 2)
+
+    def test_seekable_source_sha1_preserves_its_position(self):
+        source = io.BytesIO(b'prefix' + self.payload)
+        source.seek(6)
+        source.metadata = {'sha1': hashlib.sha1(self.payload).hexdigest()}
+        self.driver.upload('/file', source, len(self.payload))
+        self.assertEqual(source.tell(), 6)
+        self.assertEqual(self.requests[0][1]['content_hash'], source.metadata['sha1'].upper())
+
+    def test_prehash_miss_replays_prefix_and_keeps_streaming_without_full_cache(self):
+        self.prehash_match = False
+        source = io.BytesIO(self.payload)
+        original_put = self.put
+
+        def put(*args, **kwargs):
+            self.assertEqual(source.tell(), 1024)
+            self.assertIsNone(self.driver.upload_context.cached_source)
+            return original_put(*args, **kwargs)
+
+        self.driver.session.put.side_effect = put
+        self.driver.upload('/file', source, len(self.payload))
+        self.assertEqual(self.uploaded, [self.payload])
+        self.assertEqual(len([item for item in self.requests if item[0].endswith('/create')]), 1)
+
+    def test_hash_miss_uploads_the_cached_file_and_closes_it(self):
+        self.rapid_match = False
+        source = io.BytesIO(self.payload)
+        original_put = self.put
+        caches = []
+
+        def put(*args, **kwargs):
+            self.assertEqual(source.tell(), len(self.payload))
+            caches.append(self.driver.upload_context.cached_source)
+            return original_put(*args, **kwargs)
+
+        self.driver.session.put.side_effect = put
+        self.driver.upload('/file', source, len(self.payload))
+        self.assertEqual(self.uploaded, [self.payload])
+        self.assertTrue(caches[0].closed)
+
+    def test_token_refresh_recomputes_proof_with_the_token_used_for_each_request(self):
+        self.expire_proof_token = True
+
+        def refresh(force=False, **kwargs):
+            if force:
+                self.driver.access_token = 'refreshed-access-token'
+
+        self.driver._refresh_access_token.side_effect = refresh
+        self.driver.upload('/file', io.BytesIO(self.payload), len(self.payload))
+        proofs = [item for item in self.requests if 'proof_code' in item[1]]
+        self.assertEqual(len(proofs), 2)
+        for _, data, authorization in proofs:
+            token = authorization.removeprefix('Bearer ')
+            offset = int(hashlib.md5(token.encode()).hexdigest()[:16], 16) % len(self.payload)
+            self.assertEqual(data['proof_code'], base64.b64encode(self.payload[offset:offset + 8]).decode())
+        self.assertNotEqual(proofs[0][1]['proof_code'], proofs[1][1]['proof_code'])
+
+    def test_small_empty_and_disabled_uploads_skip_hash_preflight(self):
+        for payload, enabled in ((b'', True), (b'small', True), (self.payload, False)):
+            with self.subTest(size=len(payload), enabled=enabled):
+                self.requests.clear()
+                self.uploaded.clear()
+                self.driver.rapid_upload = enabled
+                self.driver.upload('/file', io.BytesIO(payload), len(payload))
+                self.assertEqual(self.uploaded, [payload])
+                self.assertTrue(all('pre_hash' not in item[1] and 'content_hash' not in item[1]
+                                    for item in self.requests))
+
+    def test_truncated_source_after_prehash_match_does_not_commit_or_remove_old_file(self):
+        with self.assertRaisesRegex(IOError, 'source stream ended'):
+            self.driver.upload('/file', io.BytesIO(self.payload[:-1]), len(self.payload))
+        self.driver._remove_duplicates.assert_not_called()
+        self.driver._abort_upload.assert_not_called()
+        self.assertIsNone(self.driver.upload_context.cached_source)
+        self.assertFalse(any(item[0].endswith('/complete') for item in self.requests))
+
+    def test_cancellation_during_hashing_closes_cache_and_does_not_commit(self):
+        cancel = threading.Event()
+
+        class Source(io.BytesIO):
+            def read(source, size=-1):
+                data = super().read(size)
+                if source.tell() > 1024:
+                    cancel.set()
+                return data
+
+        with self.assertRaises(TransferCancelled):
+            self.driver.upload('/file', Source(self.payload), len(self.payload), cancel=cancel)
+        self.assertIsNone(self.driver.upload_context.cached_source)
+        self.driver._remove_duplicates.assert_not_called()
+        self.assertFalse(any(item[0].endswith('/complete') for item in self.requests))
+
+    def test_api_errors_other_than_prehash_matched_do_not_trigger_full_hash(self):
+        error = AliyunAPIError('permission denied', 'Forbidden')
+        self.driver._request = Mock(side_effect=error)
+        source = io.BytesIO(self.payload)
+        with self.assertRaisesRegex(AliyunAPIError, 'permission denied'):
+            self.driver.upload('/file', source, len(self.payload))
+        self.assertEqual(source.tell(), 1024)
+        self.driver._remove_duplicates.assert_not_called()
+
+    def test_rapid_upload_consumes_a_nonseekable_pipe_and_finishes_its_producer(self):
+        payload = self.payload
+        producer_finished = threading.Event()
+
+        class Source:
+            def download(source, path, target, progress=None, cancel=None):
+                for offset in range(0, len(payload), 97):
+                    target.write(payload[offset:offset + 97])
+                producer_finished.set()
+
+        stream_transfer(Source(), '/source', self.driver, '/file', len(payload))
+        self.assertTrue(producer_finished.is_set())
+        self.driver.session.put.assert_not_called()
+
+
 class BrowseTests(unittest.TestCase):
     def test_browse_uses_selected_space_and_filters_files(self):
         driver = Mock()
@@ -317,9 +576,35 @@ class ConcurrencyConfigTests(unittest.TestCase):
 
     def test_setting_limit_updates_database_and_shared_limiter(self):
         limiter = engineService.CopyLimiter(5)
-        with patch.object(engineService, 'getCopyLimiter', return_value=limiter), patch(
+        with patch.object(engineService, 'getEngineById', return_value={'engineType': 'alist'}), \
+                patch.object(engineService, 'getCopyLimiter', return_value=limiter), patch(
             'mapper.alistMapper.updateCopyConcurrency'
         ) as persist:
             engineService.updateCopyConcurrency(1, 8)
         persist.assert_called_once_with(1, 8)
         self.assertEqual(limiter.limit, 8)
+
+    def test_builtin_engine_rejects_the_obsolete_global_setting(self):
+        with patch.object(engineService, 'getEngineById', return_value={'engineType': 'taosync'}), \
+                patch.object(engineService, 'getCopyLimiter') as get_limiter:
+            with self.assertRaisesRegex(ValueError, 'each storage directory'):
+                engineService.updateCopyConcurrency(1, 8)
+        get_limiter.assert_not_called()
+
+    def test_mount_limiter_is_shared_and_defaults_to_five_independently_of_engine(self):
+        with patch.dict(engineService.copyLimiters, clear=True), patch.object(
+            engineService.storageMapper, 'getMountById',
+            side_effect=lambda mount_id: {'id': mount_id, 'copyConcurrency': 2 if mount_id == 11 else 5},
+        ) as load:
+            first = engineService.getMountCopyLimiter(11)
+            self.assertIs(first, engineService.getMountCopyLimiter(11))
+            other = engineService.getMountCopyLimiter(12)
+            self.assertEqual((first.limit, other.limit), (2, 5))
+            self.assertEqual(load.call_count, 2)
+
+    def test_failed_persistence_does_not_change_the_live_directory_limit(self):
+        limiter = engineService.CopyLimiter(5)
+        with patch.object(engineService, 'getMountCopyLimiter', return_value=limiter):
+            with self.assertRaisesRegex(OSError, 'database unavailable'):
+                engineService.updateMountCopyConcurrency(11, 8, persist=Mock(side_effect=OSError('database unavailable')))
+        self.assertEqual(limiter.limit, 5)

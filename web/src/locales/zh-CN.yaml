@@ -243,6 +243,18 @@ taskDetail:
   copy: 复制
   failedReason: 失败，原因
 engine:
+  cloudFiles: 云端文件
+  cloudRename: 重命名
+  cloudMove: 移动
+  cloudNewName: 新名称
+  cloudInvalidName: 名称不能为空，不能包含斜杠或控制字符
+  cloudDestination: 目标目录
+  cloudParent: 上级目录
+  cloudRefresh: 刷新
+  cloudSize: 大小
+  cloudCreated: 创建时间
+  cloudModified: 修改时间
+  cloudOperationFailed: 云端操作失败
   loading: 加载中
   empty: 暂无引擎，请新增
   add: 新增
@@ -331,6 +343,9 @@ engine:
   driveType: 网盘空间
   rootFolder: 根文件夹
   copyConcurrency: 并行复制数
+  directoryCopyConcurrency: "并行复制数：{name}"
+  copyConcurrencyValue: "并行 {count}"
+  rapidUpload: 哈希秒传
   removeWay: 删除方式
   secretPlaceholderEdit: 留空表示保留现有值
   mountNameRule: 请输入目录名称

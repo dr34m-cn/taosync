@@ -305,6 +305,7 @@ class SftpDriver(StorageDriver):
                     "size": None if is_dir else int(item.st_size),
                 }
                 if details:
+                    entry["modified_at"] = getattr(item, "st_mtime", None)
                     entry["fingerprint"] = fileFingerprint(
                             "sftp", getattr(item, "st_mtime", None)
                         )

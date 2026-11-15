@@ -1,6 +1,7 @@
 import threading
 
 from mapper.alistMapper import getEngineById
+from mapper import storageMapper
 from service.alist.alistClient import AlistClient
 from service.engine.taosyncClient import TaoSyncClient
 
@@ -38,6 +39,25 @@ def getCopyLimiter(engineId):
         return copyLimiters[engineId]
 
 
+def getMountCopyLimiter(mountId):
+    mountId = int(mountId)
+    key = ("mount", mountId)
+    with clientLock:
+        if key not in copyLimiters:
+            mount = storageMapper.getMountById(mountId)
+            copyLimiters[key] = CopyLimiter(int(mount.get("copyConcurrency") or 5))
+        return copyLimiters[key]
+
+
+def updateMountCopyConcurrency(mountId, value, persist=None):
+    value = validateCopyConcurrency(value)
+    limiter = getMountCopyLimiter(mountId)
+    with limiter.lock:
+        if persist is not None:
+            persist()
+        limiter.limit = value
+
+
 def validateCopyConcurrency(value):
     if isinstance(value, bool) or not str(value).isdigit() or not 1 <= int(value) <= 100:
         raise ValueError("copy concurrency must be an integer between 1 and 100")
@@ -49,6 +69,8 @@ def updateCopyConcurrency(engineId, value):
 
     value = validateCopyConcurrency(value)
     engineId = int(engineId)
+    if getEngineById(engineId).get("engineType") == "taosync":
+        raise ValueError("configure copy concurrency for each storage directory")
     limiter = getCopyLimiter(engineId)
     with limiter.lock:
         persist(engineId, value)

@@ -10,6 +10,7 @@ from .base import StorageDriver, check_cancel, normalize_path
 
 class LocalDriver(StorageDriver):
     driver_type = "local"
+    supports_random_read = True
 
     def __init__(self, config):
         root = config.get("root_path") or config.get("path")
@@ -79,6 +80,8 @@ class LocalDriver(StorageDriver):
                     "size": size,
                 }
                 if details:
+                    item["modified_at"] = info.st_mtime
+                    item["created_at"] = getattr(info, "st_birthtime", info.st_ctime if os.name == "nt" else None)
                     item["fingerprint"] = fileFingerprint(
                         "local",
                         getattr(info, "st_dev", None),
@@ -117,6 +120,16 @@ class LocalDriver(StorageDriver):
             raise IOError("local file changed during download")
         if progress and size == 0:
             progress(1.0)
+
+    def read_range(self, path, offset, length, cancel=None):
+        check_cancel(cancel)
+        with open(self._resolve(path, allow_root=False), "rb") as source:
+            source.seek(offset)
+            data = source.read(length)
+        check_cancel(cancel)
+        if len(data) != length:
+            raise IOError("source file changed during range read")
+        return data
 
     def upload(self, path, source, size=None, progress=None, cancel=None):
         destination = self._resolve(path, allow_root=False)

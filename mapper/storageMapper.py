@@ -32,12 +32,13 @@ def getMountById(mountId):
 
 def addMount(mount):
     return sqlBase.execute_insert(
-        "insert into storage_mount (engineId, name, driverType, config, enabled) "
-        "values (:engineId, :name, :driverType, :config, :enabled)",
+        "insert into storage_mount (engineId, name, driverType, config, enabled, copyConcurrency) "
+        "values (:engineId, :name, :driverType, :config, :enabled, :copyConcurrency)",
         {
             **mount,
             "config": json.dumps(mount["config"], ensure_ascii=False),
             "enabled": mount.get("enabled", 1),
+            "copyConcurrency": mount.get("copyConcurrency", 5),
         },
     )
 
@@ -45,12 +46,13 @@ def addMount(mount):
 def updateMount(mount):
     sqlBase.execute_update(
         "update storage_mount set name=:name, driverType=:driverType, config=:config, enabled=:enabled, "
-        "configVersion=configVersion + 1, authVersion=:authVersion "
+        "configVersion=configVersion + 1, authVersion=:authVersion, copyConcurrency=:copyConcurrency "
         "where id=:id",
         {
             **mount,
             "config": json.dumps(mount["config"], ensure_ascii=False),
             "enabled": mount.get("enabled", 1),
+            "copyConcurrency": mount.get("copyConcurrency", 5),
         },
     )
 
@@ -96,6 +98,10 @@ def updateMountTokens(conn, mountId, expectedAuthVersion, tokenValues, expectedT
         return None
     finally:
         cursor.close()
+
+
+def updateCopyConcurrency(mountId, value):
+    sqlBase.execute_update("update storage_mount set copyConcurrency=? where id=?", (value, mountId))
 
 
 def removeMount(mountId):

@@ -21,6 +21,7 @@ def _smb_operation(operation):
 
 class SmbDriver(StorageDriver):
     driver_type = "smb"
+    supports_random_read = True
     _MAX_IDLE_CONNECTIONS = 4
 
     def __init__(self, config):
@@ -184,6 +185,9 @@ class SmbDriver(StorageDriver):
                     "size": size,
                 }
                 if details:
+                    item["modified_at"] = getattr(info, "st_mtime", None)
+                    # smbclient maps SMB creation_time to st_ctime on every OS.
+                    item["created_at"] = getattr(info, "st_ctime", None)
                     item["fingerprint"] = fileFingerprint(
                         "smb", getattr(info, "st_ino", None), mtime_ns
                     )
@@ -247,6 +251,24 @@ class SmbDriver(StorageDriver):
             raise IOError("SMB download ended before the expected file size")
         if progress and size == 0:
             progress(1.0)
+
+    @_smb_operation
+    def read_range(self, path, offset, length, cancel=None):
+        check_cancel(cancel)
+        client = self._client()
+        remote = self._remote(path, allow_root=False)
+        self._assert_no_reparse(client, remote)
+        with client.open_file(remote, mode="rb", **self._connection_kwargs()) as source:
+            source.seek(offset)
+            chunks = []
+            while length:
+                check_cancel(cancel)
+                chunk = source.read(length)
+                if not chunk:
+                    raise IOError("SMB file changed during range read")
+                chunks.append(chunk)
+                length -= len(chunk)
+        return b"".join(chunks)
 
     @_smb_operation
     def upload(self, path, source, size=None, progress=None, cancel=None):

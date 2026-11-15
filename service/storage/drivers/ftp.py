@@ -2,6 +2,7 @@ import ftplib
 import posixpath
 import ssl
 import uuid
+from datetime import datetime, timezone
 from contextlib import contextmanager
 
 from common.fileFingerprint import fileFingerprint
@@ -91,6 +92,12 @@ class FtpDriver(StorageDriver):
                     "size": size,
                 }
                 if details:
+                    for fact, field in (("modify", "modified_at"), ("create", "created_at")):
+                        if facts.get(fact):
+                            try:
+                                item[field] = datetime.strptime(facts[fact].split(".")[0], "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc).timestamp()
+                            except ValueError:
+                                pass
                     item["fingerprint"] = fileFingerprint(
                         "ftp", facts.get("unique"), facts.get("modify")
                     )

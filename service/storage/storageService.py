@@ -45,6 +45,34 @@ def getSupportedDrivers():
     return getDriverTypes()
 
 
+def cloudFileOperation(req):
+    from service.engine import engineService
+
+    _requireTaoSync(req['engineId'])
+    client = engineService.getClientById(req['engineId'])
+    action = req['action']
+    if action == 'fileTask':
+        info = client.taskInfo(req['taskId'])
+        if req.get('forget') is True and info['state'] in (2, 4, 7):
+            client.copyTaskDelete(req['taskId'])
+        return info
+    if action == 'fileCancel':
+        client.copyTaskCancel(req['taskId'])
+        return client.taskInfo(req['taskId'])
+    if action == 'fileList':
+        mount, _ = client.resolve(req['path'])
+        if mount['driverType'] != 'aliyun':
+            raise ValueError('cloud file management requires an Aliyun storage directory')
+        return client._entries(req['path'], 0)
+    if action == 'fileRename':
+        task_id = client.renameFile(req['path'], req['name'])
+    elif action == 'fileMove':
+        task_id = client.relocateFile(req['path'], req['destination'])
+    else:
+        raise ValueError('unknown cloud file action')
+    return {'taskId': task_id}
+
+
 def engineMountPathsOverlap(engineId, firstPath, secondPath):
     engine = getEngineById(int(engineId))
     if engine.get("engineType") != "taosync" or engine.get("systemKey") != "taosync":
@@ -377,6 +405,8 @@ def discoverSmbShares(data):
 
 
 def addMount(data):
+    from service.engine.engineService import validateCopyConcurrency
+
     engineId = int(data["engineId"])
     _requireTaoSync(engineId)
     name = _cleanName(data.get("name"))
@@ -399,6 +429,7 @@ def addMount(data):
             "driverType": driverType,
             "config": config,
             "enabled": 1,
+            "copyConcurrency": validateCopyConcurrency(data.get("copyConcurrency", 5)),
         }
     )
     _invalidateEngine(engineId)
@@ -406,9 +437,18 @@ def addMount(data):
 
 
 def updateMount(data):
+    from service.engine.engineService import updateMountCopyConcurrency, validateCopyConcurrency
+
     mountId = int(data["id"])
     old = storageMapper.getMountById(mountId)
     _requireTaoSync(old["engineId"])
+    concurrency = validateCopyConcurrency(data.get("copyConcurrency", old.get("copyConcurrency", 5)))
+    if set(data) <= {"id", "copyConcurrency", "__user"}:
+        updateMountCopyConcurrency(
+            mountId, concurrency,
+            persist=lambda: storageMapper.updateCopyConcurrency(mountId, concurrency),
+        )
+        return
     name = _cleanName(data.get("name", old["name"]))
     if name != old["name"]:
         raise ValueError("storage directory names cannot be changed; remove and recreate the directory")
@@ -455,18 +495,18 @@ def updateMount(data):
     elif driveChanged:
         config.pop("drive_id", None)
     config = _normalizeDriverConfig(driverType, config)
-    storageMapper.updateMount(
-        {
-            "id": mountId,
-            "name": name,
-            "driverType": driverType,
-            "config": config,
-            "enabled": int(data.get("enabled", old.get("enabled", 1))),
-            "authVersion": int(old.get("authVersion", 1)) + (
-                1 if authChanged or driveChanged else 0
-            ),
-        }
-    )
+    mount = {
+        "id": mountId,
+        "name": name,
+        "driverType": driverType,
+        "config": config,
+        "enabled": int(data.get("enabled", old.get("enabled", 1))),
+        "copyConcurrency": concurrency,
+        "authVersion": int(old.get("authVersion", 1)) + (
+            1 if authChanged or driveChanged else 0
+        ),
+    }
+    updateMountCopyConcurrency(mountId, concurrency, persist=lambda: storageMapper.updateMount(mount))
     _invalidateEngine(old["engineId"])
 
 

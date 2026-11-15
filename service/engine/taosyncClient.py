@@ -2,6 +2,7 @@ import posixpath
 import threading
 import time
 import uuid
+from collections import OrderedDict
 
 from common.intervalGate import IntervalGate
 from mapper import storageMapper
@@ -56,15 +57,27 @@ class _CopyTask:
         with self.lock:
             self.state = 1
         try:
+            source_mount, source_relative = self.client.resolve(self.source_path)
+            destination_mount, destination_relative = self.client.resolve(self.destination_path)
+            source_driver = self.client.getDriver(source_mount)
+            destination_driver = self.client.getDriver(destination_mount)
+            native_move = getattr(source_driver, "can_move_to", None)
+            if self.delete_source and callable(native_move) and native_move(destination_driver):
+                source_driver.move_to(source_relative, destination_driver, destination_relative,
+                                      self._report, self.cancel_event)
+                self.client._invalidateMountCache(source_mount["id"])
+                self.client._invalidateMountCache(destination_mount["id"])
+                with self.lock:
+                    self.progress = 100.0
+                    self.state = 2
+                return
+            metadata = self.client.fileMetadata(source_mount, source_relative)
+            size = int(metadata.get("size") or 0)
             if self.source_path == self.destination_path:
                 with self.lock:
                     self.progress = 100.0
                     self.state = 2
                 return
-            source_mount, source_relative = self.client.resolve(self.source_path)
-            destination_mount, destination_relative = self.client.resolve(self.destination_path)
-            size = self.client.fileSize(source_mount, source_relative)
-            source_driver = self.client.getDriver(source_mount)
             if source_mount["id"] == destination_mount["id"]:
                 source_driver.copy(
                     source_relative,
@@ -74,7 +87,6 @@ class _CopyTask:
                     cancel=self.cancel_event,
                 )
             else:
-                destination_driver = self.client.getDriver(destination_mount)
                 stream_transfer(
                     source_driver,
                     source_relative,
@@ -83,7 +95,9 @@ class _CopyTask:
                     size,
                     self._report,
                     self.cancel_event,
+                    metadata,
                 )
+                self.client._rememberHash(source_mount, source_relative, metadata)
             self.client._invalidateMountCache(destination_mount["id"])
             if self.delete_source:
                 # The destination commit is complete. A late cancellation
@@ -148,6 +162,8 @@ class TaoSyncClient:
         self.entry_cache = {}
         self.entry_cache_lock = threading.Lock()
         self.cache_ttl = 15.0
+        self.hash_cache = OrderedDict()
+        self.hash_cache_lock = threading.Lock()
         for row in storageMapper.getMountList(self.alistId):
             mount_id = int(row["id"])
             auth_version = int(row.get("authVersion") or 1)
@@ -271,6 +287,7 @@ class TaoSyncClient:
                 "isDir": 1 if item["is_dir"] else 0,
                 "size": None if item["is_dir"] else int(item.get("size") or 0),
                 "fingerprint": item.get("fingerprint"),
+                **{key: item[key] for key in ("sha1", "created_at", "modified_at") if item.get(key) is not None},
             }
             for item in entries
         }
@@ -328,11 +345,33 @@ class TaoSyncClient:
             self._invalidateMountCache(mount["id"])
 
     def fileSize(self, mount, relative):
-        parent, name = posixpath.split(relative)
-        for item in self.getDriver(mount).list(parent or "/"):
-            if item["name"] == name and not item["is_dir"]:
-                return int(item.get("size") or 0)
-        raise FileNotFoundError(relative)
+        return int(self.fileMetadata(mount, relative).get("size") or 0)
+
+    def fileMetadata(self, mount, relative):
+        metadata = self.getDriver(mount).file_metadata(relative)
+        key = self._hashKey(mount, relative, metadata)
+        with self.hash_cache_lock:
+            cached = self.hash_cache.get(key) if key is not None else None
+            if cached and time.monotonic() - cached[0] < 600:
+                if not metadata.get("sha1"):
+                    metadata["sha1"] = cached[1]
+                self.hash_cache.move_to_end(key)
+        return metadata
+
+    @staticmethod
+    def _hashKey(mount, relative, metadata):
+        fingerprint = metadata.get("fingerprint")
+        return (mount["id"], relative, metadata.get("size"), fingerprint) if fingerprint else None
+
+    def _rememberHash(self, mount, relative, metadata):
+        key = self._hashKey(mount, relative, metadata)
+        if key is None or not metadata.get("sha1"):
+            return
+        with self.hash_cache_lock:
+            self.hash_cache[key] = (time.monotonic(), metadata["sha1"])
+            self.hash_cache.move_to_end(key)
+            while len(self.hash_cache) > 512:
+                self.hash_cache.popitem(last=False)
 
     def copyFile(self, srcDir, dstDir, name):
         return self._startCopyTask(srcDir, dstDir, name, delete_source=False)
@@ -348,6 +387,26 @@ class TaoSyncClient:
 
     def moveFile(self, srcDir, dstDir, name):
         return self._startCopyTask(srcDir, dstDir, name, delete_source=True)
+
+    def relocateFile(self, source, destination):
+        source = normalize_path(source, allow_root=False)
+        destination = normalize_path(destination, allow_root=False)
+        for path in (source, destination):
+            mount, relative = self.resolve(path)
+            if relative == "/" or not getattr(self.getDriver(mount), "supports_native_move", False):
+                raise ValueError("cloud operations require a path below an Aliyun storage root")
+        source_mount, _ = self.resolve(source)
+        destination_mount, _ = self.resolve(destination)
+        if not self.getDriver(source_mount).can_move_to(self.getDriver(destination_mount)):
+            raise ValueError("cloud moves require the same Aliyun drive")
+        task = _CopyTask(self, source, destination, delete_source=True)
+        with self.tasks_lock:
+            self.tasks[task.id] = task
+        task.start()
+        return task.id
+
+    def renameFile(self, path, name):
+        return self.relocateFile(path, child_path(posixpath.dirname(normalize_path(path)), name))
 
     def _forgetTask(self, taskId, expected=None):
         with self.tasks_lock:

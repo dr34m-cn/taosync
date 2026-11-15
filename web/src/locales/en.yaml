@@ -243,6 +243,18 @@ taskDetail:
   copy: Copy
   failedReason: Failed, reason
 engine:
+  cloudFiles: Cloud Files
+  cloudRename: Rename
+  cloudMove: Move
+  cloudNewName: New name
+  cloudInvalidName: Enter a name without slashes or control characters
+  cloudDestination: Destination directory
+  cloudParent: Parent directory
+  cloudRefresh: Refresh
+  cloudSize: Size
+  cloudCreated: Created
+  cloudModified: Modified
+  cloudOperationFailed: Cloud operation failed
   loading: Loading
   empty: No engines yet. Add one.
   add: Add
@@ -331,6 +343,9 @@ engine:
   driveType: Drive Space
   rootFolder: Root folder
   copyConcurrency: Concurrent copies
+  directoryCopyConcurrency: "Concurrent copies: {name}"
+  copyConcurrencyValue: "Concurrency {count}"
+  rapidUpload: Hash-based Rapid Upload
   removeWay: Delete Method
   secretPlaceholderEdit: Leave blank to keep the current value
   mountNameRule: Please enter a directory name

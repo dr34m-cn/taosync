@@ -56,6 +56,7 @@ class EngineTestBase(unittest.TestCase):
         userMapper.users = {}
         sqlInit.init_sql()
         engineService.clientList.clear()
+        engineService.copyLimiters.clear()
         jobService.jobClientList.clear()
         conn = sqlite3.connect(config.sysConfig['db']['dbname'])
         self.engineId = conn.execute("select id from alist_list where systemKey='taosync'").fetchone()[0]
@@ -73,6 +74,7 @@ class EngineTestBase(unittest.TestCase):
                 time.sleep(0.05)
         jobService.jobClientList.clear()
         engineService.clientList.clear()
+        engineService.copyLimiters.clear()
         config.sysConfig = self.originalConfig
         LNG.sysLanguage = self.originalLanguage
         userMapper.users = self.originalUsers
@@ -137,6 +139,25 @@ class EngineTestBase(unittest.TestCase):
 
 
 class BuiltinEngineSyncTest(EngineTestBase):
+    def test_directory_concurrency_persists_and_updates_only_its_live_limiter(self):
+        mounts = {row['name']: row for row in storageService.getMountList(self.engineId)}
+        source = engineService.getMountCopyLimiter(mounts['S']['id'])
+        destination = engineService.getMountCopyLimiter(mounts['D']['id'])
+        self.assertEqual((source.limit, destination.limit), (5, 5))
+        destination.tryAcquire()
+        with mock.patch.object(storageService, '_invalidateEngine') as invalidate:
+            storageService.updateMount({'id': mounts['D']['id'], 'copyConcurrency': 2})
+        invalidate.assert_not_called()
+        self.assertIs(engineService.getMountCopyLimiter(mounts['D']['id']), destination)
+        self.assertEqual((source.limit, destination.limit, destination.active), (5, 2, 1))
+        destination.release()
+        sqlInit.init_sql()
+        rows = {row['name']: row for row in storageService.getMountList(self.engineId)}
+        self.assertEqual((rows['S']['copyConcurrency'], rows['D']['copyConcurrency']), (5, 2))
+        self.assertEqual(rows['D']['configVersion'], mounts['D']['configVersion'])
+        self.assertEqual(rows['D']['authVersion'], mounts['D']['authVersion'])
+        self.assertEqual(rows['D']['config'], mounts['D']['config'])
+
     def test_abort_records_waiting_files_and_never_counts_them_as_delivered(self):
         for index in range(40):
             write(self.src, f'cancel-{index}.bin', b'x')
@@ -162,6 +183,8 @@ class BuiltinEngineSyncTest(EngineTestBase):
             job = self._job(method=0)
             jobService.doJobManual(job)
             client = jobService.getJobClientById(job)
+            destination = next(row for row in storageService.getMountList(self.engineId) if row['name'] == 'D')
+            limiter = engineService.getMountCopyLimiter(destination['id'])
             deadline = time.time() + 5
             while time.time() < deadline:
                 task = client.currentJobTask
@@ -175,11 +198,11 @@ class BuiltinEngineSyncTest(EngineTestBase):
             client.abortJob()
             try:
                 self.assertTrue(cleanup_started.wait(5))
-                self.assertEqual(task.copyLimiter.active, 5)
+                self.assertEqual(limiter.active, 5)
             finally:
                 allow_cleanup.set()
             self._wait(client)
-            self.assertEqual(task.copyLimiter.active, 0)
+            self.assertEqual(limiter.active, 0)
         conn = sqlite3.connect(config.sysConfig['db']['dbname'])
         try:
             rows = conn.execute('select fileName, status from job_task_item where fileName is not null').fetchall()

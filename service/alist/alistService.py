@@ -20,6 +20,7 @@ def getClientList():
     for client in clientList:
         client.pop('token', None)
         if client.get('engineType') == 'taosync':
+            client.pop('copyConcurrency', None)
             client['displayName'] = 'TaoSync'
             client['directoryCount'] = len(getMountList(client['id']))
         else:
