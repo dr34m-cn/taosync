@@ -3,12 +3,14 @@ import asyncio
 import json
 import os
 import shutil
-import socket
 import threading
 import time
 import uuid
 
 import tornado.web
+from tornado.httpserver import HTTPServer
+from tornado.ioloop import IOLoop
+from tornado.netutil import bind_sockets
 
 
 class FakeAlist:
@@ -19,6 +21,10 @@ class FakeAlist:
         self.listCalls = []     # (path, refresh)
         self.copyFaults = []    # dict(dst_prefix, name_match, mode: 'fail'|'write_then_fail'|'truncate')
         self.port = None
+        self.loop = None
+        self.thread = None
+        self.workers = []
+        self.stopping = threading.Event()
 
     # -------------------------------------------------- path mapping
     def storage(self, mount, root, driver='Local', dirSizeDelay=0.0):
@@ -89,7 +95,10 @@ class FakeAlist:
                 task['error'] = str(exc)
                 task['state'] = 7
 
-        threading.Thread(target=run, daemon=True).start()
+        worker = threading.Thread(target=run, daemon=True)
+        with self.lock:
+            self.workers.append(worker)
+        worker.start()
         return tid
 
     # -------------------------------------------------- http
@@ -167,24 +176,65 @@ class FakeAlist:
                                      for i, (m, s) in enumerate(fake.storages.items())],
                          'total': len(fake.storages)})
 
-        sock = socket.socket()
-        sock.bind(('127.0.0.1', 0))
-        self.port = sock.getsockname()[1]
-        sock.close()
         ready = threading.Event()
+        errors = []
 
         def serve():
-            asyncio.set_event_loop(asyncio.new_event_loop())
-            app = tornado.web.Application([
-                (r'/api/me', Me), (r'/api/fs/list', FsList), (r'/api/fs/mkdir', Mkdir),
-                (r'/api/fs/remove', Remove), (r'/api/fs/copy', Copy),
-                (r'/api/admin/task/copy/info', TaskInfo), (r'/api/admin/task/copy/delete', TaskDrop),
-                (r'/api/admin/task/copy/cancel', TaskCancel), (r'/api/admin/storage/list', StorageList),
-            ])
-            app.listen(self.port, address='127.0.0.1')
-            ready.set()
-            asyncio.get_event_loop().run_forever()
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            io_loop = IOLoop.current()
+            server = None
+            sockets = []
+            try:
+                app = tornado.web.Application([
+                    (r'/api/me', Me), (r'/api/fs/list', FsList), (r'/api/fs/mkdir', Mkdir),
+                    (r'/api/fs/remove', Remove), (r'/api/fs/copy', Copy),
+                    (r'/api/admin/task/copy/info', TaskInfo), (r'/api/admin/task/copy/delete', TaskDrop),
+                    (r'/api/admin/task/copy/cancel', TaskCancel), (r'/api/admin/storage/list', StorageList),
+                ])
+                server = HTTPServer(app)
+                sockets = bind_sockets(0, address='127.0.0.1')
+                self.port = sockets[0].getsockname()[1]
+                server.add_sockets(sockets)
+                ready.set()
+                if self.stopping.is_set():
+                    self.loop.call_soon(self.loop.stop)
+                self.loop.run_forever()
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                if server is not None:
+                    server.stop()
+                    self.loop.run_until_complete(server.close_all_connections())
+                for sock in sockets:
+                    sock.close()
+                io_loop.close(all_fds=True)
+                ready.set()
 
-        threading.Thread(target=serve, daemon=True).start()
-        ready.wait(5)
+        self.thread = threading.Thread(target=serve, daemon=True)
+        self.thread.start()
+        if not ready.wait(5):
+            self.stop()
+            raise TimeoutError('fake OpenList server did not start')
+        if errors:
+            self.stop()
+            raise RuntimeError('fake OpenList server failed to start') from errors[0]
         return 'http://127.0.0.1:%d' % self.port
+
+    def stop(self):
+        self.stopping.set()
+        if self.thread is not None:
+            if self.thread.is_alive() and self.loop is not None:
+                try:
+                    self.loop.call_soon_threadsafe(self.loop.stop)
+                except RuntimeError:
+                    pass  # The server may already have closed its loop after a startup failure.
+            self.thread.join(5)
+            if self.thread.is_alive():
+                raise TimeoutError('fake OpenList server did not stop')
+        with self.lock:
+            workers = list(self.workers)
+        for worker in workers:
+            worker.join(5)
+            if worker.is_alive():
+                raise TimeoutError('fake OpenList copy did not finish')

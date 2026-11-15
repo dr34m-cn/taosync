@@ -1,9 +1,11 @@
 import json
+import threading
 from unittest.mock import patch
 
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
+from common import LNG, locales
 from controller import baseController, jobController
 from service.alist import alistService
 from service.engine import engineService
@@ -11,6 +13,11 @@ from service.storage import storageService
 
 
 class ConcurrencyApiTests(AsyncHTTPTestCase):
+    def setUp(self):
+        self.enterContext(patch.multiple(locales, allLang={}, sysLang=None))
+        self.enterContext(patch.object(LNG, '_local', threading.local()))
+        super().setUp()
+
     def get_app(self):
         return Application([(r'/alist', jobController.Alist), (r'/storage', jobController.Storage)])
 

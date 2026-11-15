@@ -4,7 +4,20 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
+from common import LNG
 from service.syncJob import jobClient, jobService
+
+
+def setUpModule():
+    patches = (
+        mock.patch.object(jobClient, 'getConfig', return_value={
+            'server': {'timeout': 0, 'source_full_scan_days': 15},
+        }),
+        mock.patch.object(LNG, 'language', return_value='en'),
+    )
+    for patcher in patches:
+        patcher.start()
+        unittest.addModuleCleanup(patcher.stop)
 
 
 class FakeEngine:
@@ -472,6 +485,7 @@ class SourceModeEditTest(unittest.TestCase):
         jobService.jobClientList = {8: oldClient}
         try:
             with mock.patch.object(jobService, 'getJobClientById', return_value=oldClient), \
+                    mock.patch.object(jobService.storageService, 'getEngineById', return_value={'engineType': 'alist'}), \
                     mock.patch.object(jobService.jobClient, 'JobClient', side_effect=[newClient, restoredClient]) as clientFactory, \
                     mock.patch.object(jobService.jobMapper, 'updateJob', side_effect=updateSideEffect) as updateJob:
                 if updateSideEffect is None:

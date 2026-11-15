@@ -38,6 +38,10 @@ def tree(root):
 
 class EngineTestBase(unittest.TestCase):
     def setUp(self):
+        self.enterContext(mock.patch.multiple(locales, allLang={}, sysLang=None))
+        self.enterContext(mock.patch.object(LNG, '_local', threading.local()))
+        self.enterContext(mock.patch.multiple(engineService, clientList={}, copyLimiters={}, engineLocks={}))
+        self.enterContext(mock.patch.object(jobService, 'jobClientList', {}))
         locales.initLang()
         self.originalCwd = os.getcwd()
         self.originalConfig = config.sysConfig

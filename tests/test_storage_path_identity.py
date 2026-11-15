@@ -198,7 +198,8 @@ class StoragePathJobGuardTest(unittest.TestCase):
         task.sourceScanFailed = False
         task.scanFinish = False
 
-        with mock.patch.object(jobClient.jobMapper, "getSourceSnapshot") as get_snapshot:
+        with mock.patch.object(jobClient.jobMapper, "getSourceSnapshot") as get_snapshot, \
+                mock.patch.object(jobClient, "G", return_value="source_target_overlap"):
             task.sync()
 
         self.assertTrue(task.scanFinish)

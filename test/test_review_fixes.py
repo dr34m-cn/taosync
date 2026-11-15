@@ -218,6 +218,9 @@ class JobTaskStateTest(unittest.TestCase):
         patcher = mock.patch.object(jobClient, 'G', side_effect=_key)
         patcher.start()
         self.addCleanup(patcher.stop)
+        config_patcher = mock.patch.object(jobClient, 'getConfig', return_value={'server': {'timeout': 0}})
+        config_patcher.start()
+        self.addCleanup(config_patcher.stop)
 
     def test_hooks_use_call_time_instead_of_import_time(self):
         task = _bare_task()
@@ -578,6 +581,8 @@ JSON_HEADERS = {'Content-Type': 'application/json'}
 
 class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
     def setUp(self):
+        self.enterContext(mock.patch.multiple(locales, allLang={}, sysLang=None))
+        self.enterContext(mock.patch.object(LNG, '_local', threading.local()))
         locales.initLang()
         self.original_cwd = os.getcwd()
         self.temp_dir = tempfile.TemporaryDirectory()

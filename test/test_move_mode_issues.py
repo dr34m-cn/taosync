@@ -17,6 +17,7 @@ PARSE_TIME_ERROR = 'parsing time'
 class MoveAndOpenListIssueTest(EngineTestBase):
     def _openList(self, **storages):
         fake = FakeAlist()
+        self.addCleanup(fake.stop)
         for mount, (root, driver, delay) in storages.items():
             fake.storage('/' + mount, root, driver=driver, dirSizeDelay=delay)
         url = fake.start()
@@ -38,6 +39,7 @@ class MoveAndOpenListIssueTest(EngineTestBase):
         patcher = mock.patch.object(LocalDriver, 'upload', upload)
         patcher.start()
         self.addCleanup(patcher.stop)
+        return patcher
 
     # ------------------------------------------------------------ #215
     def test_move_removes_source_directories_emptied_by_the_run(self):
@@ -79,14 +81,15 @@ class MoveAndOpenListIssueTest(EngineTestBase):
         self._mount('D2', second)
         write(self.src, 'a/m.txt', 'move me')
         write(self.src, 'a/n.txt', 'and me')
-        self._failUploads(lambda driver, path: driver.root == os.path.realpath(second) and path.endswith('m.txt'))
+        uploadFault = self._failUploads(
+            lambda driver, path: driver.root == os.path.realpath(second) and path.endswith('m.txt'))
         job = self._job(method=2, dst='/D/:/D2/')
         status, _, _ = self._run(job)
         self.assertEqual(status, 3)
         self.assertTrue(Path(self.src, 'a', 'm.txt').exists())
         self.assertFalse(Path(self.src, 'a', 'n.txt').exists())
         self.assertEqual(tree(second).get('a/n.txt'), b'and me')
-        mock.patch.stopall()
+        uploadFault.stop()
         status, _, _ = self._run(job)
         self.assertEqual(status, 2)
         self.assertFalse(Path(self.src, 'a').exists())

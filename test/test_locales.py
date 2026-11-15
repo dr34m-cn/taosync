@@ -23,7 +23,8 @@ class LocalesPathTest(unittest.TestCase):
 
             try:
                 os.chdir(working_path)
-                with mock.patch.object(sys, '_MEIPASS', str(bundle_path), create=True):
+                with mock.patch.object(sys, '_MEIPASS', str(bundle_path), create=True), \
+                        mock.patch.multiple(locales, allLang={}, sysLang=None):
                     locales.initLang()
                     self.assertEqual(locales.t('success', 'zh_CN'), 'success-zh')
                     self.assertEqual(locales.t('success', 'en'), 'success-en')

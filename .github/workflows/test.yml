@@ -19,8 +19,9 @@ jobs:
           python-version: '3.11'
           cache: pip
       - run: python -m pip install -r requirements.txt
-      - run: python -m unittest discover -s test
-      - run: python -m unittest discover -s tests
+      - run: python scripts/run-backend-tests.py test
+      - run: python scripts/run-backend-tests.py tests
+      - run: python scripts/run-backend-tests.py --shuffle-seed 42
   frontend:
     runs-on: ubuntu-latest
     defaults:
