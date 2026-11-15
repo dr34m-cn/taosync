@@ -272,7 +272,7 @@ onMounted(() => {
     <div v-else class="card-box">
       <div class="card-item" v-for="item in dataList" :key="item.id">
         <div class="card-item-top">
-          <el-image v-if="item.method < 5" :src="`/notify/${item.method}.png`" fit="contain" class="notify-logo" />
+          <el-image v-if="item.method < 5 || [6, 7, 8].includes(item.method)" :src="`/notify/${item.method}.png`" :alt="notifyMethod(item.method)" fit="contain" class="notify-logo" />
           <el-icon v-else class="notify-logo" :size="40"><Connection v-if="item.method === 5" /><Bell v-else /></el-icon>
           <div class="notify-info">
             <div class="card-item-user">{{ notifyMethod(item.method) }}</div>
