@@ -36,3 +36,8 @@ def removeAlist(alistId):
 
 def getEngineById(engineId):
     return getAlistById(engineId)
+
+
+def updateCopyConcurrency(engineId, concurrency):
+    sqlBase.execute_update("update alist_list set copyConcurrency=? where id=?",
+                           (concurrency, engineId))

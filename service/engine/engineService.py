@@ -8,6 +8,51 @@ from service.engine.taosyncClient import TaoSyncClient
 clientList = {}
 clientLock = threading.Lock()
 engineLocks = {}
+copyLimiters = {}
+
+
+class CopyLimiter:
+    def __init__(self, limit):
+        self.limit = limit
+        self.active = 0
+        self.lock = threading.Lock()
+
+    def tryAcquire(self):
+        with self.lock:
+            if self.active >= self.limit:
+                return False
+            self.active += 1
+            return True
+
+    def release(self):
+        with self.lock:
+            self.active -= 1
+
+
+def getCopyLimiter(engineId):
+    engineId = int(engineId)
+    with _getEngineLock(engineId):
+        if engineId not in copyLimiters:
+            engine = getEngineById(engineId)
+            copyLimiters[engineId] = CopyLimiter(int(engine.get("copyConcurrency") or 5))
+        return copyLimiters[engineId]
+
+
+def validateCopyConcurrency(value):
+    if isinstance(value, bool) or not str(value).isdigit() or not 1 <= int(value) <= 100:
+        raise ValueError("copy concurrency must be an integer between 1 and 100")
+    return int(value)
+
+
+def updateCopyConcurrency(engineId, value):
+    from mapper.alistMapper import updateCopyConcurrency as persist
+
+    value = validateCopyConcurrency(value)
+    engineId = int(engineId)
+    limiter = getCopyLimiter(engineId)
+    with limiter.lock:
+        persist(engineId, value)
+        limiter.limit = value
 
 
 def _getEngineLock(engineId):

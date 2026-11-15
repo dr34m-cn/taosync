@@ -329,7 +329,8 @@ engine:
   aliyunAuthSuccess: 阿里云盘授权成功
   aliyunAuthRequired: 请先完成阿里云盘扫码授权
   driveType: 网盘空间
-  rootFolderId: 根文件夹 ID
+  rootFolder: 根文件夹
+  copyConcurrency: 并行复制数
   removeWay: 删除方式
   secretPlaceholderEdit: 留空表示保留现有值
   mountNameRule: 请输入目录名称

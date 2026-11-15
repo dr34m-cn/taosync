@@ -381,9 +381,13 @@ log_save=7
 task_save=0
 # 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多
 task_timeout=72
+# 阿里云盘扫码授权和令牌刷新服务地址，省略或留空时使用默认地址
+aliyun_auth_server=https://taoapi.dr34m.cn
 ```
 
 上边的文件默认不存在，如需要，您可以手动在程序同级目录的`data`目录下创建`config.ini`，并填入上边的内容。注意，文件应使用`UTF-8`编码
+
+`aliyun_auth_server` 位于 `[tao]` 中，用于阿里云盘扫码授权及授权后的令牌刷新，默认值为 `https://taoapi.dr34m.cn`。可填写自建授权服务的 HTTPS 地址。没有 `data/config.ini` 时，可通过环境变量 `TAO_ALIYUN_AUTH_SERVER` 设置；当前配置来源中省略该项或留空时使用默认值。
 
 | config.ini    | Docker环境变量    | 描述                                                         | 默认值           |
 | ------------- | ----------------- | ------------------------------------------------------------ |---------------|
@@ -395,6 +399,7 @@ task_timeout=72
 | log_save      | TAO_LOG_SAVE      | 系统日志保留天数，该天数之前的日志会自动清理，单位天，0表示不自动清理 | 7             |
 | task_save     | TAO_TASK_SAVE     | 任务记录保留天数，该天数之前的记录会自动清理，单位天，0表示不自动清理 | 0             |
 | task_timeout  | TAO_TASK_TIMEOUT  | 任务执行超时时间，单位小时。一定要设置长一点，以免要备份的东西太多 | 72            |
+| aliyun_auth_server | TAO_ALIYUN_AUTH_SERVER | 阿里云盘扫码授权及令牌刷新服务地址，可使用自建 HTTPS 服务；省略或留空时使用默认值 | https://taoapi.dr34m.cn |
 | -             | TZ                | 时区                                                         | Asia/Shanghai |
 
 </details>

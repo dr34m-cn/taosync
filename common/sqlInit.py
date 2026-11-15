@@ -294,6 +294,8 @@ def init_sql(conn):
         cursor.execute("alter table alist_list add column systemKey text DEFAULT NULL")
     if 'protected' not in engineColumns:
         cursor.execute("alter table alist_list add column protected integer DEFAULT 0")
+    if 'copyConcurrency' not in engineColumns:
+        cursor.execute("alter table alist_list add column copyConcurrency integer NOT NULL DEFAULT 5")
     cursor.execute("create table if not exists storage_mount("
                    "id integer primary key autoincrement, engineId integer not null,"
                    "name text not null, driverType text not null, config text not null,"

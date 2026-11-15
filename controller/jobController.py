@@ -71,6 +71,8 @@ class Storage(BaseHandler):
             return storageService.testSftp(req)
         if action == 'sftpBrowse':
             return storageService.browseSftp(req)
+        if action == 'aliyunBrowse':
+            return storageService.browseAliyun(req)
         if action == 'smbShares':
             return storageService.discoverSmbShares(req)
         if action is not None:

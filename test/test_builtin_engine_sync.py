@@ -1,4 +1,5 @@
 """End-to-end sync scenarios on the built-in TaoSync engine with local mounts."""
+import json
 import os
 import shutil
 import sqlite3
@@ -136,6 +137,60 @@ class EngineTestBase(unittest.TestCase):
 
 
 class BuiltinEngineSyncTest(EngineTestBase):
+    def test_abort_records_waiting_files_and_never_counts_them_as_delivered(self):
+        for index in range(40):
+            write(self.src, f'cancel-{index}.bin', b'x')
+        original_upload = LocalDriver.upload
+        uploads_started = threading.Event()
+        uploads_lock = threading.Lock()
+        active_uploads = []
+        cleanup_started = threading.Event()
+        allow_cleanup = threading.Event()
+
+        def blocked_upload(driver, *args, **kwargs):
+            cancel = kwargs.get('cancel') or args[4]
+            with uploads_lock:
+                active_uploads.append(1)
+                if len(active_uploads) == 5:
+                    uploads_started.set()
+            cancel.external.wait(10)
+            cleanup_started.set()
+            allow_cleanup.wait(10)
+            return original_upload(driver, *args, **kwargs)
+
+        with mock.patch.object(LocalDriver, 'upload', blocked_upload):
+            job = self._job(method=0)
+            jobService.doJobManual(job)
+            client = jobService.getJobClientById(job)
+            deadline = time.time() + 5
+            while time.time() < deadline:
+                task = client.currentJobTask
+                if task and task.scanFinish and len(task.waiting) == 35:
+                    break
+                time.sleep(0.01)
+            self.assertTrue(task.scanFinish)
+            self.assertEqual(len(task.waiting), 35)
+            self.assertEqual(len(task.doing), 5)
+            self.assertTrue(uploads_started.wait(5))
+            client.abortJob()
+            try:
+                self.assertTrue(cleanup_started.wait(5))
+                self.assertEqual(task.copyLimiter.active, 5)
+            finally:
+                allow_cleanup.set()
+            self._wait(client)
+            self.assertEqual(task.copyLimiter.active, 0)
+        conn = sqlite3.connect(config.sysConfig['db']['dbname'])
+        try:
+            rows = conn.execute('select fileName, status from job_task_item where fileName is not null').fetchall()
+            task_num = json.loads(conn.execute('select taskNum from job_task').fetchone()[0])
+        finally:
+            conn.close()
+        self.assertEqual(len(rows), 40)
+        self.assertTrue(all(status == 4 for _, status in rows), rows)
+        self.assertEqual(task_num['otherNum'], 40)
+        self.assertEqual(tree(self.dst), {})
+
     # ------------------------------------------------------------ 1
     def test_case_only_rename_keeps_target_files_with_throttled_deletes(self):
         for i in range(4):

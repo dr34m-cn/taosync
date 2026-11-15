@@ -88,7 +88,7 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
                 source_driver.download(
                     source_path,
                     target,
-                    _scale_progress(progress, 0.0, 0.5),
+                    None,
                     transfer_cancel,
                 )
         except BaseException as exc:
@@ -104,7 +104,7 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
                 destination_path,
                 source,
                 size,
-                _scale_progress(progress, 0.5, 1.0),
+                progress,
                 transfer_cancel,
             )
     except BaseException as exc:
@@ -151,13 +151,3 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
         if isinstance(source_error, TransferCancelled):
             raise TransferCancelled("transfer cancelled")
         raise source_error
-
-
-def _scale_progress(callback, start, end):
-    if callback is None:
-        return None
-
-    def report(value):
-        callback(start + (end - start) * max(0.0, min(1.0, float(value))))
-
-    return report

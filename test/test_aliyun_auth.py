@@ -114,45 +114,56 @@ class AliyunStorageConfigTest(unittest.TestCase):
 
 class TaoSyncConfigTest(unittest.TestCase):
     @staticmethod
-    def _config_from_ini(env_value):
-        class FakeSection(dict):
-            def get(self, key, fallback=None, raw=False):
-                return super().get(key, fallback)
-
-        fake_section = FakeSection(
-            password="secret",
-            aliyun_auth_server="https://config.example.com",
-        )
-
-        class FakeConfigParser:
-            def read(self, *args, **kwargs):
-                return []
-
-            def __getitem__(self, key):
-                if key != "tao":
-                    raise KeyError(key)
-                return fake_section
-
-        env = {} if env_value is None else {"TAO_ALIYUN_AUTH_SERVER": env_value}
+    def _load_config(ini=None, env=None):
+        parser = config_module.configparser.ConfigParser()
+        if ini is not None:
+            parser.read_string("[tao]\n" + ini)
         with mock.patch.object(config_module, "sysConfig", None), \
-                mock.patch.object(config_module.os.path, "exists", return_value=True), \
+                mock.patch.object(config_module.os.path, "exists", return_value=ini is not None), \
                 mock.patch.object(config_module, "getPasswordStr", return_value="passwd"), \
-                mock.patch.object(config_module.configparser, "ConfigParser", return_value=FakeConfigParser()), \
-                mock.patch.dict(config_module.os.environ, env, clear=False):
+                mock.patch.object(parser, "read", return_value=[]), \
+                mock.patch.object(config_module.configparser, "ConfigParser", return_value=parser), \
+                mock.patch.dict(config_module.os.environ, env or {}, clear=True):
             return config_module.getConfig()
 
-    def test_aliyun_auth_server_env_overrides_config_file(self):
-        config = self._config_from_ini("https://env.example.com")
+    def test_aliyun_auth_server_defaults_when_omitted_or_empty(self):
+        for ini in (None, "", "aliyun_auth_server=\n", "aliyun_auth_server=   \n"):
+            with self.subTest(ini=ini):
+                config = self._load_config(ini)
+                self.assertEqual("https://taoapi.dr34m.cn", config["server"]["aliyun_auth_server"])
+
+    def test_aliyun_auth_server_config_file_has_priority_over_environment(self):
+        for env in ({}, {"TAO_ALIYUN_AUTH_SERVER": ""},
+                    {"TAO_ALIYUN_AUTH_SERVER": "https://env.example.com"}):
+            with self.subTest(env=env):
+                config = self._load_config(
+                    "aliyun_auth_server= https://config.example.com \n", env,
+                )
+                self.assertEqual("https://config.example.com", config["server"]["aliyun_auth_server"])
+
+    def test_config_file_omitted_or_empty_server_uses_default_even_with_environment(self):
+        for ini in ("", "aliyun_auth_server=\n"):
+            with self.subTest(ini=ini):
+                config = self._load_config(ini, {"TAO_ALIYUN_AUTH_SERVER": "https://env.example.com"})
+                self.assertEqual("https://taoapi.dr34m.cn", config["server"]["aliyun_auth_server"])
+
+    def test_aliyun_auth_server_environment_is_used_without_config_file(self):
+        config = self._load_config(env={"TAO_ALIYUN_AUTH_SERVER": " https://env.example.com "})
         self.assertEqual("https://env.example.com", config["server"]["aliyun_auth_server"])
 
-    def test_aliyun_auth_server_empty_env_keeps_config_file(self):
-        # Docker 镜像预置 TAO_ALIYUN_AUTH_SERVER=""，空值不应覆盖 config.ini
-        config = self._config_from_ini("")
-        self.assertEqual("https://config.example.com", config["server"]["aliyun_auth_server"])
+    def test_empty_environment_server_uses_default(self):
+        for value in ("", "   "):
+            with self.subTest(value=value):
+                config = self._load_config(env={"TAO_ALIYUN_AUTH_SERVER": value})
+                self.assertEqual("https://taoapi.dr34m.cn", config["server"]["aliyun_auth_server"])
 
-    def test_aliyun_auth_server_unset_env_keeps_config_file(self):
-        config = self._config_from_ini(None)
-        self.assertEqual("https://config.example.com", config["server"]["aliyun_auth_server"])
+    def test_string_setting_preserves_percent_and_numeric_settings_remain_integers(self):
+        config = self._load_config(
+            "port=9000\ntask_timeout=8\naliyun_auth_server=https://config.example.com/auth%20service\n"
+        )
+        self.assertEqual("https://config.example.com/auth%20service", config["server"]["aliyun_auth_server"])
+        self.assertEqual(9000, config["server"]["port"])
+        self.assertEqual(8, config["server"]["timeout"])
 
 
 if __name__ == "__main__":

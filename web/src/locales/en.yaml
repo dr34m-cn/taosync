@@ -329,7 +329,8 @@ engine:
   aliyunAuthSuccess: Aliyun Drive authorization succeeded
   aliyunAuthRequired: Authorize Aliyun Drive before saving
   driveType: Drive Space
-  rootFolderId: Root Folder ID
+  rootFolder: Root folder
+  copyConcurrency: Concurrent copies
   removeWay: Delete Method
   secretPlaceholderEdit: Leave blank to keep the current value
   mountNameRule: Please enter a directory name

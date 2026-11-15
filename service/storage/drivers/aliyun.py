@@ -4,11 +4,18 @@ import hashlib
 import json
 import math
 import posixpath
+import re
+import socket
+import sys
 import tempfile
 import threading
 import time
+import xml.etree.ElementTree as ET
 
 import requests
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPSConnectionPool
+from urllib3.util import connection as urllib3_connection
 
 from common.fileFingerprint import fileFingerprint
 
@@ -17,6 +24,54 @@ from .base import StorageDriver, TransferCancelled, check_cancel, normalize_path
 
 _GLOBAL_RATE_LOCK = threading.Lock()
 _GLOBAL_RATE_STATES = {}
+
+
+class _UploadHTTPSConnection(HTTPSConnection):
+    def _new_conn(self):
+        # Some dual-stack Aliyun upload routes accept IPv6 connections but
+        # stall while sending parts. Preserve the hostname for TLS and prefer
+        # IPv4 only for the upload service; the normal connector is a fallback.
+        if self._dns_host.endswith((".aliyundrive.net", ".aliyuncs.com")):
+            try:
+                addresses = socket.getaddrinfo(
+                    self._dns_host, self.port, socket.AF_INET, socket.SOCK_STREAM
+                )
+            except socket.gaierror:
+                addresses = []
+            for _family, _kind, _protocol, _name, address in addresses:
+                try:
+                    sock = urllib3_connection.create_connection(
+                        address[:2], self.timeout,
+                        source_address=self.source_address,
+                        socket_options=self.socket_options,
+                    )
+                except OSError:
+                    continue
+                sys.audit("http.client.connect", self, self.host, self.port)
+                return sock
+        return super()._new_conn()
+
+
+class _UploadHTTPSConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _UploadHTTPSConnection
+
+
+class _TransferAdapter(requests.adapters.HTTPAdapter):
+    @staticmethod
+    def _use_upload_connections(manager):
+        manager.pool_classes_by_scheme = {
+            **manager.pool_classes_by_scheme,
+            "https": _UploadHTTPSConnectionPool,
+        }
+
+    def init_poolmanager(self, connections, maxsize, block=False, **kwargs):
+        kwargs["blocksize"] = 256 * 1024
+        super().init_poolmanager(connections, maxsize, block=block, **kwargs)
+        self._use_upload_connections(self.poolmanager)
+
+    def proxy_manager_for(self, proxy, **kwargs):
+        kwargs["blocksize"] = 256 * 1024
+        return super().proxy_manager_for(proxy, **kwargs)
 
 
 def _account_key(client_id, refresh_token, drive_id):
@@ -37,24 +92,53 @@ def _account_key(client_id, refresh_token, drive_id):
 class _PartReader:
     def __init__(self, source, length, cancel, on_read):
         self.source = source
-        self.remaining = length
         self.length = length
         self.cancel = cancel
         self.on_read = on_read
+        self.position = 0
+        self.cached = 0
+        self.reported = 0
+        # Ordinary 20 MiB parts stay in memory. Large parts may spill to disk,
+        # but the first attempt starts sending without staging the whole part.
+        self.buffer = tempfile.SpooledTemporaryFile(max_size=32 * 1024 * 1024, mode="w+b")
 
     def __len__(self):
         return self.length
 
+    def tell(self):
+        return self.position
+
+    def reset(self):
+        self.position = 0
+
+    def close(self):
+        self.buffer.close()
+
     def read(self, size=-1):
         check_cancel(self.cancel)
-        if self.remaining <= 0:
+        remaining = self.length - self.position
+        if remaining <= 0:
             return b""
         if size is None or size < 0:
-            size = self.remaining
-        data = self.source.read(min(size, self.remaining))
-        self.remaining -= len(data)
-        if data:
-            self.on_read(len(data))
+            size = remaining
+        size = min(size, remaining)
+        if size == 0:
+            return b""
+        if self.position < self.cached:
+            self.buffer.seek(self.position)
+            data = self.buffer.read(min(size, self.cached - self.position))
+        else:
+            data = self.source.read(min(max(size, 1024 * 1024), self.length - self.cached))
+            if not data:
+                raise IOError("source stream ended before the expected file size")
+            self.buffer.seek(self.cached)
+            self.buffer.write(data)
+            self.cached += len(data)
+            data = data[:size]
+        self.position += len(data)
+        if self.position > self.reported:
+            self.on_read(self.position - self.reported)
+            self.reported = self.position
         return data
 
 
@@ -114,6 +198,8 @@ class AliyunDriveDriver(StorageDriver):
         self.load_config = load_config
         self.auth_version = int(auth_version) if auth_version is not None else None
         self.session = requests.Session()
+        self.session.mount("http://", _TransferAdapter(pool_maxsize=100))
+        self.session.mount("https://", _TransferAdapter(pool_maxsize=100))
         self.refresh_lock = refresh_lock or threading.Lock()
         self.upload_context = threading.local()
         self.destination_locks_lock = threading.Lock()
@@ -125,9 +211,7 @@ class AliyunDriveDriver(StorageDriver):
             return self.destination_locks.setdefault(path, threading.Lock())
 
     def _wait_rate(self, kind):
-        # Conservative per-driver limits based on the limits used by AList's
-        # official Open driver. They also protect a single account when jobs
-        # submit up to twenty concurrent copy workers.
+        # Account-wide API limits; signed part PUTs do not use this limiter.
         interval = {"list": 1 / 3.9, "link": 1 / 0.9, "other": 1 / 14.9}[kind]
         with _GLOBAL_RATE_LOCK:
             state = _GLOBAL_RATE_STATES.setdefault(
@@ -533,24 +617,15 @@ class AliyunDriveDriver(StorageDriver):
                     uploaded_parts = self._get_upload_parts(file_id, upload_id, part_count)
                     upload_urls_at = time.monotonic()
                     part = uploaded_parts[index]
-                with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as part_buffer:
-                    remaining = length
-                    while remaining:
-                        check_cancel(cancel)
-                        chunk = source.read(min(1024 * 1024, remaining))
-                        if not chunk:
-                            raise IOError("source stream ended before the expected file size")
-                        part_buffer.write(chunk)
-                        remaining -= len(chunk)
-                        on_read(len(chunk))
+                reader = _PartReader(source, length, cancel, on_read)
+                try:
                     for retry_index in range(3):
                         check_cancel(cancel)
                         if retry_index and not part.get("upload_url"):
                             uploaded_parts = self._get_upload_parts(file_id, upload_id, part_count)
                             upload_urls_at = time.monotonic()
                             part = uploaded_parts[index]
-                        part_buffer.seek(0)
-                        reader = _PartReader(part_buffer, length, cancel, lambda count: None)
+                        reader.reset()
                         try:
                             response = self.session.put(
                                 part["upload_url"],
@@ -560,27 +635,50 @@ class AliyunDriveDriver(StorageDriver):
                             )
                         except requests.RequestException as exc:
                             if retry_index == 2:
-                                raise RuntimeError("Aliyun part upload failed after retries") from exc
+                                raise RuntimeError(
+                                    "Aliyun part upload failed after retries: part {}/{}, {}".format(
+                                        index + 1, part_count, type(exc).__name__
+                                    )
+                                ) from exc
                             time.sleep(2 ** retry_index)
                             continue
-                        if response.status_code in (200, 201, 204, 409):
+                        try:
+                            status = response.status_code
+                            detail = _part_error(response) if status not in (200, 201, 204, 409) else ""
+                            try:
+                                retry_after = float(response.headers.get("Retry-After", 0))
+                            except (AttributeError, TypeError, ValueError):
+                                retry_after = 0
+                        finally:
+                            response.close()
+                        if status in (200, 201, 204, 409):
+                            if reader.position != length and status != 409:
+                                raise IOError("Aliyun part upload did not consume the expected file size")
                             break
-                        if response.status_code in (401, 403, 404):
+                        if status in (401, 403, 404):
                             uploaded_parts = self._get_upload_parts(file_id, upload_id, part_count)
                             upload_urls_at = time.monotonic()
                             part = uploaded_parts[index]
                             if retry_index == 2:
-                                raise RuntimeError("Aliyun upload URL expired after retries")
+                                raise RuntimeError("Aliyun upload URL expired after retries: part {}/{}, {}".format(
+                                    index + 1, part_count, detail
+                                ))
+                            time.sleep(2 ** retry_index)
                             continue
-                        if response.status_code not in (429,) and not 500 <= response.status_code < 600:
-                            raise RuntimeError("Aliyun part upload failed: HTTP {}".format(response.status_code))
+                        if status != 429 and not 500 <= status < 600:
+                            raise RuntimeError("Aliyun part upload failed: part {}/{}, {}".format(
+                                index + 1, part_count, detail
+                            ))
                         if retry_index == 2:
-                            raise RuntimeError("Aliyun part upload failed after retries")
-                        try:
-                            retry_after = float(response.headers.get("Retry-After", 0))
-                        except (AttributeError, TypeError, ValueError):
-                            retry_after = 0
+                            raise RuntimeError("Aliyun part upload failed after retries: part {}/{}, {}".format(
+                                index + 1, part_count, detail
+                            ))
                         time.sleep(max(retry_after, 2 ** retry_index))
+                    # A 409 may acknowledge an earlier successful attempt.
+                    while reader.position < length:
+                        reader.read(min(1024 * 1024, length - reader.position))
+                finally:
+                    reader.close()
             if total_done != size:
                 raise IOError("source stream ended before the expected file size")
         else:
@@ -686,6 +784,17 @@ def _response_json(response):
         return data if isinstance(data, dict) else {}
     except ValueError:
         return {}
+
+
+def _part_error(response):
+    detail = "HTTP {}".format(response.status_code)
+    try:
+        code = ET.fromstring(response.text[:8192]).findtext("Code") or ""
+        if re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", code):
+            detail += " " + code
+    except (ET.ParseError, TypeError):
+        pass
+    return detail
 
 
 def _api_error(prefix, response, data):

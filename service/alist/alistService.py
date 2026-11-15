@@ -48,6 +48,11 @@ def updateClient(alist):
     }
     """
     alistId = alist['id']
+    if 'copyConcurrency' in alist:
+        engineService.validateCopyConcurrency(alist['copyConcurrency'])
+        if set(alist) <= {'id', 'copyConcurrency', '__user'}:
+            engineService.updateCopyConcurrency(alistId, alist['copyConcurrency'])
+            return
     if alist['remark'] is not None and alist['remark'].strip() == '':
         alist['remark'] = None
     if 'token' in alist:
@@ -69,6 +74,8 @@ def updateClient(alist):
             raise Exception(G('without_token'))
         AlistClient(alist['url'], alist['token'], alistId)
     updateAlist(alist)
+    if 'copyConcurrency' in alist:
+        engineService.updateCopyConcurrency(alistId, alist['copyConcurrency'])
     if connectionChanged:
         jobMapper.clearSourceSnapshotsByEngine(int(alistId))
     engineService.invalidateClient(alistId)

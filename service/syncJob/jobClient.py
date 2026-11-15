@@ -23,7 +23,7 @@ from service.engine import engineService
 from service.syncJob import taskService
 
 # 同时提交到引擎的复制任务上限
-MAX_ACTIVE_COPY = 20
+MAX_ACTIVE_COPY = 5
 # 查询引擎任务状态时，允许的连续失败次数（网络抖动等），超过才判定失败
 MAX_TASK_INFO_FAILURES = 5
 # 中止或超时后，等待进行中的复制任务完成取消的最长秒数
@@ -101,6 +101,16 @@ class CopyItem:
 
     def doIt(self):
         try:
+            self._doIt()
+        finally:
+            limiter = getattr(self, 'copyLimiter', None)
+            if limiter is not None:
+                self.copyLimiter = None
+                limiter.release()
+                self.jobTask._wake()
+
+    def _doIt(self):
+        try:
             if self.jobTask.breakFlag:
                 self.status = 4
             else:
@@ -109,7 +119,9 @@ class CopyItem:
             self.errMsg = str(e)
             self.status = 7
         else:
-            if self.alistTaskId is None:
+            if self.status == 4:
+                pass
+            elif self.alistTaskId is None:
                 self.status = 2
             elif self.status != 4:
                 self.checkAndGetStatus()
@@ -140,7 +152,23 @@ class CopyItem:
                 self.status = 4
                 if self.alistTaskId is not None:
                     try:
-                        self.alistClient.copyTaskCancel(self.alistTaskId)
+                        try:
+                            info = self.alistClient.taskInfo(self.alistTaskId)
+                        except Exception:
+                            info = None
+                        if not isinstance(info, dict) or info.get('state') not in (2, 4, 7):
+                            self.alistClient.copyTaskCancel(self.alistTaskId)
+                            if isinstance(self.alistClient, engineService.TaoSyncClient):
+                                # Keep the engine slot until its transfer has stopped.
+                                while True:
+                                    self.alistClient.waitTask(self.alistTaskId, 0.5)
+                                    info = self.alistClient.taskInfo(self.alistTaskId)
+                                    if info.get('state') in (2, 4, 7):
+                                        break
+                        if isinstance(info, dict) and info.get('state') in (2, 4, 7):
+                            self.status = info['state']
+                            self.progress = info.get('progress', self.progress)
+                            self.errMsg = info.get('error') or None
                         self.alistClient.copyTaskDelete(self.alistTaskId)
                     except Exception as e:
                         self.status = 7
@@ -223,6 +251,7 @@ class JobTask:
         self.jobClient = vm
         self.job = self.jobClient.job
         self.alistClient = engineService.getClientById(self.job['alistId'])
+        self.copyLimiter = engineService.getCopyLimiter(self.job['alistId'])
         self.createTime = time.time()
         # 保护 finish/doing/waiting：扫描线程、提交线程、复制线程与查询接口会同时访问
         self.stateLock = threading.RLock()
@@ -405,11 +434,16 @@ class JobTask:
         with self._stateLock():
             if self.scanFinish and not self.doing and not self.waiting:
                 return None
-            while len(self.doing) < MAX_ACTIVE_COPY and self.waiting and not self.breakFlag:
+            limiter = getattr(self, 'copyLimiter', None)
+            limit = limiter.limit if limiter is not None else MAX_ACTIVE_COPY
+            while len(self.doing) < limit and self.waiting and not self.breakFlag:
+                if limiter is not None and not limiter.tryAcquire():
+                    break
                 if self.firstSync is None:
                     self.firstSync = time.time()
                 self.queueNum += 1
                 copyItem = self.waiting.popleft()
+                copyItem.copyLimiter = limiter
                 copyItem.doingKey = self.queueNum
                 self.doing[self.queueNum] = copyItem
                 started.append(copyItem)
@@ -417,6 +451,10 @@ class JobTask:
 
     def _drainAfterBreak(self):
         """中止/超时后，在有限时间内等待扫描线程与进行中的复制完成取消。"""
+        with self._stateLock():
+            while self.waiting:
+                item = self.waiting.popleft()
+                self.finish.append(item.toRecord(status=4, errMsg=G('copy_interrupted')))
         deadline = time.time() + ABORT_DRAIN_SECONDS
         syncThread = getattr(self, 'syncThread', None)
         if syncThread is not None and syncThread.is_alive():
@@ -993,6 +1031,8 @@ class JobTask:
             return
         copyItem = CopyItem(srcPath, dstPath, fileName, fileSize, self.job['method'], self, canVerify=canVerify)
         with self._stateLock():
+            if self.breakFlag or getattr(self, 'finalized', False):
+                return
             self.waiting.append(copyItem)
         self._wake()
 

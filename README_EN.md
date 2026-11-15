@@ -384,9 +384,13 @@ log_save=7
 task_save=0
 # Task execution timeout in hours. Set this high enough for large backups to complete.
 task_timeout=72
+# Aliyun Drive QR authorization and token refresh service URL; omit or leave empty to use the default.
+aliyun_auth_server=https://taoapi.dr34m.cn
 ```
 
 This file does not exist by default. To use it, create `config.ini` in the `data` directory next to the TaoSync executable and add the content shown above. The file must use `UTF-8` encoding.
+
+Set `aliyun_auth_server` in the `[tao]` section to configure Aliyun Drive QR authorization and subsequent token refresh. The default is `https://taoapi.dr34m.cn`; you can supply the HTTPS URL of your own authorization service. When `data/config.ini` is absent, use the `TAO_ALIYUN_AUTH_SERVER` environment variable instead. Omitting the setting or leaving it empty in the active configuration source uses the default.
 
 | config.ini    | Docker environment variable | Description | Default |
 | ------------- | --------------------------- | ----------- | ------- |
@@ -398,6 +402,7 @@ This file does not exist by default. To use it, create `config.ini` in the `data
 | log_save      | TAO_LOG_SAVE                | System log retention period, in days. Older logs are removed automatically; 0 disables automatic cleanup | 7 |
 | task_save     | TAO_TASK_SAVE               | Task record retention period, in days. Older records are removed automatically; 0 disables automatic cleanup | 0 |
 | task_timeout   | TAO_TASK_TIMEOUT            | Task execution timeout, in hours. Set this high enough for large backups to complete | 72 |
+| aliyun_auth_server | TAO_ALIYUN_AUTH_SERVER | Aliyun Drive QR authorization and token refresh service URL; supports your own HTTPS service. Omit or leave empty to use the default | https://taoapi.dr34m.cn |
 | -             | TZ                          | Time zone | Asia/Shanghai |
 
 </details>

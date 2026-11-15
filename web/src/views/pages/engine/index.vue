@@ -8,6 +8,7 @@ import {
   storageDelete,
   storageAliyunAuthPoll,
   storageAliyunAuthStart,
+  storageAliyunBrowse,
   storageGet,
   storageLocalBrowse,
   storagePost,
@@ -30,6 +31,7 @@ import {
   Plus,
   RefreshRight,
   Search,
+  Setting,
   View,
 } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
@@ -43,6 +45,9 @@ const editData = ref(null);
 const editFlag = ref(false);
 const editShow = ref(false);
 const formRef = ref();
+const concurrencyShow = ref(false);
+const concurrencyLoading = ref(false);
+const concurrencyData = ref({ id: null, copyConcurrency: 5 });
 
 const directoryShow = ref(false);
 const directoryLoading = ref(false);
@@ -79,6 +84,10 @@ const aliyunAuthQrCode = ref("");
 const aliyunAuthorizationUrl = ref("");
 const aliyunAuthStatus = ref("idle");
 const aliyunAuthExpiresIn = ref(0);
+const aliyunTreeKey = ref(0);
+const aliyunRootCache = ref([]);
+let aliyunBrowseEpoch = 0;
+let aliyunApplyingBrowseResult = false;
 let aliyunAuthPollTimer = null;
 let localBrowseRequestId = 0;
 let smbDiscoverRequestId = 0;
@@ -121,6 +130,7 @@ const driverConfigKeys = {
     "expires_at",
     "drive_type",
     "root_folder_id",
+    "root_folder_path",
     "remove_way",
   ],
 };
@@ -171,6 +181,7 @@ const driverDefaults = (driverType) => {
       expires_at: 0,
       drive_type: "resource",
       root_folder_id: "root",
+      root_folder_path: "/",
       remove_way: "trash",
     },
   };
@@ -237,6 +248,73 @@ const aliyunAuthorized = computed(() => {
 const editRule = computed(() => ({
   url: [requiredRule("engine.addressRule")],
 }));
+
+const resetAliyunRoot = () => {
+  aliyunBrowseEpoch += 1;
+  aliyunTreeKey.value += 1;
+  const config = mountData.value?.config || {};
+  aliyunRootCache.value = [{
+    id: config.root_folder_id || "root",
+    name: config.root_folder_id === "root" ? "/" : config.root_folder_path || t("engine.rootFolder"),
+  }];
+};
+
+watch(
+  () => {
+    const config = mountData.value?.config || {};
+    return [mountData.value?.id, mountData.value?.driverType, config.drive_type, config.auth_mode, config.client_id, config.client_secret, config.refresh_token, config.refresh_proof];
+  },
+  (values, previous) => {
+    if (aliyunApplyingBrowseResult || mountData.value?.driverType !== "aliyun") return;
+    if (previous && values[0] === previous[0] && values[1] === previous[1] &&
+        values.slice(2).some((value, index) => value !== previous[index + 2])) {
+      mountData.value.config.root_folder_id = "root";
+      mountData.value.config.root_folder_path = "/";
+    }
+    resetAliyunRoot();
+  },
+  { flush: "sync" }
+);
+
+const loadAliyunRootNode = async (node, resolve, reject) => {
+  if (node.level === 0) {
+    resolve([{ id: "root", name: "/", path: "/" }]);
+    return;
+  }
+  const epoch = aliyunBrowseEpoch;
+  try {
+    const res = await storageAliyunBrowse({
+      engineId: mountData.value.engineId,
+      ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
+      parentId: node.data.id,
+      config: mountPayload().config,
+    });
+    if (epoch !== aliyunBrowseEpoch || !mountShow.value) {
+      reject();
+      return;
+    }
+    if (res.data?.authorization) {
+      aliyunApplyingBrowseResult = true;
+      try {
+        Object.assign(mountData.value.config, res.data.authorization);
+      } finally {
+        aliyunApplyingBrowseResult = false;
+      }
+    }
+    const directories = (res.data?.directories || []).map((item) => ({
+      ...item, path: (node.data.path === "/" ? "" : node.data.path) + "/" + item.name,
+    }));
+    aliyunRootCache.value.push(...directories);
+    resolve(directories);
+  } catch {
+    reject();
+  }
+};
+
+const selectAliyunRoot = (id) => {
+  const node = aliyunRootCache.value.find((item) => item.id === id);
+  mountData.value.config.root_folder_path = id === "root" ? "/" : node?.path || node?.name || "";
+};
 
 const addRule = computed(() => ({
   url: [requiredRule("engine.addressRule")],
@@ -530,6 +608,22 @@ const editShowDialog = (row) => {
   editShow.value = true;
 };
 
+const openConcurrency = (row) => {
+  concurrencyData.value = { id: row.id, copyConcurrency: row.copyConcurrency || 5 };
+  concurrencyShow.value = true;
+};
+
+const saveConcurrency = async () => {
+  concurrencyLoading.value = true;
+  try {
+    await alistPut(concurrencyData.value);
+    concurrencyShow.value = false;
+    await getAlistList();
+  } finally {
+    concurrencyLoading.value = false;
+  }
+};
+
 const closeShow = () => {
   formRef.value?.clearValidate();
   editShow.value = false;
@@ -647,13 +741,13 @@ const editMount = (mount) => {
     config: {
       ...driverDefaults(mount.driverType),
       ...(mount.config || {}),
+      ...(mount.driverType === "aliyun" ? {
+        auth_mode: mount.config?.auth_mode || (mount.config?.auth_service_url ? "service" : "direct"),
+        root_folder_path: mount.config?.root_folder_path || (mount.config?.root_folder_id && mount.config.root_folder_id !== "root" ? "" : "/"),
+      } : {}),
     },
   };
   if (mount.driverType === "aliyun") {
-    const config = mount.config || {};
-    if (!config.auth_mode) {
-      mountData.value.config.auth_mode = config.auth_service_url ? "service" : "direct";
-    }
     aliyunAuthStatus.value = aliyunAuthorized.value ? "authorized" : "idle";
   }
   if (mount.driverType === "sftp") {
@@ -1073,7 +1167,8 @@ const mountSummary = (mount) => {
     return `sftp://${config.username || "-"}@${config.host || "-"}:${config.port || 22}${root}`;
   }
   if (mount.driverType === "aliyun") {
-    return `${t(`engine.driveTypes.${config.drive_type || "resource"}`)} / ${config.root_folder_id || "root"}`;
+    const root = config.root_folder_path || (config.root_folder_id && config.root_folder_id !== "root" ? t("engine.rootFolder") : "/");
+    return `${t(`engine.driveTypes.${config.drive_type || "resource"}`)} ${root}`;
   }
   return "-";
 };
@@ -1128,6 +1223,9 @@ onBeforeUnmount(() => {
               {{ $t("common.delete") }}
             </el-button>
           </template>
+          <el-tooltip :content="$t('engine.copyConcurrency')">
+            <el-button size="small" :icon="Setting" :aria-label="$t('engine.copyConcurrency')" @click="openConcurrency(item)" />
+          </el-tooltip>
         </div>
       </div>
       <button type="button" class="card-item card-add" @click="addShow">
@@ -1135,6 +1233,18 @@ onBeforeUnmount(() => {
         <span>{{ $t("engine.addAlist") }}</span>
       </button>
     </div>
+
+    <el-dialog v-model="concurrencyShow" :title="$t('engine.copyConcurrency')" width="min(420px, calc(100vw - 24px))" :append-to-body="true">
+      <el-form label-position="top">
+        <el-form-item :label="$t('engine.copyConcurrency')">
+          <el-input-number v-model="concurrencyData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="concurrencyShow = false">{{ $t("common.cancel") }}</el-button>
+        <el-button type="primary" :loading="concurrencyLoading" @click="saveConcurrency">{{ $t("common.confirm") }}</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="editShow"
@@ -1518,8 +1628,21 @@ onBeforeUnmount(() => {
                 <el-option :label="$t('engine.driveTypes.backup')" value="backup" />
               </el-select>
             </el-form-item>
-            <el-form-item prop="config.root_folder_id" :label="$t('engine.rootFolderId')">
-              <el-input v-model="mountData.config.root_folder_id" placeholder="root" />
+            <el-form-item prop="config.root_folder_id" :label="$t('engine.rootFolder')">
+              <el-tree-select
+                :key="aliyunTreeKey"
+                v-model="mountData.config.root_folder_id"
+                :disabled="!aliyunAuthorized"
+                :props="{ value: 'id', label: 'name', children: 'children' }"
+                node-key="id"
+                :cache-data="aliyunRootCache"
+                :load="loadAliyunRootNode"
+                lazy
+                check-strictly
+                :render-after-expand="false"
+                :placeholder="$t('engine.rootFolder')"
+                @change="selectAliyunRoot"
+              />
             </el-form-item>
             <el-form-item class="form-span-2" prop="config.remove_way" :label="$t('engine.removeWay')">
               <el-radio-group v-model="mountData.config.remove_way">

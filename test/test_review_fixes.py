@@ -188,6 +188,30 @@ class CopyItemStatusTest(unittest.TestCase):
         self.assertEqual(self.item.errMsg, 'task_may_delete')
         self.assertEqual(self.task.alistClient.taskInfo.call_count, 1)
 
+    def test_abort_before_submission_never_marks_a_copy_successful(self):
+        self.task.breakFlag = True
+        self.item.alistTaskId = None
+        self.item.doingKey = 1
+        self.task.doing[1] = self.item
+        self.item.doIt()
+        self.assertEqual(self.item.status, 4)
+        self.assertEqual(self.task.finish[0]['status'], 4)
+        self.task.alistClient.copyFile.assert_not_called()
+
+    def test_abort_preserves_copies_already_committed_by_the_engine(self):
+        self.task.breakFlag = True
+        self.task.alistClient.taskInfo.return_value = {'state': 2, 'progress': 100, 'error': ''}
+        self.item.checkAndGetStatus()
+        self.assertEqual(self.item.status, 2)
+        self.task.alistClient.copyTaskCancel.assert_not_called()
+
+    def test_abort_still_cancels_when_the_last_status_query_fails(self):
+        self.task.breakFlag = True
+        self.task.alistClient.taskInfo.side_effect = OSError('temporary network failure')
+        self.item.checkAndGetStatus()
+        self.assertEqual(self.item.status, 4)
+        self.task.alistClient.copyTaskCancel.assert_called_once_with(self.item.alistTaskId)
+
 
 class JobTaskStateTest(unittest.TestCase):
     def setUp(self):
@@ -219,6 +243,48 @@ class JobTaskStateTest(unittest.TestCase):
                          [('stuck.bin', 7, 'copy_interrupted')])
         task.completeCopy(item)
         self.assertEqual(len(task.finish), 1)
+
+    def test_abort_preserves_all_waiting_items_as_cancelled(self):
+        task = _bare_task(breakFlag=True)
+        for index in range(80):
+            task.waiting.append(CopyItem('/src/', '/dst/', str(index), 10, 0, task))
+        completed = CopyItem('/src/', '/dst/', 'done', 10, 0, task)
+        task.finish.append(completed.toRecord(status=2))
+        task._drainAfterBreak()
+        current = task.getCurrent()
+        self.assertEqual(current['num']['success'], 1)
+        self.assertEqual(current['num']['other'], 80)
+        self.assertEqual(current['num']['wait'], 0)
+        self.assertEqual(len(task.finish), 81)
+        self.assertTrue(all(item['status'] == 4 for item in task.finish[1:]))
+
+    def test_jobs_share_the_engine_limit_and_release_capacity_on_completion(self):
+        from service.engine.engineService import CopyLimiter
+
+        limiter = CopyLimiter(5)
+        first = _bare_task(scanFinish=False, copyLimiter=limiter)
+        second = _bare_task(scanFinish=False, copyLimiter=limiter)
+        for task in (first, second):
+            for index in range(10):
+                task.waiting.append(CopyItem('/src/', '/dst/', str(index), 10, 0, task))
+        started = first._submitReady()
+        self.assertEqual(len(started), 5)
+        self.assertEqual(second._submitReady(), [])
+        first.breakFlag = True
+        started[0].doIt()
+        self.assertEqual(len(second._submitReady()), 1)
+        limiter.limit = 8
+        self.assertEqual(len(second._submitReady()), 3)
+        limiter.limit = 2
+        self.assertEqual(second._submitReady(), [])
+
+    def test_configured_limit_can_exceed_the_default(self):
+        from service.engine.engineService import CopyLimiter
+
+        task = _bare_task(scanFinish=False, copyLimiter=CopyLimiter(8))
+        for index in range(10):
+            task.waiting.append(CopyItem('/src/', '/dst/', str(index), 10, 0, task))
+        self.assertEqual(len(task._submitReady()), 8)
 
     def test_completed_copy_moves_from_doing_to_finish(self):
         task = _bare_task()

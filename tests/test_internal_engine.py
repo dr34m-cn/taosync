@@ -27,6 +27,9 @@ class _Response:
     def json(self):
         return self._data
 
+    def close(self):
+        pass
+
 
 class SqlInitializationTests(unittest.TestCase):
     def _initialize(self, database):
@@ -53,6 +56,10 @@ class SqlInitializationTests(unittest.TestCase):
             [("taosync://internal", "TaoSync", "taosync", "taosync", 1)],
         )
         self.assertEqual(mount_count, 0)
+        with closing(sqlite3.connect(database)) as connection:
+            self.assertTrue(all(row[0] == 5 for row in connection.execute(
+                "select copyConcurrency from alist_list"
+            )))
 
     def test_fresh_database_has_one_builtin_engine_and_init_is_idempotent(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -318,6 +325,13 @@ class TaoSyncClientTests(unittest.TestCase):
 
 
 class StorageServiceTests(unittest.TestCase):
+    def test_mount_names_allow_leading_slashes_and_keep_alias_checks(self):
+        for value in ('photos', '/photos', '///photos'):
+            self.assertEqual(storageService._cleanName(value), 'photos')
+        for value in ('/', '//', '/..', '/a/b', '/a\b'):
+            with self.assertRaises(ValueError):
+                storageService._cleanName(value)
+
     def test_account_switch_drops_derived_aliyun_tokens(self):
         old = {
             "id": 41,

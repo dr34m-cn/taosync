@@ -31,10 +31,8 @@ def getConfig():
             'log_save': 7,
             'task_save': 0,
             'timeout': 72,
-            'source_full_scan_hours': 24
-        }
-        textCfg = {
-            'aliyun_auth_server': ''
+            'source_full_scan_hours': 24,
+            'aliyun_auth_server': 'https://taoapi.dr34m.cn'
         }
         password = DEFAULT_PASSWORD
         if os.path.exists('data/config.ini'):
@@ -44,15 +42,13 @@ def getConfig():
                 tao = cfg['tao']
                 if 'password' in tao:
                     password = tao.get('password', raw=True)
-                for keyItem in sCfg.keys():
+                for keyItem, default in sCfg.items():
                     if keyItem in tao:
-                        sCfg[keyItem] = int(tao[keyItem])
+                        value = tao.get(keyItem, raw=True)
+                        sCfg[keyItem] = int(value) if isinstance(default, int) else value.strip() or default
                 # 文档中的配置项名为 task_timeout；旧的 timeout 键仍兼容
                 if 'task_timeout' in tao:
                     sCfg['timeout'] = int(tao['task_timeout'])
-                for keyItem in textCfg.keys():
-                    if keyItem in tao:
-                        textCfg[keyItem] = tao.get(keyItem, raw=True).strip()
             except Exception as e:
                 logger = logging.getLogger()
                 error_type = type(e).__name__
@@ -61,6 +57,9 @@ def getConfig():
             password = os.getenv('TAO_PASSWORD')
             if password is None:
                 password = os.getenv('TAO_PASSWD', DEFAULT_PASSWORD)
+            sCfg['aliyun_auth_server'] = (
+                os.getenv('TAO_ALIYUN_AUTH_SERVER', '').strip() or sCfg['aliyun_auth_server']
+            )
             try:
                 sCfg['port'] = int(os.getenv('TAO_PORT', 8023))
                 sCfg['expires'] = int(os.getenv('TAO_EXPIRES', 2))
@@ -70,15 +69,10 @@ def getConfig():
                 sCfg['task_save'] = int(os.getenv('TAO_TASK_SAVE', 0))
                 sCfg['timeout'] = int(os.getenv('TAO_TASK_TIMEOUT', 72))
                 sCfg['source_full_scan_hours'] = int(os.getenv('TAO_SOURCE_FULL_SCAN_HOURS', 24))
-                textCfg['aliyun_auth_server'] = os.getenv('TAO_ALIYUN_AUTH_SERVER', '').strip()
             except Exception as e:
                 logger = logging.getLogger()
                 logger.error(f"环境变量读取失败，将使用默认配置_/_ENV read error: {e}")
                 logger.exception(e)
-        env_aliyun_auth_server = os.getenv('TAO_ALIYUN_AUTH_SERVER')
-        # 环境变量为空时不覆盖，Docker 镜像预置的空值不应使 config.ini 配置失效
-        if env_aliyun_auth_server is not None and env_aliyun_auth_server.strip():
-            textCfg['aliyun_auth_server'] = env_aliyun_auth_server.strip()
         if not password or not password.strip():
             password = DEFAULT_PASSWORD
         sysConfig = {
@@ -88,8 +82,7 @@ def getConfig():
             'server': {
                 'passwdStr': passwdStr,
                 'password': password,
-                **sCfg,
-                **textCfg
+                **sCfg
             }
         }
     return sysConfig

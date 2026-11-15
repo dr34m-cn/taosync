@@ -18,7 +18,7 @@ def _requireTaoSync(engineId):
 
 
 def _cleanName(name):
-    name = str(name or "").strip()
+    name = str(name or "").strip().lstrip("/")
     if not name or name in (".", "..") or not MOUNT_NAME_PATTERN.match(name):
         raise ValueError("invalid storage directory name")
     return name
@@ -275,6 +275,70 @@ def browseSftp(data):
     if "path" not in data:
         raise ValueError("SFTP browse path is required")
     return createDriver("sftp", _sftpRequestConfig(data)).browse(data["path"])
+
+
+def browseAliyun(data):
+    engineId = int(data["engineId"])
+    _requireTaoSync(engineId)
+    raw = data.get("config") or {}
+    if not isinstance(raw, dict):
+        raise ValueError("storage configuration must be an object")
+    old = None
+    if data.get("mountId") not in (None, ""):
+        old = storageMapper.getMountById(int(data["mountId"]))
+        if int(old["engineId"]) != engineId or old["driverType"] != "aliyun":
+            raise ValueError("storage directory does not belong to the selected Aliyun engine")
+    config = _prepareAliyunConfig(raw, old=old)
+    authFields = ("auth_mode", "auth_service_url", "client_id", "client_secret",
+                  "refresh_token", "api_url", "oauth_url")
+    sameAuth = old is not None and _aliyunAuthMode(config) == _aliyunAuthMode(old["config"]) and all(
+        (config.get(key) or "") == (old["config"].get(key) or "")
+        for key in authFields if key != "auth_mode"
+    )
+    if old is not None and not sameAuth:
+        for key in ("access_token", "expires_at", "drive_id"):
+            config.pop(key, None)
+    # Resolve the selected space independently of the saved mount root/space.
+    config.pop("drive_id", None)
+    config["root_folder_id"] = "root"
+    callbacks = {}
+    if sameAuth:
+        from service.engine.taosyncClient import _get_mount_refresh_lock
+
+        version = int(old.get("authVersion") or 1)
+
+        def save(values, expected_tokens=None):
+            values = {key: value for key, value in values.items() if key != "drive_id"}
+            expected = {key: value for key, value in (expected_tokens or {}).items() if key != "drive_id"}
+            result = updateMountConfig(old["id"], version, values, expectedTokens=expected)
+            if isinstance(result, dict) and result.get("conflict"):
+                result = {**result, "config": {key: value for key, value in
+                          (result.get("config") or {}).items() if key != "drive_id"}}
+            return result
+
+        def load():
+            row = dict(storageMapper.getMountById(old["id"]))
+            row["config"] = {key: value for key, value in row["config"].items() if key != "drive_id"}
+            return row
+
+        callbacks = dict(save_config=save, load_config=load,
+                         refresh_lock=_get_mount_refresh_lock(old["id"], version), auth_version=version)
+    driver = createDriver("aliyun", config, **callbacks)
+    try:
+        parentId = str(data.get("parentId") or "root")
+        directories = [
+            {"id": item["file_id"], "name": item.get("name") or item.get("file_name")}
+            for item in driver._list_id(parentId) if item.get("type") == "folder"
+        ]
+        result = {"directories": directories}
+        if not sameAuth:
+            result["authorization"] = {
+                key: getattr(driver, key)
+                for key in ("access_token", "refresh_token", "refresh_proof", "expires_at")
+            }
+        return result
+    finally:
+        driver.session.close()
 
 
 def _smbRequestConfig(data):
