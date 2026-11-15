@@ -56,6 +56,7 @@ login:
   newPasswd2Error: 两次输入密码不一致
   resetSuccess: 密码重置成功，请使用新密码登录
 user:
+  userNameRule: 用户名不能为空，最多64个字符，不能包含控制字符
   oldPasswd: 请输入旧密码
   oldPasswdLabel: 旧密码
   oldPasswdRule: 请输入旧密码
@@ -68,6 +69,7 @@ user:
   newPasswd2Error: 两次密码不一致
   success: 修改成功
 header:
+  setUserName: 修改用户名
   setPwd: 修改密码
   logout: 登出
 menu:
@@ -397,6 +399,38 @@ notify:
   method: 方式
   requestUrl: 请求地址
   requestMethod: 请求方法
+  requestHeaders: 请求头
+  requestBody: 请求体
+  headersPlaceholder: "Authorization: Bearer token（每行一个请求头，也支持 JSON 对象）"
+  bodyPlaceholder: "支持 $title、$content；JSON 或 key: value 行；text/plain 使用原文"
+  barkPush: 设备码或推送地址
+  bark_group: 推送分组
+  bark_sound: 推送声音
+  bark_icon: 图标地址
+  bark_url: 跳转链接
+  bark_level: 时效性
+  bark_isArchive: 保存到历史
+  optional: 可选
+  pushPlusToken: Token
+  pushPlusTopic: 群组编码
+  pushPlusTemplate: 消息模板
+  pushPlusChannel: 发送渠道
+  pushPlusWebhook: Webhook 编码
+  pushPlusCallback: 回调地址
+  pushPlusTo: 接收人
+  pushPlusChannels:
+    wechat: 微信
+    webhook: Webhook
+    cp: 企业微信
+    mail: 邮件
+    sms: 短信
+  pushDeerKey: PushKey
+  pushDeerUrl: 推送接口地址
+  barkLevels:
+    passive: 被动（无声音）
+    active: 主动
+    timeSensitive: 时效性通知
+    critical: 重要警告
   contentType: 请求体类型
   titleName: 标题参数名
   needContent: 是否需要内容
@@ -426,6 +460,10 @@ notify:
     dingTalk: 钉钉群机器人
     weCom: 企业微信应用消息
     lark: Lark群机器人
+    advancedCustom: 高级自定义
+    bark: Bark
+    pushPlus: pushPlus
+    pushDeer: PushDeer
 refresh:
   auto: 自动刷新
 pathSelect:
@@ -433,6 +471,17 @@ pathSelect:
   selectFirst: 请先选择路径
 setting:
   title: 系统设置
+  saveAndApply: 保存并生效
+  saved: 配置已保存并生效
+  task_save: 任务记录保留时间
+  task_saveHint: 0 表示不自动清理
+  timeout: 任务执行超时
+  timeoutHint: 0 表示不限制
+  source_full_scan_days: 源目录完整比对周期
+  source_full_scan_daysHint: 0 表示从不；到期后下次执行完整比对
+  aliyun_auth_server: 阿里云盘授权服务地址
+  days: 天
+  hours: 小时
   username: 用户名
   version: TaoSync 版本：__version_placeholder__
   github: 项目地址（GitHub）

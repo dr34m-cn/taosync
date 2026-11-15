@@ -56,6 +56,7 @@ login:
   newPasswd2Error: The two passwords do not match
   resetSuccess: Password reset. Please log in with the new password.
 user:
+  userNameRule: Enter 1 to 64 characters without control characters
   oldPasswd: Please enter old password
   oldPasswdLabel: Old Password
   oldPasswdRule: Please enter old password
@@ -68,6 +69,7 @@ user:
   newPasswd2Error: Passwords do not match
   success: Updated
 header:
+  setUserName: Change Username
   setPwd: Change Password
   logout: Log out
 menu:
@@ -397,6 +399,38 @@ notify:
   method: Method
   requestUrl: Request URL
   requestMethod: Request Method
+  requestHeaders: Request Headers
+  requestBody: Request Body
+  headersPlaceholder: "Authorization: Bearer token (one header per line, or a JSON object)"
+  bodyPlaceholder: "Use $title and $content; JSON or key: value lines; raw text for text/plain"
+  barkPush: Device Key or Push URL
+  bark_group: Group
+  bark_sound: Sound
+  bark_icon: Icon URL
+  bark_url: Open URL
+  bark_level: Interruption Level
+  bark_isArchive: Save to History
+  optional: Optional
+  pushPlusToken: Token
+  pushPlusTopic: Group Code
+  pushPlusTemplate: Message Template
+  pushPlusChannel: Channel
+  pushPlusWebhook: Webhook Code
+  pushPlusCallback: Callback URL
+  pushPlusTo: Recipient
+  pushPlusChannels:
+    wechat: WeChat
+    webhook: Webhook
+    cp: WeCom
+    mail: Email
+    sms: SMS
+  pushDeerKey: PushKey
+  pushDeerUrl: Push API URL
+  barkLevels:
+    passive: Passive (silent)
+    active: Active
+    timeSensitive: Time Sensitive
+    critical: Critical
   contentType: Content Type
   titleName: Title Field
   needContent: Need Content
@@ -426,6 +460,10 @@ notify:
     dingTalk: DingTalk Bot
     weCom: WeCom App
     lark: Lark Bot
+    advancedCustom: Advanced Custom
+    bark: Bark
+    pushPlus: pushPlus
+    pushDeer: PushDeer
 refresh:
   auto: Auto refresh
 pathSelect:
@@ -433,6 +471,17 @@ pathSelect:
   selectFirst: Select a path first
 setting:
   title: Settings
+  saveAndApply: Save and Apply
+  saved: Settings saved and applied
+  task_save: Task Record Retention
+  task_saveHint: 0 keeps all records
+  timeout: Task Timeout
+  timeoutHint: 0 means unlimited
+  source_full_scan_days: Full Source Comparison Interval
+  source_full_scan_daysHint: 0 disables it; the next run after this interval compares all targets
+  aliyun_auth_server: Aliyun Drive Authorization Server
+  days: days
+  hours: hours
   username: Username
   version: "TaoSync version: __version_placeholder__"
   github: Project (GitHub)

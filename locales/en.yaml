@@ -80,3 +80,4 @@ hms: "{} hours {} minutes {} seconds"
 task_end_msg_error: "Failed due to: {}"
 notify_error: "Failed to send notification due to: {}"
 notify_test_msg: This is a TaoSync test message sent by yourself. When you see this message, your configuration is correct and available.
+invalid_username: "Username must contain 1 to 64 characters without control characters"

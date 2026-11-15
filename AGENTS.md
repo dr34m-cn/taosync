@@ -16,3 +16,7 @@ Do not remove content merely because it is technical. Preserve technology-stack 
 
 Always review and update README.md and README_EN.md together. Keep their user-facing content, examples, screenshots, and meaning synchronized in the same change.
 
+# Frontend Preferences
+
+Numeric inputs must not show increment/decrement arrow controls. Use `:controls="false"` for Element Plus `el-input-number` components and hide native number input spinners when applicable.
+

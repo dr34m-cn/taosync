@@ -1248,7 +1248,7 @@ onBeforeUnmount(() => {
     <el-dialog v-model="concurrencyShow" :title="concurrencyMountName ? $t('engine.directoryCopyConcurrency', { name: concurrencyMountName }) : $t('engine.copyConcurrency')" width="min(420px, calc(100vw - 24px))" :append-to-body="true">
       <el-form label-position="top">
         <el-form-item :label="$t('engine.copyConcurrency')">
-          <el-input-number v-model="concurrencyData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" />
+          <el-input-number v-model="concurrencyData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" :controls="false" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1367,7 +1367,7 @@ onBeforeUnmount(() => {
           </el-form-item>
 
           <el-form-item prop="copyConcurrency" :label="$t('engine.copyConcurrency')">
-            <el-input-number v-model="mountData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" />
+            <el-input-number v-model="mountData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" :controls="false" />
           </el-form-item>
 
           <template v-if="mountData.driverType === 'local'">
@@ -1401,7 +1401,7 @@ onBeforeUnmount(() => {
               </el-input>
             </el-form-item>
             <el-form-item prop="config.port" :label="$t('engine.port')">
-              <el-input-number v-model="mountData.config.port" :min="1" :max="65535" controls-position="right" />
+              <el-input-number v-model="mountData.config.port" :min="1" :max="65535" :controls="false" />
             </el-form-item>
             <el-form-item prop="config.share" :label="$t('engine.share')">
               <el-input v-model="mountData.config.share" :placeholder="$t('engine.sharePlaceholder')">
@@ -1441,7 +1441,7 @@ onBeforeUnmount(() => {
               <el-input v-model="mountData.config.host" :placeholder="$t('engine.hostPlaceholder')" />
             </el-form-item>
             <el-form-item prop="config.port" :label="$t('engine.port')">
-              <el-input-number v-model="mountData.config.port" :min="1" :max="65535" controls-position="right" />
+              <el-input-number v-model="mountData.config.port" :min="1" :max="65535" :controls="false" />
             </el-form-item>
             <el-form-item prop="config.root_path" :label="$t('engine.rootPath')">
               <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')" />
@@ -1470,7 +1470,7 @@ onBeforeUnmount(() => {
               <el-input v-model="mountData.config.host" :placeholder="$t('engine.hostPlaceholder')" />
             </el-form-item>
             <el-form-item prop="config.port" :label="$t('engine.port')">
-              <el-input-number v-model="mountData.config.port" :min="1" :max="65535" controls-position="right" />
+              <el-input-number v-model="mountData.config.port" :min="1" :max="65535" :controls="false" />
             </el-form-item>
             <el-form-item prop="config.username" :label="$t('engine.username')">
               <el-input v-model="mountData.config.username" :placeholder="$t('engine.usernamePlaceholder')" autocomplete="username" />
@@ -1495,7 +1495,7 @@ onBeforeUnmount(() => {
               </el-radio-group>
             </el-form-item>
             <el-form-item prop="config.timeout" :label="$t('engine.connectionTimeout')">
-              <el-input-number v-model="mountData.config.timeout" :min="1" :max="300" controls-position="right" />
+              <el-input-number v-model="mountData.config.timeout" :min="1" :max="300" :controls="false" />
             </el-form-item>
             <el-form-item
               v-if="mountData.config.auth_type === 'password'"

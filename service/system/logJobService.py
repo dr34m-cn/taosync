@@ -58,7 +58,7 @@ def startJob():
         logger.info(G('keep_all_task'))
     if logSave > 0 or taskSave > 0:
         logger.info(G('clear_task_start'))
-        startClearScheduler()
+    startClearScheduler()
 
 
 def startClearScheduler():

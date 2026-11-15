@@ -39,3 +39,13 @@ def resetPasswd(userId, passwd):
     if userKey in users:
         users[userKey]['passwd'] = passwd
     sqlBase.execute_update("update user_list set passwd = ? where id = ?", (passwd, userId))
+
+
+def editUserName(userId, userName):
+    with sqlBase.DB_LOCK:
+        duplicates = sqlBase.fetchall('select id from user_list where userName = ? and id <> ?', (userName, userId))
+        if duplicates:
+            raise ValueError(G('same_exists'))
+        sqlBase.execute_update('update user_list set userName = ? where id = ?', (userName, userId))
+        users.pop(f'uId-{userId}', None)
+        return getUserById(userId)

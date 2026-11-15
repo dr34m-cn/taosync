@@ -10,8 +10,8 @@ from pathlib import Path
 from unittest import mock
 
 import tornado.testing
-import tornado.web
 
+import main as desktopMain
 from common import LNG, commonUtils, config, locales, sqlBase, sqlInit
 from common.intervalGate import IntervalGate
 from controller import baseController, systemController
@@ -366,7 +366,8 @@ class JobTaskStateTest(unittest.TestCase):
 
     def test_timeout_aborts_and_reports_timeout_status(self):
         task = _bare_task(timeoutSeconds=10, createTime=time.time() - 20)
-        self.assertTrue(task.checkTimeout())
+        with mock.patch.object(jobClient, 'taskTimeoutSeconds', return_value=10):
+            self.assertTrue(task.checkTimeout())
         self.assertTrue(task.breakFlag)
         with mock.patch.object(jobClient.taskService, 'updateJobTaskStatus') as update:
             task.updateTaskStatus()
@@ -586,7 +587,9 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         self.original_language = LNG.sysLanguage
         config.sysConfig = {
             'db': {'dbname': str(Path(self.temp_dir.name) / 'data' / 'taoSync.db')},
-            'server': {'password': 'admin-pass', 'passwdStr': 'test-secret', 'expires': 2},
+            'server': {'password': 'admin-pass', 'passwdStr': 'test-secret', 'expires': 2,
+                       'task_save': 0, 'timeout': 72, 'source_full_scan_days': 15,
+                       'aliyun_auth_server': 'https://taoapi.dr34m.cn'},
         }
         LNG.sysLanguage = None
         self.original_users = userMapper.users
@@ -606,10 +609,9 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         self.temp_dir.cleanup()
 
     def get_app(self):
-        return tornado.web.Application([
-            (r"/svr/noAuth/login", systemController.Login),
-            (r"/svr/user", systemController.User),
-        ], cookie_secret='test-secret')
+        with mock.patch.object(desktopMain, 'server', config.getConfig()['server'], create=True), \
+                mock.patch.object(desktopMain, 'frontendPath', self.temp_dir.name, create=True):
+            return desktopMain.make_app()
 
     def test_login_sets_httponly_session_cookie_without_password_hash(self):
         response = self.fetch('/svr/noAuth/login', method='POST', headers=JSON_HEADERS,
@@ -633,6 +635,87 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
 
     def test_request_without_cookie_is_unauthorized(self):
         self.assertEqual(json.loads(self.fetch('/svr/user').body)['code'], 401)
+
+    def _login_cookie(self):
+        response = self.fetch('/svr/noAuth/login', method='POST', headers=JSON_HEADERS,
+                              body=json.dumps({'userName': 'admin', 'passwd': 'admin-pass'}))
+        return response.headers['Set-Cookie'].split(';', 1)[0]
+
+    def test_rename_refreshes_cookie_invalidates_old_session_and_preserves_password(self):
+        cookie = self._login_cookie()
+        oldHash = userMapper.getUserById(1)['passwd']
+        response = self.fetch('/svr/user', method='PUT', headers={**JSON_HEADERS, 'Cookie': cookie},
+                              body=json.dumps({'userName': '  renamed  '}))
+        user = json.loads(response.body)['data']
+        self.assertEqual(user['userName'], 'renamed')
+        self.assertNotIn('passwd', user)
+        self.assertEqual(userMapper.getUserById(1)['passwd'], oldHash)
+        newCookie = response.headers['Set-Cookie'].split(';', 1)[0]
+        self.assertEqual(json.loads(self.fetch('/svr/user', headers={'Cookie': newCookie}).body)['code'], 200)
+        self.assertEqual(json.loads(self.fetch('/svr/user', headers={'Cookie': cookie}).body)['code'], 401)
+        login = self.fetch('/svr/noAuth/login', method='POST', headers=JSON_HEADERS,
+                           body=json.dumps({'userName': 'renamed', 'passwd': 'admin-pass'}))
+        self.assertEqual(json.loads(login.body)['code'], 200)
+        with self.assertRaises(Exception):
+            userMapper.getUserByName('admin')
+
+    def test_invalid_or_duplicate_name_does_not_change_user(self):
+        cookie = self._login_cookie()
+        sqlBase.execute_insert('insert into user_list(userName, passwd) values (?, ?)', ('other', 'unused'))
+        for name in (' ', 'a' * 65, 'bad\nname', 'other'):
+            with self.subTest(name=name):
+                response = self.fetch('/svr/user', method='PUT', headers={**JSON_HEADERS, 'Cookie': cookie},
+                                      body=json.dumps({'userName': name}))
+                self.assertEqual(json.loads(response.body)['code'], 500)
+                self.assertEqual(userMapper.getUserById(1)['userName'], 'admin')
+
+    def test_settings_require_auth_and_only_return_editable_values(self):
+        self.assertEqual(json.loads(self.fetch('/svr/settings').body)['code'], 401)
+        response = self.fetch('/svr/settings', headers={'Cookie': self._login_cookie()})
+        self.assertEqual(set(json.loads(response.body)['data']), set(config.EDITABLE_SETTINGS))
+        response = self.fetch('/svr/settings', method='PUT', headers=JSON_HEADERS,
+                              body=json.dumps({'settings': {'timeout': 8}}))
+        self.assertEqual(json.loads(response.body)['code'], 401)
+        self.assertFalse(Path('data/config.ini').exists())
+
+    def test_settings_api_persists_and_updates_runtime(self):
+        response = self.fetch('/svr/settings', method='PUT', headers={**JSON_HEADERS, 'Cookie': self._login_cookie()},
+                              body=json.dumps({'settings': {'timeout': 8, 'source_full_scan_days': 15}}))
+        self.assertEqual(json.loads(response.body)['code'], 200)
+        self.assertEqual(config.getConfig()['server']['timeout'], 8)
+        self.assertIn('timeout = 8', Path('data/config.ini').read_text(encoding='utf-8'))
+
+    def test_new_notification_methods_persist_edit_test_and_delete(self):
+        headers = {**JSON_HEADERS, 'Cookie': self._login_cookie()}
+        for method, params in ((5, {'url': 'https://notify.example', 'method': 'POST',
+                                   'contentType': 'application/json', 'headers': 'Authorization: Bearer test',
+                                   'body': '{"title":"$title", "body":"$content"}'}),
+                               (6, {'push': 'test-key', 'group': 'TaoSync', 'isArchive': 1}),
+                               (7, {'token': 'test-token', 'topic': 'group', 'template': 'markdown', 'channel': 'wechat'}),
+                               (8, {'pushkey': 'test-key', 'url': 'https://deer.example/message/push'})):
+            with self.subTest(method=method):
+                notify = {'enable': 1, 'method': method, 'params': json.dumps(params)}
+                response = self.fetch('/svr/notify', method='POST', headers=headers, body=json.dumps({'notify': notify}))
+                self.assertEqual(json.loads(response.body)['code'], 200)
+                stored = json.loads(self.fetch('/svr/notify', headers=headers).body)['data'][0]
+                self.assertEqual(json.loads(stored['params']), params)
+                stored['enable'] = 0
+                response = self.fetch('/svr/notify', method='PUT', headers=headers, body=json.dumps({'notify': stored}))
+                self.assertEqual(json.loads(response.body)['code'], 200)
+                stored.pop('enable')
+                with mock.patch('service.notify.custom.requests.request') as request, \
+                        mock.patch('service.notify.custom.requests.post') as post:
+                    request.return_value.status_code = 200
+                    post.return_value.status_code = 200
+                    post.return_value.json.return_value = ({'code': 0, 'content': {'result': ['accepted']}}
+                                                          if method == 8 else {'code': 200})
+                    response = self.fetch('/svr/notify', method='POST', headers=headers, body=json.dumps({'notify': stored}))
+                    self.assertEqual(json.loads(response.body)['code'], 200)
+                    (request if method == 5 else post).assert_called_once()
+                response = self.fetch('/svr/notify', method='DELETE', headers=headers,
+                                      body=json.dumps({'notifyId': stored['id']}), allow_nonstandard_methods=True)
+                self.assertEqual(json.loads(response.body)['code'], 200)
+                self.assertEqual(json.loads(self.fetch('/svr/notify', headers=headers).body)['data'], [])
 
 
 class MountSecretReuseTest(unittest.TestCase):

@@ -21,6 +21,7 @@ def make_app():
     return Application([
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
+        (r"/svr/settings", systemController.Settings),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
         (r"/svr/storage", jobController.Storage),

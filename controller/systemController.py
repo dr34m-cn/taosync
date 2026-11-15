@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
 
 from common.LNG import language
+from common.config import getSettings, updateSettings
 from controller.baseController import BaseHandler, handle_request, cookieName
 from service.system import userService
 
@@ -43,7 +44,24 @@ class User(BaseHandler):
     @run_on_executor
     @handle_request
     def put(self, req):
+        if 'userName' in req:
+            user = userService.editUserName(req['__user']['id'], req['userName'])
+            self.set_session_cookie(user)
+            return {key: value for key, value in user.items() if key not in ('passwd', 'sqlVersion')}
         userService.editPasswd(req['__user']['id'], req['passwd'], req['oldPasswd'])
+
+
+class Settings(BaseHandler):
+    executor = ThreadPoolExecutor(1)
+
+    @handle_request
+    def get(self, req):
+        return getSettings()
+
+    @run_on_executor
+    @handle_request
+    def put(self, req):
+        return updateSettings(req['settings'])
 
 
 class Language(BaseHandler):

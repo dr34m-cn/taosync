@@ -141,11 +141,11 @@ class TaoSyncConfigTest(unittest.TestCase):
                 )
                 self.assertEqual("https://config.example.com", config["server"]["aliyun_auth_server"])
 
-    def test_config_file_omitted_or_empty_server_uses_default_even_with_environment(self):
+    def test_config_file_omitted_or_empty_server_uses_environment(self):
         for ini in ("", "aliyun_auth_server=\n"):
             with self.subTest(ini=ini):
                 config = self._load_config(ini, {"TAO_ALIYUN_AUTH_SERVER": "https://env.example.com"})
-                self.assertEqual("https://taoapi.dr34m.cn", config["server"]["aliyun_auth_server"])
+                self.assertEqual("https://env.example.com", config["server"]["aliyun_auth_server"])
 
     def test_aliyun_auth_server_environment_is_used_without_config_file(self):
         config = self._load_config(env={"TAO_ALIYUN_AUTH_SERVER": " https://env.example.com "})

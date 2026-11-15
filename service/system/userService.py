@@ -83,6 +83,15 @@ def editPasswd(userId, passwd, oldPasswd):
     userMapper.resetPasswd(userId, commonUtils.hashPasswd(passwd))
 
 
+def editUserName(userId, userName):
+    if not isinstance(userName, str):
+        raise ValueError(G('invalid_username'))
+    userName = userName.strip()
+    if not userName or len(userName) > 64 or any(ord(char) < 32 or ord(char) == 127 for char in userName):
+        raise ValueError(G('invalid_username'))
+    return userMapper.editUserName(userId, userName)
+
+
 def resetPasswd(userName, key, passwd=None):
     """
     重置密码

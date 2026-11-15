@@ -55,3 +55,4 @@ export function putUser(data) {
 }
 
 export const editPwd = putUser;
+export const editUserName = putUser;

@@ -421,7 +421,7 @@ class JobTask:
         self._wake()
 
     def checkTimeout(self):
-        timeout = getattr(self, 'timeoutSeconds', 0)
+        timeout = self.timeoutSeconds = taskTimeoutSeconds()
         if (timeout and not getattr(self, 'timedOut', False) and not self.breakFlag
                 and time.time() - self.createTime >= timeout):
             self.timedOut = True
@@ -859,15 +859,17 @@ class JobTask:
     def fullScanDue(meta):
         """源目录模式下按配置周期做一次完整比对，以修复目标端被手动删改的内容。"""
         try:
-            hours = float(getConfig()['server'].get('source_full_scan_hours', 24) or 0)
+            server = getConfig()['server']
+            days = (float(server['source_full_scan_days'] or 0) if 'source_full_scan_days' in server
+                    else float(server.get('source_full_scan_hours', 360) or 0) / 24)
         except (TypeError, ValueError, KeyError):
-            hours = 24
-        if hours <= 0:
+            days = 15
+        if days <= 0:
             return False
         last = meta.get('fullScanTime')
         if not last:
             return True
-        return time.time() - float(last) >= hours * 3600
+        return time.time() - float(last) >= days * 86400
 
     def scanSourceTree(self, path, spec, rootPath):
         """Scan the complete source tree without reading any target directory."""

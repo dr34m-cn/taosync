@@ -4,7 +4,7 @@ import requests
 
 from common.LNG import G
 from mapper import notifyMapper
-from service.notify import sc
+from service.notify import sc, custom, push
 
 
 def getNotifyList(needEnable=False):
@@ -22,6 +22,7 @@ def addNewNotify(notify):
     :param notify:
     :return:
     """
+    validateNotify(notify)
     notifyMapper.addNotify(notify)
 
 
@@ -31,7 +32,20 @@ def editNotify(notify):
     :param notify:
     :return:
     """
+    validateNotify(notify)
     notifyMapper.editNotify(notify)
+
+
+def validateNotify(notify):
+    params = json.loads(notify['params'])
+    if notify['method'] == 5:
+        custom.validate(params)
+    elif notify['method'] == 6:
+        custom.barkUrl(params)
+    elif notify['method'] == 7:
+        push.pushPlusData(params)
+    elif notify['method'] == 8:
+        push.pushDeerUrl(params)
 
 
 def updateNotifyStatus(notifyId, enable):
@@ -78,6 +92,10 @@ def sendNotify(notify, title, content, needNotSync=False):
         2: {'url': '', 'notSendNull': False}
         3: {'corpid': '', 'agentid': '', 'corpsecret': '', 'notSendNull': False}
         4: {'url': '', 'notSendNull': False}
+        5: {'url': '', 'method': 'POST', 'contentType': 'application/json', 'headers': '', 'body': ''}
+        6: {'push': '', 'isArchive': 1, 'group': '', 'sound': '', 'icon': '', 'level': '', 'url': ''}
+        7: {'token': '', 'topic': '', 'template': 'html', 'channel': 'wechat', 'webhook': '', 'callbackUrl': '', 'to': ''}
+        8: {'pushkey': '', 'url': 'https://api2.pushdeer.com/message/push'}
     """
     timeout = (10, 30)
     params = json.loads(notify['params'])
@@ -171,5 +189,13 @@ def sendNotify(notify, title, content, needNotSync=False):
         rst = r.json()
         if rst['code'] != 0:
             raise Exception(f"Lark群机器人发送消息失败: {rst['msg']}")
+    elif notify['method'] == 5:
+        custom.send(params, title, content, timeout)
+    elif notify['method'] == 6:
+        custom.sendBark(params, title, content, timeout)
+    elif notify['method'] == 7:
+        push.sendPushPlus(params, title, content, timeout)
+    elif notify['method'] == 8:
+        push.sendPushDeer(params, title, content, timeout)
     else:
         raise Exception("Wrong method")

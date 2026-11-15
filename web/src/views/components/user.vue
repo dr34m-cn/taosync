@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
-import { logout, editPwd } from "@/api/user";
+import { logout, editPwd, editUserName } from "@/api/user";
 import { useAppStore } from "@/store/useAppStore";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
@@ -25,6 +25,43 @@ const form = ref({
 const formRef = ref();
 const loading = ref(false);
 const dialogShow = ref(false);
+const nameDialogShow = ref(false);
+const nameFormRef = ref();
+const nameForm = ref({ userName: "" });
+const nameLoading = ref(false);
+const nameRules = computed(() => ({
+  userName: [{
+    validator: (_rule, value, callback) => {
+      const name = value.trim();
+      const characters = Array.from(name);
+      callback(!name || characters.length > 64 || characters.some(char => char.codePointAt(0) < 32 || char.codePointAt(0) === 127)
+        ? new Error(t("user.userNameRule")) : undefined);
+    },
+    trigger: ["blur", "change"],
+  }],
+}));
+
+const showName = () => {
+  nameForm.value.userName = appStore.user.userName;
+  nameDialogShow.value = true;
+};
+
+const submitName = () => {
+  nameFormRef.value.validate(async (valid) => {
+    if (!valid) return;
+    nameLoading.value = true;
+    try {
+      const { data } = await editUserName({ userName: nameForm.value.userName.trim() });
+      appStore.set("user", data);
+      nameDialogShow.value = false;
+      ElMessage.success(t("user.success"));
+    } catch {
+      // Request errors are displayed by the shared interceptor.
+    } finally {
+      nameLoading.value = false;
+    }
+  });
+};
 
 const validatePass2 = (rule, value, callback) => {
   if (value == "" || value == null) {
@@ -109,11 +146,26 @@ const submit = () => {
       </div>
       <template #dropdown>
         <el-dropdown-menu>
+          <el-dropdown-item @click="showName">{{ $t("header.setUserName") }}</el-dropdown-item>
           <el-dropdown-item @click="showPut">{{ $t("header.setPwd") }}</el-dropdown-item>
           <el-dropdown-item @click="doLogout">{{ $t("header.logout") }}</el-dropdown-item>
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+
+    <el-dialog width="520px" :append-to-body="true" v-model="nameDialogShow" :title="$t('header.setUserName')"
+      :close-on-click-modal="false" @closed="nameFormRef?.clearValidate()">
+      <el-form ref="nameFormRef" :model="nameForm" :rules="nameRules" label-position="top" @submit.prevent="submitName">
+        <el-form-item prop="userName" :label="$t('setting.username')">
+          <el-input v-model="nameForm.userName" :disabled="nameLoading" :placeholder="$t('login.userName')" />
+        </el-form-item>
+        <button type="submit" style="display: none" />
+      </el-form>
+      <template #footer>
+        <el-button :disabled="nameLoading" @click="nameDialogShow = false">{{ $t("common.cancel") }}</el-button>
+        <el-button :loading="nameLoading" type="primary" @click="submitName">{{ $t("common.confirm") }}</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog width="520px" :append-to-body="true" v-model="dialogShow" :title="$t('header.setPwd')">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">

@@ -49,6 +49,26 @@ const editRule = computed(() => [
       url: [{ type: "string", required: true, message: t("notify.webhook"), trigger: "blur" }],
     },
   },
+  {
+    params: {
+      url: [{ type: "string", required: true, message: t("notify.requestUrl"), trigger: "blur" }],
+    },
+  },
+  {
+    params: {
+      push: [{ type: "string", required: true, message: t("notify.barkPush"), trigger: "blur" }],
+    },
+  },
+  {
+    params: {
+      token: [{ type: "string", required: true, whitespace: true, message: t("notify.pushPlusToken"), trigger: "blur" }],
+    },
+  },
+  {
+    params: {
+      pushkey: [{ type: "string", required: true, whitespace: true, message: t("notify.pushDeerKey"), trigger: "blur" }],
+    },
+  },
 ]);
 
 const getData = () => {
@@ -119,6 +139,27 @@ const methodChange = (val) => {
     editData.value.params = {
       url: "",
       notSendNull: false,
+    };
+  } else if (val === 5) {
+    editData.value.params = {
+      url: "",
+      method: "POST",
+      contentType: "application/json",
+      headers: "",
+      body: '{\n  "title": "$title",\n  "content": "$content"\n}',
+      notSendNull: false,
+    };
+  } else if (val === 6) {
+    editData.value.params = {
+      push: "", isArchive: 1, group: "TaoSync", sound: "", icon: "", level: "active", url: "", notSendNull: false,
+    };
+  } else if (val === 7) {
+    editData.value.params = {
+      token: "", topic: "", template: "html", channel: "wechat", webhook: "", callbackUrl: "", to: "", notSendNull: false,
+    };
+  } else if (val === 8) {
+    editData.value.params = {
+      pushkey: "", url: "https://api2.pushdeer.com/message/push", notSendNull: false,
     };
   }
   setTimeout(() => {
@@ -231,7 +272,8 @@ onMounted(() => {
     <div v-else class="card-box">
       <div class="card-item" v-for="item in dataList" :key="item.id">
         <div class="card-item-top">
-          <el-image :src="`/notify/${item.method}.png`" fit="contain" class="notify-logo" />
+          <el-image v-if="item.method < 5" :src="`/notify/${item.method}.png`" fit="contain" class="notify-logo" />
+          <el-icon v-else class="notify-logo" :size="40"><Connection v-if="item.method === 5" /><Bell v-else /></el-icon>
           <div class="notify-info">
             <div class="card-item-user">{{ notifyMethod(item.method) }}</div>
             <div :class="`card-item-enable enable-${item.enable == 1 ? 'enable' : 'disable'}`">
@@ -294,7 +336,7 @@ onMounted(() => {
             </template>
           </i18n-t>
         </el-form-item>
-        <template v-if="editData.method == 0">
+        <template v-if="editData.method == 0 || editData.method == 5">
           <el-form-item prop="params.url" :label="$t('notify.requestUrl')">
             <el-input v-model="editData.params.url" :placeholder="$t('notify.requestUrl')" />
           </el-form-item>
@@ -303,26 +345,42 @@ onMounted(() => {
               <el-option key="POST" value="POST" label="POST" />
               <el-option key="PUT" value="PUT" label="PUT" />
               <el-option key="GET" value="GET" label="GET" />
+              <template v-if="editData.method == 5">
+                <el-option value="PATCH" label="PATCH" />
+                <el-option value="DELETE" label="DELETE" />
+                <el-option value="HEAD" label="HEAD" />
+              </template>
             </el-select>
           </el-form-item>
-          <el-form-item v-if="editData.params.method != 'GET'" prop="params.contentType" :label="$t('notify.contentType')">
+          <el-form-item v-if="editData.method == 5 || editData.params.method != 'GET'" prop="params.contentType" :label="$t('notify.contentType')">
             <el-select v-model="editData.params.contentType" style="width: 100%">
               <el-option key="application/json" value="application/json" label="application/json" />
               <el-option key="application/x-www-form-urlencoded" value="application/x-www-form-urlencoded" label="application/x-www-form-urlencoded" />
+              <el-option v-if="editData.method == 5" value="text/plain" label="text/plain" />
             </el-select>
           </el-form-item>
-          <el-form-item prop="params.titleName" :label="$t('notify.titleName')">
-            <el-input v-model="editData.params.titleName" :placeholder="$t('notify.titleName')" />
-          </el-form-item>
-          <el-form-item prop="params.needContent" :label="$t('notify.needContent')">
-            <el-select v-model="editData.params.needContent" style="width: 100%">
-              <el-option :key="true" :value="true" :label="$t('notify.need')" />
-              <el-option :key="false" :value="false" :label="$t('notify.notNeed')" />
-            </el-select>
-          </el-form-item>
-          <el-form-item prop="params.contentName" v-if="editData.params.needContent" :label="$t('notify.contentName')">
-            <el-input v-model="editData.params.contentName" :placeholder="$t('notify.contentName')" />
-          </el-form-item>
+          <template v-if="editData.method == 5">
+            <el-form-item prop="params.headers" :label="$t('notify.requestHeaders')">
+              <el-input v-model="editData.params.headers" type="textarea" :rows="3" :placeholder="$t('notify.headersPlaceholder')" />
+            </el-form-item>
+            <el-form-item prop="params.body" :label="$t('notify.requestBody')">
+              <el-input v-model="editData.params.body" type="textarea" :rows="7" :placeholder="$t('notify.bodyPlaceholder')" />
+            </el-form-item>
+          </template>
+          <template v-else>
+            <el-form-item prop="params.titleName" :label="$t('notify.titleName')">
+              <el-input v-model="editData.params.titleName" :placeholder="$t('notify.titleName')" />
+            </el-form-item>
+            <el-form-item prop="params.needContent" :label="$t('notify.needContent')">
+              <el-select v-model="editData.params.needContent" style="width: 100%">
+                <el-option :key="true" :value="true" :label="$t('notify.need')" />
+                <el-option :key="false" :value="false" :label="$t('notify.notNeed')" />
+              </el-select>
+            </el-form-item>
+            <el-form-item prop="params.contentName" v-if="editData.params.needContent" :label="$t('notify.contentName')">
+              <el-input v-model="editData.params.contentName" :placeholder="$t('notify.contentName')" />
+            </el-form-item>
+          </template>
         </template>
         <template v-else-if="editData.method == 1">
           <el-form-item prop="params.sendKey" :label="$t('notify.sendKey')">
@@ -351,6 +409,57 @@ onMounted(() => {
         <template v-else-if="editData.method == 4">
           <el-form-item prop="params.url" :label="$t('notify.webhook')">
             <el-input v-model="editData.params.url" placeholder="https://open.larksuite.com/open-apis/bot/v2/hook/xxxxxxxxxx" />
+          </el-form-item>
+        </template>
+        <template v-if="editData.method == 6">
+          <el-form-item prop="params.push" :label="$t('notify.barkPush')">
+            <el-input v-model="editData.params.push" placeholder="https://api.day.app/device_key" />
+          </el-form-item>
+          <el-form-item v-for="key in ['group', 'sound', 'icon', 'url']" :key="key" :prop="`params.${key}`" :label="$t(`notify.bark_${key}`)">
+            <el-input v-model="editData.params[key]" />
+          </el-form-item>
+          <el-form-item prop="params.level" :label="$t('notify.bark_level')">
+            <el-select v-model="editData.params.level" style="width: 100%">
+              <el-option v-for="level in ['passive', 'active', 'timeSensitive', 'critical']" :key="level" :value="level" :label="$t(`notify.barkLevels.${level}`)" />
+            </el-select>
+          </el-form-item>
+          <el-form-item prop="params.isArchive" :label="$t('notify.bark_isArchive')">
+            <el-switch v-model="editData.params.isArchive" :active-value="1" :inactive-value="0" />
+          </el-form-item>
+        </template>
+        <template v-else-if="editData.method == 7">
+          <el-form-item prop="params.token" :label="$t('notify.pushPlusToken')">
+            <el-input v-model="editData.params.token" placeholder="Token" type="password" show-password />
+          </el-form-item>
+          <el-form-item prop="params.topic" :label="$t('notify.pushPlusTopic')">
+            <el-input v-model="editData.params.topic" :placeholder="$t('notify.optional')" />
+          </el-form-item>
+          <el-form-item prop="params.template" :label="$t('notify.pushPlusTemplate')">
+            <el-select v-model="editData.params.template" style="width: 100%">
+              <el-option v-for="value in ['html', 'txt', 'json', 'markdown', 'cloudMonitor', 'jenkins', 'route', 'pay']" :key="value" :value="value" :label="value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item prop="params.channel" :label="$t('notify.pushPlusChannel')">
+            <el-select v-model="editData.params.channel" style="width: 100%">
+              <el-option v-for="value in ['wechat', 'webhook', 'cp', 'mail', 'sms']" :key="value" :value="value" :label="$t(`notify.pushPlusChannels.${value}`)" />
+            </el-select>
+          </el-form-item>
+          <el-form-item prop="params.webhook" :label="$t('notify.pushPlusWebhook')">
+            <el-input v-model="editData.params.webhook" :placeholder="$t('notify.optional')" />
+          </el-form-item>
+          <el-form-item prop="params.callbackUrl" :label="$t('notify.pushPlusCallback')">
+            <el-input v-model="editData.params.callbackUrl" placeholder="https://example.com/callback" />
+          </el-form-item>
+          <el-form-item prop="params.to" :label="$t('notify.pushPlusTo')">
+            <el-input v-model="editData.params.to" :placeholder="$t('notify.optional')" />
+          </el-form-item>
+        </template>
+        <template v-else-if="editData.method == 8">
+          <el-form-item prop="params.pushkey" :label="$t('notify.pushDeerKey')">
+            <el-input v-model="editData.params.pushkey" placeholder="PushKey" type="password" show-password />
+          </el-form-item>
+          <el-form-item prop="params.url" :label="$t('notify.pushDeerUrl')">
+            <el-input v-model="editData.params.url" placeholder="https://api2.pushdeer.com/message/push" />
           </el-form-item>
         </template>
         <el-form-item prop="params.notSendNull" :label="$t('notify.notSendNull')">
