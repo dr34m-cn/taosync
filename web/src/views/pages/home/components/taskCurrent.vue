@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { jobGetTaskCurrent, jobPut } from "@/api/job";
 import taskCurrentEcharts from "./taskCurrentEcharts.vue";
 import taskDetailTable from "./taskDetailTable.vue";
+import taskProgress from "./taskProgress.vue";
 import { parseSize, parseTime } from "@/utils/utils";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useI18n } from "vue-i18n";
@@ -17,7 +18,7 @@ const props = defineProps({
 const emit = defineEmits(["currentChange"]);
 const { t } = useI18n();
 const isMobile = useMediaQuery("(max-width: 768px)");
-const currentPanelHeight = computed(() => (isMobile.value ? 1120 : 443));
+const currentPanelHeight = computed(() => (isMobile.value ? 1240 : 479));
 
 const loading = ref(false);
 const loadingTask = ref(false);
@@ -29,6 +30,25 @@ const toTableParams = ref({
 });
 const current = ref(null);
 let timer = null;
+
+const summaryMetrics = computed(() => {
+  const counts = current.value?.num || {};
+  const sizes = current.value?.size || {};
+  const statuses = ["wait", "running", "success", "fail", "other"];
+  return [
+    {
+      key: "total",
+      label: "current.totalFiles",
+      count: statuses.reduce((sum, key) => sum + (counts[key] || 0), 0),
+      size: statuses.reduce((sum, key) => sum + (sizes[key] || 0), 0),
+    },
+    ...[
+      ["success", "current.completed"],
+      ["running", "current.running"],
+      ["wait", "current.wait"],
+    ].map(([key, label]) => ({ key, label, count: counts[key] || 0, size: sizes[key] || 0 })),
+  ];
+});
 
 const toTable = computed(() => {
   const count = cuTaskList.value.length;
@@ -76,6 +96,7 @@ const calcSpeedAndSize = (nextCurrent) => {
   const syncDuration = nextCurrent.duration - nextCurrent.firstSync + nextCurrent.createTime;
   const speedAvg = syncDuration > 0 ? doneSize / syncDuration : 0;
   const remainTime = speedAvg > 0 ? parseInt(remainSize / speedAvg) : 0;
+  const displayRemainTime = remainTime > 24 * 3600 ? Math.ceil(remainTime / 60) * 60 : remainTime;
   const allSize = doneSize + remainSize;
   return {
     remainSize,
@@ -83,7 +104,7 @@ const calcSpeedAndSize = (nextCurrent) => {
     speedAvg,
     speed,
     remainTime,
-    remainTimeText: formatSeconds(remainTime),
+    remainTimeText: formatSeconds(displayRemainTime),
     allProgress: allSize > 0 ? (doneSize / allSize) * 100 : 0,
   };
 };
@@ -242,11 +263,10 @@ watch(isMobile, () => {
               {{ $t("current.overall") }}:
               <span v-if="current.firstSync === null">{{ $t("current.noSyncFound") }}</span>
               <template v-else>
-                <el-progress
-                  :stroke-width="20"
-                  :text-inside="true"
+                <taskProgress
                   style="width: 130px"
-                  :percentage="Number(current.allProgress.toFixed(4))"
+                  :percentage="current.allProgress"
+                  :precision="4"
                 />
                 <el-tooltip v-if="!current.scanFinish" effect="dark" :content="$t('current.unreliableProgress')" placement="top-end">
                   <el-icon class="hint"><QuestionFilled /></el-icon>
@@ -300,6 +320,12 @@ watch(isMobile, () => {
               </span>
             </div>
           </div>
+          <div class="top-line summary-line">
+            <div v-for="metric in summaryMetrics" :key="metric.key" class="metric">
+              <span>{{ $t(metric.label) }}:</span>
+              <span class="metric-value">{{ metric.count }} ({{ parseSize(metric.size) }})</span>
+            </div>
+          </div>
         </div>
         <div class="current-box-top-right">
           <el-button type="danger" @click="abortJob">{{ $t("current.abort") }}</el-button>
@@ -344,6 +370,8 @@ watch(isMobile, () => {
     width: 100%;
     box-sizing: border-box;
     overflow-x: auto;
+    display: flex;
+    flex-direction: column;
 
     .current-box-top {
       min-width: 1120px;
@@ -354,17 +382,33 @@ watch(isMobile, () => {
       display: flex;
       align-items: center;
       justify-content: center;
+      flex: 0 0 auto;
 
       .top-line {
         display: flex;
         align-items: center;
         justify-content: center;
+        min-height: 28px;
 
         .metric {
           width: 270px;
           display: flex;
           align-items: center;
           color: var(--text-secondary);
+        }
+      }
+
+      .summary-line .metric {
+        gap: 4px;
+        flex-wrap: wrap;
+        padding: 3px 0;
+        line-height: 22px;
+
+        .metric-value {
+          min-width: 0;
+          overflow-wrap: anywhere;
+          color: var(--text-primary);
+          font-variant-numeric: tabular-nums;
         }
       }
 
@@ -376,7 +420,8 @@ watch(isMobile, () => {
     .current-box-bottom {
       min-width: 1120px;
       box-sizing: border-box;
-      height: calc(100% - 74px);
+      min-height: 0;
+      flex: 1;
       width: 100%;
       display: flex;
 

@@ -213,6 +213,8 @@ current:
   speedTip: Speed estimates can be inaccurate when scanning takes too long
   duration: Duration
   remaining: Remaining
+  totalFiles: Total Files
+  completed: Completed
   startAt: Started
   finishAt: ETA
   timeTip: Time is only an estimate before scanning completes and may be inaccurate if scanning takes too long

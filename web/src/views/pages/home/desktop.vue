@@ -724,14 +724,12 @@ onMounted(() => {
               <template #append>{{ $t("home.second") }}</template>
             </el-input>
           </el-form-item>
-          <el-form-item prop="exclude" :label="$t('home.excludeSyntax')">
-            <div class="label-width">
-              {{ $t("home.excludeSyntaxTip") }}<br />
-              <span @click="toIgnore" class="to-link">{{ $t("home.excludeGuide") }}</span>
-            </div>
-          </el-form-item>
           <el-form-item prop="exclude" :label="$t('home.excludeRules')">
             <div class="label-width">
+              <div class="exclude-help">
+                <span>{{ $t("home.excludeSyntaxTip") }}</span>
+                <el-link type="primary" @click="toIgnore">{{ $t("home.excludeGuide") }}</el-link>
+              </div>
               <div class="label-list-box">
                 <el-input v-model="excludeTmp" :placeholder="$t('home.excludePlaceholder')">
                   <template #append>
@@ -886,6 +884,20 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   min-height: 42px;
+}
+
+:global(.job-dialog .exclude-help) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:global(.job-dialog .exclude-help .el-link) {
+  font-size: inherit;
 }
 
 :global(.job-dialog .label-list-item) {

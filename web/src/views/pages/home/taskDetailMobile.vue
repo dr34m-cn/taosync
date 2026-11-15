@@ -7,6 +7,7 @@ import { jobGetTaskItem } from "@/api/job";
 import taskItemStatus, { taskItemStatusKeys } from "@/utils/taskItemStatus";
 import { parseSize, parseTime } from "@/utils/utils";
 import menuRefresh from "./components/menuRefresh.vue";
+import taskProgress from "./components/taskProgress.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -97,11 +98,10 @@ const handleCurrentChange = (value) => {
         </div>
 
         <div class="status-line">
-          <el-progress
+          <taskProgress
             v-if="item.status == 1"
             :stroke-width="18"
-            :text-inside="true"
-            :percentage="Number(Number(item.progress || 0).toFixed(3))"
+            :percentage="Number(item.progress || 0)"
           />
           <div v-else :class="`item-status bg-${item.status}`">{{ statusText(item) }}</div>
         </div>

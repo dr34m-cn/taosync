@@ -568,11 +568,12 @@ onMounted(getJobList);
         </section>
 
         <section class="editor-section">
-          <div class="section-title-row">
-            <h2>{{ $t("home.mobileExclude") }}</h2>
-            <el-link type="primary" @click="toIgnore">{{ $t("home.excludeGuide") }}</el-link>
-          </div>
-          <el-form-item :label="$t('home.excludeRules')" prop="exclude">
+          <h2>{{ $t("home.excludeRules") }}</h2>
+          <el-form-item prop="exclude">
+            <div class="exclude-help">
+              <span>{{ $t("home.excludeSyntaxTip") }}</span>
+              <el-link type="primary" @click="toIgnore">{{ $t("home.excludeGuide") }}</el-link>
+            </div>
             <el-input v-model="excludeTmp" :placeholder="$t('home.excludePlaceholder')" @keyup.enter="addExclude">
               <template #append>
                 <el-button @click="addExclude">{{ $t("common.add") }}</el-button>
@@ -947,6 +948,21 @@ onMounted(getJobList);
 :global(.mobile-job-drawer .exclude-tags) {
   margin-top: 10px;
   margin-bottom: 0;
+}
+
+:global(.mobile-job-drawer .exclude-help) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:global(.mobile-job-drawer .exclude-help .el-link) {
+  font-size: inherit;
 }
 
 :global(.mobile-job-drawer .full-width-button) {

@@ -212,6 +212,8 @@ current:
   instantSpeed: 瞬时速度
   speedTip: 如果扫描用时太久，估算速度可能有很大误差
   duration: 持续时间
+  totalFiles: 总文件数
+  completed: 已完成
   remaining: 预计还要
   startAt: 开始时间
   finishAt: 预计完成

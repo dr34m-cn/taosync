@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { parseSize, parseTime } from "@/utils/utils";
 import taskItemStatus from "@/utils/taskItemStatus";
 import { useMediaQuery } from "@vueuse/core";
+import taskProgress from "./taskProgress.vue";
 
 defineProps({
   taskItemData: {
@@ -24,9 +25,9 @@ const params = ref({
   pageNum: 1,
 });
 
-// Live records have no database ID; progress and status change on every poll.
+// Live records can share directories and timestamps; file names distinguish each row across polls.
 const rowKey = (row) => row.id != null ? `id:${row.id}` : JSON.stringify([
-  row.createTime, row.type, row.isPath, row.srcPath, row.dstPath,
+  row.createTime, row.type, row.isPath, row.srcPath, row.dstPath, row.fileName,
 ]);
 
 const handleSizeChange = (val) => {
@@ -95,12 +96,10 @@ const handleCurrentChange = (val) => {
               </template>
             </el-popover>
           </div>
-          <el-progress
+          <taskProgress
             v-else
-            :stroke-width="20"
-            :text-inside="true"
             style="width: 96px"
-            :percentage="Number(Number(scope.row.progress || 0).toFixed(3))"
+            :percentage="Number(scope.row.progress || 0)"
           />
         </template>
       </el-table-column>
