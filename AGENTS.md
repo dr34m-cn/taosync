@@ -20,6 +20,21 @@ Always review and update README.md and README_EN.md together. Keep their user-fa
 
 Numeric inputs must not show increment/decrement arrow controls. Use `:controls="false"` for Element Plus `el-input-number` components and hide native number input spinners when applicable.
 
+# Backend Test Isolation
+
+The source-mode CI failure occurred because per-file snapshot persistence added a new `jobMapper.checkpointSourceFile` call, but existing unit tests mocked only snapshot reads and final snapshot replacement. The unmocked call reached real configuration/database initialization in CI's empty working directory, failed on missing `data/secret.key`, recorded a failed operation, and prevented final snapshot replacement. The resulting snapshot-call assertion failures were secondary symptoms. Local verification had also covered only `test/`, omitting the separate `tests/` suite used by CI.
+
+- When adding persistence, configuration, filesystem, network, or other external calls, review every affected unit-test fixture and mock each external entry point where the code under test looks it up. Mocking an older read or batch-write method does not isolate newly added calls. Scope patches to the test and restore them with cleanup.
+- Unit tests must run without local runtime data, secrets, initialized databases, or state left by other tests. Do not create real `data/secret.key` or initialize production configuration to conceal a missing mock. Integration tests should explicitly provide temporary configuration and databases and clean them up.
+- Assert the new behavior as well as mocking it: successful completion saves progress, incomplete multi-target delivery does not advance the file snapshot, and persistence failures are reported and prevent a successful full-snapshot commit. Keep real-database recovery coverage in integration tests.
+- Verify both backend test directories using the CI runner, which runs in an empty temporary working directory and rejects leaked files. Run all three commands below after changes affecting shared backend behavior; running only one directory is insufficient. Check `.github/workflows/test.yml` for changes to the required commands.
+
+```sh
+python scripts/run-backend-tests.py test
+python scripts/run-backend-tests.py tests
+python scripts/run-backend-tests.py --shuffle-seed 42
+```
+
 # Code Summary Preferences
 
 - When the user asks for a coding-work summary, including `总结`, `按code记忆格式要求总结`, `按code记忆要求的格式总结`, or asks how to summarize, first read `~/code/memory.md` again and follow its current summary protocol. Do not rely on an earlier reading or recollection.

@@ -96,6 +96,10 @@ def makeTask(engine, method=0, dstPath='/dst/', sourceMode=1):
 
 
 class SourceModeSyncTest(unittest.TestCase):
+    def setUp(self):
+        self.checkpointSnapshot = self.enterContext(mock.patch.object(
+            jobClient.jobMapper, 'checkpointSourceFile'))
+
     def runTask(self, task, storedSnapshot):
         with mock.patch.object(jobClient.jobMapper, 'getSourceSnapshot', return_value=storedSnapshot), \
                 mock.patch.object(jobClient.jobMapper, 'replaceSourceSnapshot') as replaceSnapshot, \
@@ -137,6 +141,12 @@ class SourceModeSyncTest(unittest.TestCase):
             ('/src/', '/dst-b/', 'new.txt'),
             ('/src/folder/', '/dst-b/folder/', 'changed.bin'),
         ])
+        self.assertEqual(self.checkpointSnapshot.call_count, 2)
+        self.assertEqual({call.args[1]['path'] for call in self.checkpointSnapshot.call_args_list},
+                         {'new.txt', 'folder/changed.bin'})
+        for call in self.checkpointSnapshot.call_args_list:
+            self.assertEqual(call.args[0], 42)
+            self.assertEqual(call.args[2], task.sourceSnapshotIdentity)
         replaceSnapshot.assert_called_once()
         committed = replaceSnapshot.call_args.args[1]
         self.assertEqual({item['path'] for item in committed},
@@ -193,7 +203,32 @@ class SourceModeSyncTest(unittest.TestCase):
         replaceSnapshot = self.runTask(task, self.initialized([]))
 
         replaceSnapshot.assert_not_called()
+        self.checkpointSnapshot.assert_not_called()
         self.assertTrue(any(item['status'] == 7 for item in task.finish))
+
+    def test_checkpoint_waits_for_all_targets_before_writing(self):
+        engine = FakeEngine({'/src/': {'new.txt': 2}})
+        task = makeTask(engine, dstPath='/dst-a/:/dst-b/')
+        delivered = []
+        self.checkpointSnapshot.side_effect = lambda *args, **kwargs: delivered.append(list(engine.copyCalls))
+
+        self.runTask(task, self.initialized([]))
+
+        self.checkpointSnapshot.assert_called_once()
+        self.assertEqual(delivered, [[('/src/', '/dst-a/', 'new.txt'),
+                                      ('/src/', '/dst-b/', 'new.txt')]])
+
+    def test_checkpoint_failure_is_reported_and_blocks_full_snapshot_commit(self):
+        engine = FakeEngine({'/src/': {'new.txt': 2}})
+        task = makeTask(engine)
+        self.checkpointSnapshot.side_effect = RuntimeError('checkpoint write failed')
+
+        replaceSnapshot = self.runTask(task, self.initialized([]))
+
+        self.checkpointSnapshot.assert_called_once()
+        replaceSnapshot.assert_not_called()
+        self.assertTrue(any(item['status'] == 7 and item['errMsg'] == 'checkpoint write failed'
+                            for item in task.finish))
 
     def test_incomplete_source_scan_does_not_advance_snapshot(self):
         engine = FakeEngine({'/src/': {'missing/': {}}})
@@ -203,6 +238,7 @@ class SourceModeSyncTest(unittest.TestCase):
 
         self.assertEqual(engine.listCalls, ['/src/', '/src/missing/'])
         replaceSnapshot.assert_not_called()
+        self.checkpointSnapshot.assert_not_called()
         self.assertTrue(task.sourceScanFailed)
 
     def test_move_copies_all_targets_then_deletes_source_once(self):
@@ -219,6 +255,7 @@ class SourceModeSyncTest(unittest.TestCase):
             ('/src/', '/dst-b/', 'move.txt'),
         ])
         self.assertEqual(engine.deleteCalls, [('/src/', ('move.txt',))])
+        self.checkpointSnapshot.assert_called_once()
         replaceSnapshot.assert_called_once()
         self.assertEqual(replaceSnapshot.call_args.args, (42, []))
 
@@ -360,6 +397,7 @@ class SourceModeSyncTest(unittest.TestCase):
 
         self.assertEqual(engine.listCalls, ['/src/', '/dst/'])
         self.assertEqual(engine.copyCalls, [('/src/', '/dst/', 'new.txt')])
+        self.checkpointSnapshot.assert_called_once()
         replaceSnapshot.assert_called_once()
 
     def test_disabled_source_mode_still_records_successful_source_scan(self):
@@ -373,6 +411,7 @@ class SourceModeSyncTest(unittest.TestCase):
 
         self.assertEqual(engine.listCalls, ['/src/', '/dst/'])
         self.assertEqual(engine.copyCalls, [])
+        self.checkpointSnapshot.assert_not_called()
         replaceSnapshot.assert_called_once()
         self.assertEqual(replaceSnapshot.call_args.args[1], [
             {'path': 'same.txt', 'isDir': 0, 'size': 2}
