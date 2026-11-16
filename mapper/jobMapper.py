@@ -242,6 +242,51 @@ def replaceSourceSnapshot(conn, jobId, entries, expectedIdentity=None, fullScan=
 
 
 @sqlBase.connect_sql
+def checkpointSourceFile(conn, jobId, entry, expectedIdentity, directories=()):
+    """Commit one delivered file without declaring a complete source scan."""
+    try:
+        conn.execute("begin immediate")
+        columns = ', '.join(SOURCE_SNAPSHOT_FIELDS)
+        row = conn.execute("select {} from job where id=?".format(columns), (jobId,)).fetchone()
+        if row is None:
+            raise Exception(G('job_not_found'))
+        if sourceSnapshotIdentity(dict(zip(SOURCE_SNAPSHOT_FIELDS, row))) != expectedIdentity:
+            raise RuntimeError(G('job_changed_during_sync'))
+        exists = conn.execute(
+            "select isDir from job_source_snapshot where jobId=? and path=?",
+            (jobId, entry['path'])).fetchone()
+        removed = 0
+        if exists and exists[0]:
+            prefix = entry['path'] + '/'
+            removed = conn.execute(
+                "delete from job_source_snapshot where jobId=? and substr(path, 1, ?)=?",
+                (jobId, len(prefix), prefix)).rowcount
+        conn.execute(
+            "insert into job_source_snapshot(jobId, path, isDir, size, fingerprint) "
+            "values (?, ?, 0, ?, ?) on conflict(jobId, path) do update set "
+            "isDir=0, size=excluded.size, fingerprint=excluded.fingerprint",
+            (jobId, entry['path'], entry['size'], entry.get('fingerprint')))
+        added = (0 if exists else 1) - removed
+        for directory in directories:
+            cursor = conn.execute(
+                "insert or ignore into job_source_snapshot(jobId, path, isDir, size) values (?, ?, 1, NULL)",
+                (jobId, directory['path']))
+            added += cursor.rowcount
+            conn.execute(
+                "update job_source_snapshot set isDir=1, size=NULL, fingerprint=? where jobId=? and path=?",
+                (directory.get('fingerprint'), jobId, directory['path']))
+        conn.execute(
+            "insert into job_source_snapshot_meta(jobId, initialized, scanTime, entryCount) "
+            "values (?, 0, ?, ?) on conflict(jobId) do update set "
+            "scanTime=excluded.scanTime, entryCount=entryCount+?",
+            (jobId, int(time.time()), added, added))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+@sqlBase.connect_sql
 def clearSourceSnapshot(conn, jobId):
     try:
         conn.execute("begin immediate")

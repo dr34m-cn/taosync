@@ -282,6 +282,7 @@ class JobTask:
         self.sourceScanAttempted = False
         self.sourceScanFailed = False
         self.previousSourceSnapshot = None
+        self.deliveredSourceFiles = {}
         self.sourceSnapshotIdentity = jobMapper.sourceSnapshotIdentity(self.job)
         self.currentTasks = {}
         self.syncThread = threading.Thread(target=self.sync)
@@ -418,7 +419,40 @@ class JobTask:
                 return
             if not getattr(self, 'finalized', False):
                 self.finish.append(copyItem.toRecord())
+                if copyItem.status == 2:
+                    self.checkpointSourceFile(copyItem.srcPath, copyItem.dstPath, copyItem.fileName)
         self._wake()
+
+    def checkpointSourceFile(self, srcPath, dstPath, fileName):
+        """Advance a file only after every configured destination has it."""
+        if self.job.get('sourceMode') != 1 or self._jobRemoved():
+            return
+        root = self.normalizeRoot(self.job['srcPath'])
+        relativePath = (srcPath + fileName)[len(root):]
+        entry = self.sourceSnapshot.get(relativePath)
+        if entry is None or entry['isDir']:
+            return
+        with self._stateLock():
+            if getattr(self, 'finalized', False):
+                return
+            delivered = self.__dict__.setdefault('deliveredSourceFiles', {}).setdefault(relativePath, set())
+            delivered.add(self.normalizeRoot(dstPath))
+            expected = {self.entryLocation(dst, relativePath)[0] for dst in self.job['dstPath'].split(':')}
+            if delivered != expected:
+                return
+            try:
+                directories = []
+                parent = posixpath.dirname(relativePath)
+                while parent:
+                    directory = self.sourceSnapshot.get(parent)
+                    if directory and directory['isDir']:
+                        directories.append(directory)
+                    parent = posixpath.dirname(parent)
+                jobMapper.checkpointSourceFile(
+                    self.job['id'], entry, self.sourceSnapshotIdentity, directories=directories)
+            except Exception as exc:
+                logging.getLogger().exception(exc)
+                self.copyHook(srcPath, dstPath, fileName, entry['size'], status=7, errMsg=str(exc))
 
     def checkTimeout(self):
         timeout = self.timeoutSeconds = taskTimeoutSeconds()
@@ -830,7 +864,7 @@ class JobTask:
                 raise ValueError(G('source_target_overlap'))
             storedSnapshot = jobMapper.getSourceSnapshot(self.job['id'])
             meta = storedSnapshot['meta']
-            if meta['initialized'] == 1:
+            if meta['initialized'] == 1 or storedSnapshot['entries']:
                 self.previousSourceSnapshot = {
                     item['path']: item for item in storedSnapshot['entries']
                 }
@@ -900,8 +934,7 @@ class JobTask:
         changedFiles = [entry for path, entry in current.items()
                         if not entry['isDir']
                         and self.fileSizeAllowed(entry['size'])
-                        and (self.job['method'] == 2
-                             or self.sourceEntryChanged(previous.get(path), entry))]
+                        and self.sourceEntryChanged(previous.get(path), entry)]
         newDirectories = [entry for path, entry in current.items()
                           if entry['isDir']
                           and (path not in previous or not previous[path]['isDir'])]
@@ -916,6 +949,22 @@ class JobTask:
 
         for dstRoot in dstPathList:
             failedDirectoryPrefixes = []
+            if self.job['method'] == 2:
+                # A retained move entry was delivered before an interrupted
+                # source deletion. finalizeMove still verifies both ends.
+                targetDirectories = {}
+                for entry in current.values():
+                    if self.breakFlag:
+                        return
+                    if (not entry['isDir'] and self.fileSizeAllowed(entry['size'])
+                            and not self.sourceEntryChanged(previous.get(entry['path']), entry)):
+                        srcPath, name = self.entryLocation(self.job['srcPath'], entry['path'])
+                        dstPath, _ = self.entryLocation(dstRoot, entry['path'])
+                        error = self.verifyTargetCopies([dstPath], name, entry['size'], targetDirectories)
+                        if error is None:
+                            self.copyHook(srcPath, dstPath, name, entry['size'], status=2, copyType=2)
+                        else:
+                            self.copyFile(srcPath, dstPath, name, entry['size'])
             if self.job['method'] == 1:
                 self.deleteSnapshotEntries(dstRoot, removed)
 
@@ -1242,13 +1291,23 @@ class JobTask:
                 if not self.fileSizeAllowed(srcFiles[key]):
                     continue
                 # 目标目录没有这个文件或文件大小不匹配(即需要同步)
-                if (self.job['method'] == 2
+                relativePath = (srcPath + key)[len(srcRootPath):]
+                movePending = (self.job['method'] == 2 and self.job.get('sourceMode') == 1
+                               and getattr(self, 'previousSourceSnapshot', None) is not None
+                               and not self.sourceEntryChanged(
+                                   self.previousSourceSnapshot.get(relativePath),
+                                   self.sourceSnapshot[relativePath]))
+                if ((self.job['method'] == 2 and not movePending)
                         or self.sourceFileChangedSinceSnapshot(
                             srcPath, srcRootPath, key
                         )
                         or key not in dstFiles or dstFiles[key] != srcFiles[key]):
                     self.copyFile(srcPath, dstPath, key, srcFiles[key],
                                   canVerify=key not in dstFiles or dstFiles[key] != srcFiles[key])
+                else:
+                    if self.job['method'] == 2:
+                        self.copyHook(srcPath, dstPath, key, srcFiles[key], status=2, copyType=2)
+                    self.checkpointSourceFile(srcPath, dstPath, key)
             # 如果是目录
             else:
                 # 目标目录没有这个目录
