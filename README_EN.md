@@ -6,7 +6,7 @@
   <a href="https://github.com/dr34m-cn/taosync">
     <img height="64" alt="TaoSync" src="./taosync-logo.svg"/>
   </a>
-  <p><em>TaoSync is an automated synchronization tool for OpenList/AList v3+.</em></p>
+  <p><em>TaoSync is an automated synchronization tool with a built-in storage engine and support for OpenList/AList v3+.</em></p>
   <div>
     <a href="https://github.com/dr34m-cn/taosync/blob/main/LICENSE">
       <img src="https://img.shields.io/github/license/dr34m-cn/taosync" alt="License" />
@@ -225,7 +225,7 @@ I originally created this project to preserve photos of Taotao as she grows up, 
 ## Before You Begin
 
 > [!IMPORTANT]
-> You must be familiar with [OpenList](https://docs.oplist.org/) before using TaoSync. `OpenList` is not bundled with TaoSync, so you must run a separate `OpenList` instance.
+> The built-in TaoSync engine is currently in **Beta** and connects directly to local directories, SMB, FTP, SFTP, and Aliyun Drive without OpenList. **External engines such as OpenList/AList are still recommended**; deploy [OpenList](https://docs.oplist.org/)/AList separately and add it as an external engine.
 
 > [!WARNING]
 > **Do not expose TaoSync directly to the public internet. You do so at your own risk!**
@@ -238,7 +238,7 @@ I originally created this project to preserve photos of Taotao as she grows up, 
 
 Back up local files to multiple cloud drives, FTP servers, or similar storage services, or synchronize files between multiple cloud drives.
 
-TaoSync can scan specified directories for differences on a schedule. Full sync mode makes the destination match the source, while Add only mode copies only files that exist in the source but not in the destination.
+TaoSync can scan specified directories for differences on a schedule. Add only mode copies files that are missing from the destination or differ in size, while preserving extra destination content. Full sync also removes extra destination content according to exclusion and file-size filtering rules.
 
 #### 2. Scheduled Downloads
 
@@ -263,19 +263,21 @@ You can create a one-time job by specifying the year, month, day, hour, minute, 
 * Ready-to-use Docker image
 * Responsive interface for both desktop and mobile devices
 * Clean removal: simply delete TaoSync when you no longer need it; it leaves no residual files or dependencies and does not affect other applications
-* Login passwords are stored in the database using a one-way hash, and password resets are supported. If you set the initial password through a configuration file or environment variable, protect that configuration carefully
-* Runs entirely offline except for connections to AList and never uploads user data
+* Login passwords are stored in the database as salted PBKDF2 hashes, and password resets are supported. If you set the initial password through a configuration file or environment variable, protect that configuration carefully
+* Runs locally and connects to configured storage, external engines, and notification services. Aliyun Drive QR authorization and token refresh use an authorization service; file transfers connect directly to Aliyun Drive
 * Comprehensive error handling for stable, reliable, and internally consistent operation. Errors may happen, but crashes never do (or so I think)
 * Detailed logging: all errors are recorded
-* Engine management: add, delete, edit, and view `OpenList/AList` engines
-* Job management: create, delete, enable, disable, edit, and manually run jobs
+* The built-in TaoSync engine supports local directories, SMB, FTP, SFTP, and Aliyun Drive; external `OpenList/AList` engines can also be managed
+* Job management: create, delete, enable, disable, edit, and manually run jobs, with summaries of the last execution and desktop bulk actions
 * Exclusion rules for preventing specified directories or files from being synchronized
 * File-size filtering with independently configurable minimum and maximum values
 * Three synchronization modes: Add only, Full sync, and Move mode
+* Source directory mode reduces destination scans through snapshots, saves completed progress per file, and resumes synchronization after interruption or restart
+* Configurable concurrent copies, with a shared limit per destination storage directory or external engine
 * Scheduled synchronization by interval, `cron`, or manual invocation
 * Real-time visualization of per-file progress, overall progress, synchronization speed, the file currently being synchronized, estimated completion time, and more
 * Controllable storage usage: configure retention periods for task records and logs to keep TaoSync's storage footprint within a predictable range
-* Notifications through DingTalk group bots or ServerChan after a task succeeds or fails
+* Notifications through DingTalk group bots, ServerChan, WeCom application messages, Lark group bots, Bark, pushPlus, PushDeer, and custom requests. Advanced custom notifications support headers, request bodies, and `$title` and `$content` variables
 
 ## Usage
 
@@ -308,6 +310,8 @@ services:
 ```
 
 Replace `/opt/data` with the directory you want to use. On some NAS devices, such as UGREEN NAS, you can use a relative path, for example `./config:/app/data`.
+
+To synchronize host files with the built-in engine, also mount the relevant directory, for example with `-v /mnt/photos:/storage/photos`, then select `/storage/photos` inside TaoSync. For Compose, add the same mapping under `volumes`.
 
 #### Docker Compose with OpenList
 
@@ -348,19 +352,39 @@ Current OpenList images no longer use the `PUID` and `PGID` environment variable
 
 Open `http://127.0.0.1:8023`.
 
-The default username is `admin`. If the initial password is configured as `RANDOM`, find the generated password in the logs. If you configured a password manually, use that value to sign in. After signing in, go to Settings and change the password immediately.
+The default username is `admin`. If the initial password is configured as `RANDOM`, find the generated password in the logs. If you configured a password manually, use that value to sign in. After signing in, change the password immediately through the user menu, which also lets you change your username.
 
 > [!NOTE]
 > If the password does not appear in the console output, check `data/log/sys_xxx.log` in the same directory. It is usually on the first line.
 
-After signing in, first open Engine Management and create an engine. Then go to Job Management and create a synchronization job.
+After signing in, select the built-in TaoSync engine in Engine Management, open directory management, and add storage directories. Alternatively, add an external OpenList/AList engine. Then create a synchronization job in Job Management. The source and all destinations of a job must belong to the same engine.
+
+### Built-in Storage and Concurrency
+
+* For local storage, select a path accessible to the TaoSync process. SMB supports device discovery, share selection, and manual entry. SFTP supports password and key authentication.
+* Aliyun Drive uses QR authorization through the public service by default; you can also use a **[self-hosted authorization service](./apiServer/README.md) (preferred for greater security)** or supply your own application credentials. It supports directory selection, cloud renaming and moving. Files smaller than 100 MiB upload directly; larger files attempt hash-based rapid upload.
+* Concurrent copies default to 5, with a range of 1 to 100. For the built-in engine, configure each destination storage directory in directory management. For OpenList/AList, configure the external engine. Jobs share the corresponding limit.
+
+### Synchronization Behavior
+
+Source directory mode compares against the destination on the first run, then detects changes through source snapshots. By default, it performs another full comparison during a job run every 15 days. Change detection relies on storage metadata such as hashes and modification times; it cannot guarantee detection of same-size changes when that metadata stays unchanged. Progress is saved for each file after all destinations complete, and failed files are retried on subsequent runs.
+
+To avoid restoring files you manually delete from the destination, use Add only with Source directory mode and set the full comparison interval to 0 after the first successful synchronization. This applies while the source file remains unchanged. Source changes still trigger synchronization, and job changes that reset the snapshot trigger a new comparison.
+
+Move mode deletes a source file only after all destinations report successful copies, fresh checks confirm matching sizes, and the source file remains unchanged. It also removes source subdirectories emptied by that run. Full sync reports a failure and activates empty-source protection when the source root is empty but the destination still has content, or when a previously nonempty source snapshot becomes empty. Clear the destination manually if that is your intention. Disable scheduled jobs before editing and wait for any active execution to finish.
+
+### Upgrading from Older Versions
+
+Back up the entire `data` directory before upgrading. You must sign in again after the upgrade. Legacy password hashes are automatically upgraded to PBKDF2 on successful login, and the upgraded database cannot be used directly with older versions. To roll back, restore both the previous program and its data backup.
 
 ## Configuration
 
 <details>
 <summary>Click to view configuration options</summary>
 
-Configuration precedence: `data/config.ini` > `environment variables` > `default values`. When a higher-priority source is present, all lower-priority sources are **ignored**. Restart TaoSync or its Docker container after changing the configuration.
+Configuration precedence applies to each option: `data/config.ini` > `environment variables` > `default values`. Options absent from the file still use environment variables. Invalid numeric settings are logged and retain the lower-priority value already loaded. Restart TaoSync or its container after manually changing configuration files or environment variables.
+
+System Settings lets you edit task record retention, task timeout, the source directory full comparison interval, and the Aliyun Drive authorization service URL without restarting. Saving writes the current values of all four settings to `data/config.ini`; these saved values take precedence over environment variables on subsequent starts.
 
 Example `data/config.ini` file (when present, this file has the **highest priority**):
 
@@ -382,15 +406,20 @@ console_level=2
 log_save=7
 # Task record retention period in days. Older records are removed automatically; 0 disables automatic cleanup.
 task_save=0
-# Task execution timeout in hours. Set this high enough for large backups to complete.
+# Task execution timeout in hours; 0 disables it. Allow enough time for large backups.
 task_timeout=72
-# Aliyun Drive QR authorization and token refresh service URL; omit or leave empty to use the default.
+# Full comparison interval for Source directory mode, in days; fractions are allowed.
+# 0 disables periodic comparisons, but the first run still performs a full comparison.
+source_full_scan_days=15
+# Aliyun Drive QR authorization and token refresh service URL.
 aliyun_auth_server=https://taoapi.dr34m.cn
 ```
 
-This file does not exist by default. To use it, create `config.ini` in the `data` directory next to the TaoSync executable and add the content shown above. The file must use `UTF-8` encoding.
+This file is not required on first startup. Create a UTF-8 `config.ini` under `data` in the program's working directory, or let System Settings create it. Inside Docker, the path is `/app/data/config.ini`.
 
-Set `aliyun_auth_server` in the `[tao]` section to configure Aliyun Drive QR authorization and subsequent token refresh. The default is `https://taoapi.dr34m.cn`; you can supply the HTTPS URL of your own authorization service. When `data/config.ini` is absent, use the `TAO_ALIYUN_AUTH_SERVER` environment variable instead. Omitting the setting or leaving it empty in the active configuration source uses the default.
+`aliyun_auth_server` configures Aliyun Drive QR authorization and token refresh and accepts the HTTPS URL of a **self-hosted authorization service (preferred for greater security)**. If the file omits this option or leaves it empty, it retains `TAO_ALIYUN_AUTH_SERVER`. If that environment variable is also unset or empty, it uses `https://taoapi.dr34m.cn`. System Settings requires a complete URL. After switching authorization services, authorize the affected Aliyun Drive directories again.
+
+The timeout also accepts `timeout`, which is the key saved by System Settings. If the file contains both `task_timeout` and `timeout`, `task_timeout` takes precedence. The full comparison interval still accepts legacy `source_full_scan_hours` / `TAO_SOURCE_FULL_SCAN_HOURS` values in hours; within each configuration source, the new days option takes precedence. An empty `password` means a random password and does not retain a password from the environment.
 
 | config.ini    | Docker environment variable | Description | Default |
 | ------------- | --------------------------- | ----------- | ------- |
@@ -401,8 +430,9 @@ Set `aliyun_auth_server` in the `[tao]` section to configure Aliyun Drive QR aut
 | console_level | TAO_CONSOLE_LEVEL           | Console log level; available in v0.2.3 and later. Uses the same levels as above | 2 |
 | log_save      | TAO_LOG_SAVE                | System log retention period, in days. Older logs are removed automatically; 0 disables automatic cleanup | 7 |
 | task_save     | TAO_TASK_SAVE               | Task record retention period, in days. Older records are removed automatically; 0 disables automatic cleanup | 0 |
-| task_timeout   | TAO_TASK_TIMEOUT            | Task execution timeout, in hours. Set this high enough for large backups to complete | 72 |
-| aliyun_auth_server | TAO_ALIYUN_AUTH_SERVER | Aliyun Drive QR authorization and token refresh service URL; supports your own HTTPS service. Omit or leave empty to use the default | https://taoapi.dr34m.cn |
+| task_timeout / timeout | TAO_TASK_TIMEOUT | Task execution timeout, in hours; 0 disables it | 72 |
+| source_full_scan_days | TAO_SOURCE_FULL_SCAN_DAYS | Full comparison interval for Source directory mode, in days; fractions are allowed, and 0 disables periodic comparisons | 15 |
+| aliyun_auth_server | TAO_ALIYUN_AUTH_SERVER | Aliyun Drive QR authorization and token refresh service URL; supports a **self-hosted HTTPS service (preferred for greater security)** | https://taoapi.dr34m.cn |
 | -             | TZ                          | Time zone | Asia/Shanghai |
 
 </details>
@@ -417,7 +447,6 @@ To try a development build, look for the latest tag containing `dev` or `pre` on
 
 * Improve the Windows version, including launch at startup, hidden-window operation, start/stop controls, and more [#13](https://github.com/dr34m-cn/taosync/issues/13)
 * Support encrypted synchronization through OpenList [#18](https://github.com/dr34m-cn/taosync/issues/18)
-* Support a local engine that does not depend on `OpenList`
 * Support encrypted synchronization for the local engine
 * Retain the latest N historical versions, with a configurable and potentially unlimited value for N
 * Import and export configuration
