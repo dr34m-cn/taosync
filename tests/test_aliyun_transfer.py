@@ -6,6 +6,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock, patch
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
@@ -62,6 +63,115 @@ class PartReaderTests(unittest.TestCase):
                 reader.read(2)
         finally:
             reader.close()
+
+
+class DirectoryBatchTests(unittest.TestCase):
+    def test_concurrent_checks_share_next_fresh_paginated_listing(self):
+        driver = make_driver()
+        started = threading.Event()
+        release = threading.Event()
+        queued = threading.Event()
+        waiting = set()
+        original_wait = driver.list_condition.wait
+        requests_seen = []
+
+        def wait(timeout=None):
+            waiting.add(threading.get_ident())
+            if len(waiting) == 20:
+                queued.set()
+            return original_wait(timeout)
+
+        def request(endpoint, data):
+            requests_seen.append(data.copy())
+            if len(requests_seen) == 1:
+                started.set()
+                if not release.wait(5):
+                    raise TimeoutError('test listing was not released')
+                return {'items': [{'file_id': 'old'}]}
+            if not data['marker']:
+                return {'items': [{'file_id': 'committed'}], 'next_marker': 'page2'}
+            return {'items': [{'file_id': 'second-page'}]}
+
+        driver._request = Mock(side_effect=request)
+        with patch.object(driver.list_condition, 'wait', side_effect=wait), \
+                ThreadPoolExecutor(max_workers=21) as pool:
+            first = pool.submit(driver._list_id, 'parent')
+            try:
+                self.assertTrue(started.wait(5))
+                followers = [pool.submit(driver._list_id, 'parent') for _ in range(20)]
+                self.assertTrue(queued.wait(5))
+            finally:
+                release.set()
+            self.assertEqual(first.result(5), [{'file_id': 'old'}])
+            results = [future.result(5) for future in followers]
+        self.assertEqual(len(requests_seen), 3)
+        for result in results:
+            self.assertEqual(result, [{'file_id': 'committed'}, {'file_id': 'second-page'}])
+        results[0][0]['file_id'] = 'changed-by-caller'
+        self.assertEqual(results[1][0]['file_id'], 'committed')
+        self.assertEqual(driver.list_batches, {})
+        driver._list_id('parent')
+        self.assertEqual(len(requests_seen), 5)
+
+    def test_failed_listing_releases_batch_and_later_calls_retry(self):
+        driver = make_driver()
+        driver._request = Mock(side_effect=[RuntimeError('offline'), {'items': []}])
+        with self.assertRaisesRegex(RuntimeError, 'offline'):
+            driver._list_id('parent')
+        self.assertEqual(driver.list_batches, {})
+        self.assertEqual(driver._list_id('parent'), [])
+
+    def test_failed_shared_batch_wakes_all_waiters(self):
+        driver = make_driver()
+        started, release, queued = (threading.Event() for _ in range(3))
+        waiting = set()
+        original_wait = driver.list_condition.wait
+
+        def wait(timeout=None):
+            waiting.add(threading.get_ident())
+            if len(waiting) == 3:
+                queued.set()
+            return original_wait(timeout)
+
+        def fetch(parent_id):
+            if not started.is_set():
+                started.set()
+                if not release.wait(5):
+                    raise TimeoutError('test listing was not released')
+                return []
+            raise RuntimeError('listing failed')
+
+        driver._fetch_list_id = Mock(side_effect=fetch)
+        with patch.object(driver.list_condition, 'wait', side_effect=wait), \
+                ThreadPoolExecutor(max_workers=4) as pool:
+            first = pool.submit(driver._list_id, 'parent')
+            try:
+                self.assertTrue(started.wait(5))
+                followers = [pool.submit(driver._list_id, 'parent') for _ in range(3)]
+                self.assertTrue(queued.wait(5))
+            finally:
+                release.set()
+            self.assertEqual(first.result(5), [])
+            for future in followers:
+                with self.assertRaisesRegex(RuntimeError, 'listing failed'):
+                    future.result(5)
+        self.assertEqual(driver._fetch_list_id.call_count, 2)
+        self.assertEqual(driver.list_batches, {})
+
+    def test_different_directories_do_not_block_each_other(self):
+        driver = make_driver()
+        barrier = threading.Barrier(2)
+
+        def request(endpoint, data):
+            barrier.wait(timeout=5)
+            return {'items': [{'file_id': data['parent_file_id']}]}
+
+        driver._request = Mock(side_effect=request)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(driver._list_id, 'a')
+            second = pool.submit(driver._list_id, 'b')
+            self.assertEqual(first.result(5), [{'file_id': 'a'}])
+            self.assertEqual(second.result(5), [{'file_id': 'b'}])
 
 
 class UploadConnectionTests(unittest.TestCase):
@@ -127,6 +237,33 @@ class UploadConnectionTests(unittest.TestCase):
 
 
 class UploadTests(unittest.TestCase):
+    def test_full_progress_requires_commit_and_duplicate_cleanup(self):
+        driver = make_driver()
+        progress = []
+
+        def request(endpoint, data):
+            if endpoint.endswith('/create'):
+                return {'file_id': 'new', 'upload_id': 'upload',
+                        'part_info_list': [{'part_number': 1, 'upload_url': 'https://example.test/part'}]}
+            self.assertLess(max(progress), 1)
+            return {'file_id': 'new'}
+
+        def put(url, data, **kwargs):
+            self.assertEqual(data.read(), b'abc')
+            self.assertLess(max(progress), 1)
+            return Mock(status_code=200)
+
+        driver._request = Mock(side_effect=request)
+        driver.session.put = Mock(side_effect=put)
+        driver._remove_duplicates.side_effect = lambda *args: self.assertLess(max(progress), 1)
+        driver.upload('/file', io.BytesIO(b'abc'), 3, progress.append)
+        self.assertEqual(progress, [0.99, 1.0])
+        progress.clear()
+        driver._remove_duplicates.side_effect = RuntimeError('cleanup failed')
+        with self.assertRaisesRegex(RuntimeError, 'cleanup failed'):
+            driver.upload('/file', io.BytesIO(b'abc'), 3, progress.append)
+        self.assertNotIn(1.0, progress)
+
     def test_connection_drop_mid_part_replays_cached_bytes_and_reads_the_rest(self):
         payload = bytes(range(256)) * (48 * 1024)
         source = io.BytesIO(payload)

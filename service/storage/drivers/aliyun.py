@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import xml.etree.ElementTree as ET
+from concurrent.futures import Future
 from datetime import datetime, timezone
 
 import requests
@@ -252,6 +253,8 @@ class AliyunDriveDriver(StorageDriver):
         self.upload_context = threading.local()
         self.destination_locks_lock = threading.Lock()
         self.destination_locks = {}
+        self.list_condition = threading.Condition()
+        self.list_batches = {}
         self.rate_key = _account_key(self.client_id, self.refresh_token, self.drive_id)
 
     def _destination_lock(self, path):
@@ -452,6 +455,39 @@ class AliyunDriveDriver(StorageDriver):
         self._persist()
 
     def _list_id(self, parent_id):
+        # Join only a batch that has NOT started fetching. In particular, a
+        # post-commit duplicate check must never receive a pre-commit listing.
+        # Requests arriving during one fetch share the next fresh fetch.
+        with self.list_condition:
+            batches = self.list_batches.setdefault(parent_id, [])
+            if not batches or batches[-1]["started"]:
+                batches.append({"started": False, "result": Future()})
+            batch = batches[-1]
+            while True:
+                if batch["result"].done():
+                    return [dict(item) for item in batch["result"].result()]
+                if batches[0] is batch and not batch["started"]:
+                    batch["started"] = True
+                    break
+                self.list_condition.wait()
+        try:
+            result = self._fetch_list_id(parent_id)
+        except BaseException as exc:
+            with self.list_condition:
+                batch["result"].set_exception(exc)
+            raise
+        else:
+            with self.list_condition:
+                batch["result"].set_result(result)
+            return [dict(item) for item in result]
+        finally:
+            with self.list_condition:
+                batches.pop(0)
+                if not batches:
+                    self.list_batches.pop(parent_id, None)
+                self.list_condition.notify_all()
+
+    def _fetch_list_id(self, parent_id):
         self._ensure_drive()
         marker = ""
         files = []
@@ -806,7 +842,8 @@ class AliyunDriveDriver(StorageDriver):
                 nonlocal total_done
                 total_done += count
                 if progress:
-                    progress(total_done / size if size else 1.0)
+                    # Reading the body is not an acknowledged cloud commit.
+                    progress(min(0.99, total_done / size if size else 0.99))
 
             # Read the current list by index. The list is replaced whenever
             # upload URLs are refreshed, so iterating a stale list would keep
