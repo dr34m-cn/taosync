@@ -174,6 +174,91 @@ class DirectoryBatchTests(unittest.TestCase):
             self.assertEqual(second.result(5), [{'file_id': 'b'}])
 
 
+class TargetedUploadLookupTests(unittest.TestCase):
+    def setUp(self):
+        self.driver = make_driver()
+        self.addCleanup(self.driver.session.close)
+
+    def test_small_upload_does_not_enumerate_unrelated_siblings(self):
+        driver = self.driver
+        for method in ('_resolve', '_assert_file_destination', '_remove_duplicates'):
+            setattr(driver, method, getattr(AliyunDriveDriver, method).__get__(driver))
+        driver._list_id = Mock(side_effect=AssertionError('full directory enumeration'))
+        payload = b'a' * (130 * 1024)
+        committed = False
+
+        def request(endpoint, data):
+            nonlocal committed
+            if endpoint.endswith('/search'):
+                if "name = 'folder'" in data['query']:
+                    return {'items': [{'name': 'folder', 'type': 'folder', 'file_id': 'parent'}]}
+                self.assertEqual(data['query'], "parent_file_id = 'parent' and name = 'small.bin'")
+                return {'items': [{'name': 'small.bin', 'type': 'file', 'file_id': 'new'}] if committed else []}
+            if endpoint.endswith('/create'):
+                self.assertNotIn('pre_hash', data)
+                return {'file_id': 'new', 'upload_id': 'upload',
+                        'part_info_list': [{'part_number': 1, 'upload_url': 'https://example.test/part'}]}
+            self.assertTrue(endpoint.endswith('/complete'))
+            committed = True
+            return {'file_id': 'new'}
+
+        def put(url, data, **kwargs):
+            self.assertEqual(data.read(), payload)
+            return Mock(status_code=200)
+
+        driver._request = Mock(side_effect=request)
+        driver.session.put = Mock(side_effect=put)
+        driver.upload('/folder/small.bin', io.BytesIO(payload), len(payload))
+        self.assertEqual(driver._request.call_count, 5)
+        driver._list_id.assert_not_called()
+
+    def test_search_paginates_duplicate_matches_and_filters_other_names(self):
+        self.driver._request = Mock(side_effect=[
+            {'items': [{'name': 'same', 'file_id': 'old'}, {'name': 'other'}], 'next_marker': 'next'},
+            {'items': [{'name': 'same', 'file_id': 'new'}]},
+        ])
+        self.assertEqual([item['file_id'] for item in self.driver._find_named('parent', 'same')], ['old', 'new'])
+        self.assertEqual(self.driver._request.call_args.args[1]['marker'], 'next')
+
+    def test_unusual_names_use_listing_without_query_interpolation(self):
+        name = "someone's file"
+        self.driver._list_id = Mock(return_value=[{'name': name}, {'name': 'other'}])
+        self.driver._request = Mock()
+        self.assertEqual(self.driver._find_named('parent', name), [{'name': name}])
+        self.driver._request.assert_not_called()
+
+    def test_cleanup_falls_back_when_search_has_not_seen_commit(self):
+        driver = self.driver
+        driver._find_named = Mock(return_value=[{'name': 'same', 'file_id': 'old', 'type': 'file'}])
+        driver._list_id = Mock(return_value=[
+            {'name': 'same', 'file_id': 'new', 'type': 'file'},
+            {'name': 'same', 'file_id': 'old', 'type': 'file'},
+        ])
+        driver._delete_id = Mock()
+        AliyunDriveDriver._remove_duplicates(driver, 'parent', 'same', 'new')
+        driver._list_id.assert_called_once_with('parent')
+        driver._delete_id.assert_called_once_with('old')
+
+    def test_targeted_resolution_falls_back_for_a_new_folder(self):
+        driver = self.driver
+        driver._find_named = Mock(return_value=[])
+        folder = {'name': 'folder', 'file_id': 'parent', 'type': 'folder'}
+        driver._list_id = Mock(return_value=[folder])
+        self.assertEqual(AliyunDriveDriver._resolve(driver, '/folder', targeted=True), folder)
+
+    def test_preflight_rejects_same_named_folder(self):
+        self.driver._find_named = Mock(return_value=[{'name': 'same', 'type': 'folder'}])
+        with self.assertRaises(IsADirectoryError):
+            AliyunDriveDriver._assert_file_destination(self.driver, 'parent', 'same', '/same')
+
+    def test_search_failure_does_not_delete_existing_files(self):
+        self.driver._request = Mock(side_effect=AliyunAPIError('unavailable', 'Forbidden'))
+        self.driver._delete_id = Mock()
+        with self.assertRaises(AliyunAPIError):
+            AliyunDriveDriver._remove_duplicates(self.driver, 'parent', 'same', 'new')
+        self.driver._delete_id.assert_not_called()
+
+
 class UploadConnectionTests(unittest.TestCase):
     def test_upload_prefers_ipv4_and_preserves_tls_hostname(self):
         connection = _UploadHTTPSConnection('cn-beijing-data.aliyundrive.net', timeout=3)
@@ -444,6 +529,8 @@ class RapidUploadTests(unittest.TestCase):
     def setUp(self):
         self.driver = make_driver()
         self.addCleanup(self.driver.session.close)
+        # Keep algorithm fixtures small; production boundaries are tested separately.
+        self.driver.RAPID_UPLOAD_MIN_SIZE = 100 * 1024
         self.payload = bytes(range(256)) * 513
         self.driver.access_token = 'first-access-token'
         self.driver._wait_rate = Mock()
@@ -562,6 +649,53 @@ class RapidUploadTests(unittest.TestCase):
         self.assertEqual(create['local_modified_at'], '2021-01-01T00:00:00.000Z')
         self.assertEqual(source.ranges, [])
         self.assertEqual(self.uploaded, [self.payload])
+
+    def test_small_streams_skip_rapid_upload_even_with_existing_hash(self):
+        self.driver.RAPID_UPLOAD_MIN_SIZE = AliyunDriveDriver.RAPID_UPLOAD_MIN_SIZE
+        for hashed in (False, True):
+            with self.subTest(hashed=hashed):
+                self.requests.clear()
+                self.uploaded.clear()
+                source = self.hashed_source()
+                metadata = source.file_metadata('/source')
+                if not hashed:
+                    metadata.pop('sha1')
+                with patch('service.storage.drivers.aliyun.hashlib.sha1') as digest, \
+                        patch('service.storage.drivers.aliyun.tempfile.TemporaryFile') as cache:
+                    stream_transfer(source, '/source', self.driver, '/file', len(self.payload), metadata=metadata)
+                digest.assert_not_called()
+                cache.assert_not_called()
+                self.assertEqual(source.ranges, [])
+                self.assertEqual(source.downloads, 1)
+                self.assertEqual(self.uploaded, [self.payload])
+                self.assertTrue(any(url.endswith('/complete') for url, *_ in self.requests))
+                creates = [data for url, data, _ in self.requests if url.endswith('/create')]
+                self.assertEqual(len(creates), 1)
+                self.assertFalse({'pre_hash', 'content_hash', 'proof_code'} & creates[0].keys())
+
+    def test_production_size_boundary_for_both_rapid_paths(self):
+        driver = make_driver()
+        self.addCleanup(driver.session.close)
+        self.assertEqual(driver.RAPID_UPLOAD_MIN_SIZE, 104857600)
+        for size in (0, 104857599, 104857600, 104857601):
+            for hashed in (False, True):
+                with self.subTest(size=size, hashed=hashed):
+                    source = Mock()
+                    source.metadata = {'sha1': 'A' * 40} if hashed else {}
+                    source.can_read_range = True
+                    source.read.return_value = b'a' * 1024
+                    driver._request = Mock(return_value={'file_id': 'new'})
+                    result = driver._create_upload({'size': size}, source, size, None)
+                    body = driver._request.call_args.args[1]
+                    if size < 104857600:
+                        self.assertEqual(body, {'size': size})
+                        self.assertIs(result[1], source)
+                        source.read.assert_not_called()
+                        source.read_range.assert_not_called()
+                    elif hashed:
+                        self.assertTrue(callable(body))
+                    else:
+                        self.assertIn('pre_hash', body)
 
     def test_existing_sha1_recalculates_range_proof_after_token_refresh(self):
         self.expire_proof_token = True

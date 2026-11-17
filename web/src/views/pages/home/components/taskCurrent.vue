@@ -5,6 +5,7 @@ import taskCurrentEcharts from "./taskCurrentEcharts.vue";
 import taskDetailTable from "./taskDetailTable.vue";
 import taskProgress from "./taskProgress.vue";
 import { parseSize, parseTime } from "@/utils/utils";
+import { averageSyncSpeed } from "@/utils/syncSpeed";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useI18n } from "vue-i18n";
 import { useMediaQuery } from "@vueuse/core";
@@ -93,8 +94,7 @@ const calcSpeedAndSize = (nextCurrent) => {
       speed = (doneSize - current.value.doneSize) / (nextCurrent.duration - current.value.duration);
     }
   }
-  const syncDuration = nextCurrent.duration - nextCurrent.firstSync + nextCurrent.createTime;
-  const speedAvg = syncDuration > 0 ? doneSize / syncDuration : 0;
+  const speedAvg = averageSyncSpeed(nextCurrent, doneSize);
   const remainTime = speedAvg > 0 ? parseInt(remainSize / speedAvg) : 0;
   const displayRemainTime = remainTime > 24 * 3600 ? Math.ceil(remainTime / 60) * 60 : remainTime;
   const allSize = doneSize + remainSize;

@@ -2,6 +2,7 @@ import base64
 import binascii
 import hashlib
 import json
+import logging
 import math
 import posixpath
 import re
@@ -199,6 +200,7 @@ class AliyunDriveDriver(StorageDriver):
     driver_type = "aliyun"
     API_URL = "https://openapi.alipan.com"
     PART_SIZE = 20 * 1024 * 1024
+    RAPID_UPLOAD_MIN_SIZE = 100 * 1024 * 1024
     MAX_PARTS = 10000
 
     def __init__(
@@ -395,10 +397,14 @@ class AliyunDriveDriver(StorageDriver):
         kind = "list" if endpoint.endswith("/list") else (
             "link" if "getDownloadUrl" in endpoint else "other"
         )
+        wait_started = time.monotonic()
         self._wait_rate(kind)
+        rate_wait = time.monotonic() - wait_started
         self._refresh_access_token()
         request_token = self.access_token
         request_data = data(request_token) if callable(data) else data
+        request_started = time.monotonic()
+        request_duration = None
         try:
             response = self.session.request(
                 method,
@@ -408,10 +414,19 @@ class AliyunDriveDriver(StorageDriver):
                 timeout=(30, 120),
             )
         except requests.RequestException as exc:
+            request_duration = time.monotonic() - request_started
             if attempt < 3:
                 time.sleep(2 ** attempt)
                 return self._request(endpoint, data, method, auth_retry, attempt + 1)
             raise RuntimeError("Aliyun API request failed after retries") from exc
+        finally:
+            if request_duration is None:
+                request_duration = time.monotonic() - request_started
+            if rate_wait + request_duration >= 3:
+                logging.getLogger(__name__).warning(
+                    "Aliyun slow API %s: rate_wait=%.2fs request=%.2fs",
+                    endpoint, rate_wait, request_duration,
+                )
         result = _response_json(response)
         code = str(result.get("code") or "")
         token_invalid = response.status_code == 401 or code in {
@@ -508,7 +523,26 @@ class AliyunDriveDriver(StorageDriver):
             if not marker:
                 return files
 
-    def _resolve(self, path, allow_root=True, forbidden_id=None):
+    def _find_named(self, parent_id, name):
+        # Search exact names rather than paging through every sibling. Keep
+        # unusual query literals on the list path, without inventing escaping.
+        if any(char in str(parent_id) + name for char in "'\\") or any(ord(char) < 32 for char in name):
+            return [item for item in self._list_id(parent_id) if item.get("name") == name]
+        self._ensure_drive()
+        marker = ""
+        matches = []
+        while True:
+            data = self._request("/adrive/v1.0/openFile/search", {
+                "drive_id": self.drive_id,
+                "query": "parent_file_id = '{}' and name = '{}'".format(parent_id, name),
+                "limit": 100, "marker": marker,
+            })
+            matches.extend(item for item in data.get("items", []) if item.get("name") == name)
+            marker = data.get("next_marker") or ""
+            if not marker:
+                return matches
+
+    def _resolve(self, path, allow_root=True, forbidden_id=None, targeted=False):
         path = normalize_path(path, allow_root=allow_root)
         current = {
             "file_id": self.root_folder_id,
@@ -521,7 +555,11 @@ class AliyunDriveDriver(StorageDriver):
         for part in path.strip("/").split("/") if path != "/" else []:
             if current.get("type") != "folder":
                 raise NotADirectoryError(path)
-            matches = [item for item in self._list_id(current["file_id"]) if item.get("name") == part]
+            matches = self._find_named(current["file_id"], part) if targeted else [
+                item for item in self._list_id(current["file_id"]) if item.get("name") == part]
+            if targeted and not matches:
+                # Newly created folders may not yet be visible to search.
+                matches = [item for item in self._list_id(current["file_id"]) if item.get("name") == part]
             if not matches:
                 raise FileNotFoundError(path)
             # Preserve the newest item if an older API operation left duplicate
@@ -706,6 +744,9 @@ class AliyunDriveDriver(StorageDriver):
     def _create_upload(self, data, source, size, cancel):
         endpoint = "/adrive/v1.0/openFile/create"
         check_cancel(cancel)
+        # Small files should start streaming without hash/proof reads over SMB.
+        if not self.rapid_upload or size < self.RAPID_UPLOAD_MIN_SIZE:
+            return self._request(endpoint, data), source, False
         metadata = getattr(source, "metadata", {})
         content_hash = _sha1(metadata.get("sha1"))
         range_read = None
@@ -722,11 +763,9 @@ class AliyunDriveDriver(StorageDriver):
                 finally:
                     source.seek(position)
 
-        if self.rapid_upload and content_hash and size > 0 and range_read is not None:
+        if content_hash and range_read is not None:
             created = self._request(endpoint, self._proof_data(data, content_hash, range_read, size, cancel))
             return created, source, bool(created.get("rapid_upload"))
-        if not self.rapid_upload or size <= 100 * 1024:
-            return self._request(endpoint, data), source, False
 
         prefix = self._read_exact(source, 1024, cancel)
         source = _PrefixReader(prefix, source)
@@ -789,7 +828,7 @@ class AliyunDriveDriver(StorageDriver):
         self.upload_context.cached_source = None
         path = normalize_path(path, allow_root=False)
         parent_path, name = posixpath.split(path)
-        parent = self._resolve(parent_path or "/")
+        parent = self._resolve(parent_path or "/", targeted=True)
         self._ensure_drive()
         self._assert_file_destination(parent["file_id"], name, path)
         if size is None:
@@ -937,12 +976,14 @@ class AliyunDriveDriver(StorageDriver):
             progress(1.0)
 
     def _assert_file_destination(self, parent_id, name, path):
-        for item in self._list_id(parent_id):
+        for item in self._find_named(parent_id, name):
             if item.get("name") == name and item.get("type") == "folder":
                 raise IsADirectoryError(path)
 
     def _remove_duplicates(self, parent_id, name, keep_id):
-        matches = [item for item in self._list_id(parent_id) if item.get("name") == name]
+        matches = self._find_named(parent_id, name)
+        if not any(item.get("file_id") == keep_id for item in matches):
+            matches = [item for item in self._list_id(parent_id) if item.get("name") == name]
         if any(item.get("type") == "folder" for item in matches):
             # A directory may have appeared after the preflight check. Roll
             # back the new file and never delete or rename that directory.

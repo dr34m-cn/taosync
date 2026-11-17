@@ -153,6 +153,20 @@ def _bare_task(**attrs):
     return task
 
 
+class SyncDurationTest(unittest.TestCase):
+    def test_initial_scan_does_not_count_toward_sync_duration(self):
+        task = _bare_task(createTime=100.25, scanFinish=False)
+        with mock.patch.object(jobClient.time, 'time', return_value=700.5):
+            self.assertEqual(task.getCurrent()['syncDuration'], 0)
+            task.waiting.append(CopyItem('/src/', '/dst/', 'a.bin', 100, 0, task))
+            task._submitReady()
+        self.assertEqual(task.firstSync, 700.5)
+        with mock.patch.object(jobClient.time, 'time', return_value=710.75):
+            current = task.getCurrent()
+        self.assertEqual(current['duration'], 610)
+        self.assertEqual(current['syncDuration'], 10.25)
+
+
 class CopyItemStatusTest(unittest.TestCase):
     def setUp(self):
         patches = [

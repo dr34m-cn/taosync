@@ -332,6 +332,7 @@ class JobTask:
             waitItems = list(self.waiting)
             doItems = list(self.doing.values())
             finishItems = list(self.finish)
+            firstSync = self.firstSync
         waits = [{
             'srcPath': waitItem.srcPath,
             'dstPath': waitItem.dstPath,
@@ -387,6 +388,7 @@ class JobTask:
             'createTime': int(self.createTime),
             'duration': int(self.lastWatching - self.createTime),
             'firstSync': int(self.firstSync) if self.firstSync is not None else None,
+            'syncDuration': max(0.0, self.lastWatching - firstSync) if firstSync is not None else 0.0,
             'num': {},
             'size': {}
         }

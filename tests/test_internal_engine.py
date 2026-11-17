@@ -533,7 +533,7 @@ class AliyunDriveDriverTests(unittest.TestCase):
                 )
             if url.endswith("/adrive/v1.0/openFile/complete"):
                 return _Response(data={"file_id": "file-new"})
-            if url.endswith("/adrive/v1.0/openFile/list"):
+            if url.endswith("/adrive/v1.0/openFile/search"):
                 return _Response(
                     data={
                         "items": [
@@ -588,10 +588,10 @@ class AliyunDriveDriverTests(unittest.TestCase):
         self.assertEqual(
             endpoints,
             [
-                "https://openapi.alipan.com/adrive/v1.0/openFile/list",
+                "https://openapi.alipan.com/adrive/v1.0/openFile/search",
                 "https://openapi.alipan.com/adrive/v1.0/openFile/create",
                 "https://openapi.alipan.com/adrive/v1.0/openFile/complete",
-                "https://openapi.alipan.com/adrive/v1.0/openFile/list",
+                "https://openapi.alipan.com/adrive/v1.0/openFile/search",
             ],
         )
         create_payload = session.request.call_args_list[1].kwargs["json"]
@@ -619,7 +619,7 @@ class AliyunDriveDriverTests(unittest.TestCase):
             {"file_id": "folder-1", "name": "same", "type": "folder"},
             {"file_id": "file-new", "name": "same", "type": "file"},
         ]
-        with patch.object(driver, "_list_id", return_value=entries), patch.object(
+        with patch.object(driver, "_find_named", return_value=entries), patch.object(
             driver, "_abort_upload"
         ) as abort, patch.object(driver, "_delete_id") as delete:
             with self.assertRaises(IsADirectoryError):
