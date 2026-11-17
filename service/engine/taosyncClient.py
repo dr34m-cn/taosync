@@ -2,6 +2,8 @@ import posixpath
 import threading
 import time
 import uuid
+from copy import copy
+from contextlib import nullcontext
 from collections import OrderedDict
 
 from common.intervalGate import IntervalGate
@@ -17,6 +19,8 @@ from service.storage.drivers.base import (
 )
 from service.storage.factory import createDriver
 from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
+from service.storage.drivers.aliyun import AliyunDriveDriver
+from service.storage.drivers.scanState import ScanState
 
 
 _mount_refresh_locks = {}
@@ -65,6 +69,8 @@ class _CopyTask:
             if self.delete_source and callable(native_move) and native_move(destination_driver):
                 source_driver.move_to(source_relative, destination_driver, destination_relative,
                                       self._report, self.cancel_event)
+                self.client._invalidateScanPath(source_mount, source_relative)
+                self.client._invalidateScanPath(destination_mount, destination_relative)
                 self.client._invalidateMountCache(source_mount["id"])
                 self.client._invalidateMountCache(destination_mount["id"])
                 with self.lock:
@@ -87,17 +93,19 @@ class _CopyTask:
                     cancel=self.cancel_event,
                     metadata=metadata,
                 )
+                self.client._invalidateScanPath(destination_mount, destination_relative)
             else:
-                stream_transfer(
-                    source_driver,
-                    source_relative,
-                    destination_driver,
-                    destination_relative,
-                    size,
-                    self._report,
-                    self.cancel_event,
-                    metadata,
-                )
+                with self.client._scanScope(destination_mount):
+                    stream_transfer(
+                        source_driver,
+                        source_relative,
+                        destination_driver,
+                        destination_relative,
+                        size,
+                        self._report,
+                        self.cancel_event,
+                        metadata,
+                    )
                 self.client._rememberHash(source_mount, source_relative, metadata)
             self.client._invalidateMountCache(destination_mount["id"])
             if self.delete_source:
@@ -109,6 +117,7 @@ class _CopyTask:
                         self.state = 2
                     return
                 source_driver.delete(source_relative)
+                self.client._invalidateScanPath(source_mount, source_relative)
                 self.client._invalidateMountCache(source_mount["id"])
             with self.lock:
                 self.progress = 100.0
@@ -206,6 +215,28 @@ class TaoSyncClient:
     def updateAlistId(self, alistId):
         self.alistId = int(alistId)
 
+    def forSync(self):
+        # Keep credentials, connections, task registry and driver locks shared,
+        # while scan identities and entry caches belong to this run alone.
+        client = copy(self)
+        client.scan_states = {mount['id']: ScanState() for mount in self.mounts.values()
+                              if isinstance(mount.get('driver'), AliyunDriveDriver)}
+        client.entry_cache = {}
+        client.entry_cache_lock = threading.Lock()
+        client.cache_owner = self
+        return client
+
+    def _scanScope(self, mount):
+        state = getattr(self, 'scan_states', {}).get(mount['id'])
+        if state is not None:
+            return self.getDriver(mount).scan_scope(state)
+        return nullcontext()
+
+    def _invalidateScanPath(self, mount, path):
+        state = getattr(self, 'scan_states', {}).get(mount['id'])
+        if state is not None:
+            state.invalidate(posixpath.dirname(path) or '/')
+
     def mountPathsOverlap(self, firstPath, secondPath):
         return mount_paths_overlap(self.mounts, firstPath, secondPath)
 
@@ -250,6 +281,9 @@ class TaoSyncClient:
             else:
                 for key in [key for key in self.entry_cache if key[0] == mount_id]:
                     self.entry_cache.pop(key, None)
+        owner = getattr(self, 'cache_owner', None)
+        if owner is not None:
+            owner._invalidateMountCache(mount_id)
 
     def _entries(self, path, useCache=0):
         normalized = normalize_path(path)
@@ -263,7 +297,8 @@ class TaoSyncClient:
             if cached and time.monotonic() - cached[0] < self.cache_ttl:
                 return [dict(item) for item in cached[1]]
         try:
-            entries = self.getDriver(mount).list(relative, details=True)
+            with self._scanScope(mount):
+                entries = self.getDriver(mount).list(relative, details=True)
         except FileNotFoundError:
             raise FileNotFoundError("directory not found: " + normalized)
         with self.entry_cache_lock:
@@ -327,7 +362,8 @@ class TaoSyncClient:
         normalized = normalize_path(path)
         mount, relative = self.resolve(normalized)
         if relative != "/":
-            self.getDriver(mount).mkdir(relative)
+            with self._scanScope(mount):
+                self.getDriver(mount).mkdir(relative)
             self._invalidateMountCache(mount["id"])
 
     def deleteFile(self, path, names, scanInterval=0):
@@ -338,7 +374,8 @@ class TaoSyncClient:
             if relative == "/":
                 raise ValueError("a mounted storage root cannot be deleted by a job")
             try:
-                self.getDriver(mount).delete(relative)
+                with self._scanScope(mount):
+                    self.getDriver(mount).delete(relative)
             except FileNotFoundError:
                 # Source-snapshot retries may repeat a delete that already
                 # succeeded for another target before a later operation failed.

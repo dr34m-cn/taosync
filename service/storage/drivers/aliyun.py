@@ -13,6 +13,8 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import Future
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
 import requests
@@ -258,6 +260,15 @@ class AliyunDriveDriver(StorageDriver):
         self.list_condition = threading.Condition()
         self.list_batches = {}
         self.rate_key = _account_key(self.client_id, self.refresh_token, self.drive_id)
+        self.scan_state = ContextVar('aliyun_scan_state', default=None)
+
+    @contextmanager
+    def scan_scope(self, state):
+        token = self.scan_state.set(state)
+        try:
+            yield
+        finally:
+            self.scan_state.reset(token)
 
     def _destination_lock(self, path):
         with self.destination_locks_lock:
@@ -570,10 +581,16 @@ class AliyunDriveDriver(StorageDriver):
         return current
 
     def list(self, path, details=False):
+        path = normalize_path(path)
+        state = self.scan_state.get()
+        revision = state.revision if state is not None else None
         parent = self._resolve(path)
         if parent.get("type") != "folder":
             raise NotADirectoryError(path)
-        result = [self._entry(item, details) for item in self._list_id(parent["file_id"])]
+        entries = self._list_id(parent["file_id"])
+        if state is not None:
+            state.record(path, parent, entries, revision)
+        result = [self._entry(item, details) for item in entries]
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
 
@@ -607,8 +624,13 @@ class AliyunDriveDriver(StorageDriver):
         path = normalize_path(path)
         self._ensure_drive()
         current_id = self.root_folder_id
+        state = self.scan_state.get()
+        current_path = '/'
         for part in path.strip("/").split("/") if path != "/" else []:
-            matches = [item for item in self._list_id(current_id) if item.get("name") == part]
+            known = state.lookup(current_path, part) if state is not None else None
+            entries = known[1] if known is not None else self._list_id(current_id)
+            matches = [item for item in entries if item.get("name") == part]
+            current_path = child_path(current_path, part)
             if matches:
                 folder = matches[-1]
                 if folder.get("type") != "folder":
@@ -626,6 +648,11 @@ class AliyunDriveDriver(StorageDriver):
                 },
             )
             current_id = created["file_id"]
+            if state is not None:
+                folder = dict(created, name=part, type='folder')
+                state.put(current_path, folder)
+                if not created.get('exist'):
+                    state.record(current_path, folder, [])
 
     def _delete_id(self, file_id):
         endpoint = "/adrive/v1.0/openFile/recyclebin/trash"
@@ -636,6 +663,9 @@ class AliyunDriveDriver(StorageDriver):
     def delete(self, path):
         item = self._resolve(path, allow_root=False)
         self._delete_id(item["file_id"])
+        state = self.scan_state.get()
+        if state is not None:
+            state.remove(normalize_path(path))
 
     def download(self, path, target, progress=None, cancel=None):
         item = self._resolve(path, allow_root=False)
@@ -704,6 +734,9 @@ class AliyunDriveDriver(StorageDriver):
             try:
                 return self._upload_impl(path, source, size, progress, cancel)
             except Exception:
+                state = self.scan_state.get()
+                if state is not None:
+                    state.invalidate(posixpath.dirname(path) or '/')
                 context = self.upload_context
                 if getattr(context, "file_id", None) and not getattr(context, "completed", False):
                     self._abort_upload(context.file_id)
@@ -828,9 +861,24 @@ class AliyunDriveDriver(StorageDriver):
         self.upload_context.cached_source = None
         path = normalize_path(path, allow_root=False)
         parent_path, name = posixpath.split(path)
-        parent = self._resolve(parent_path or "/", targeted=True)
+        state = self.scan_state.get()
+        known = state.lookup(parent_path or '/', name) if state is not None else None
+        if state is not None and known is None:
+            # Source-only runs and expired/conflicting scan state populate a
+            # directory once, shared by subsequent copies in this run.
+            with self._destination_lock('directory:' + (parent_path or '/')):
+                known = state.lookup(parent_path or '/', name)
+                if known is None:
+                    self.list(parent_path or '/')
+                    known = state.lookup(parent_path or '/', name)
+        parent = known[0] if known is not None else self._resolve(parent_path or "/", targeted=True)
         self._ensure_drive()
-        self._assert_file_destination(parent["file_id"], name, path)
+        matches = [item for item in known[1] if item.get('name') == name] if known is not None else None
+        if matches is None:
+            self._assert_file_destination(parent["file_id"], name, path)
+        elif any(item.get('type') == 'folder' for item in matches):
+            raise IsADirectoryError(path)
+        new_file = matches == []
         if size is None:
             current = source.tell()
             source.seek(0, 2)
@@ -842,18 +890,36 @@ class AliyunDriveDriver(StorageDriver):
         part_size = max(self.PART_SIZE, math.ceil(size / self.MAX_PARTS) if size else self.PART_SIZE)
         part_count = max(1, math.ceil(size / part_size) if size else 1)
         part_info = [{"part_number": index + 1} for index in range(part_count)]
-        created, source, _source_consumed = self._create_upload(
-            {
-                "drive_id": self.drive_id,
-                "parent_file_id": parent["file_id"],
-                "name": name,
-                "type": "file",
-                "size": size,
-                "check_name_mode": "ignore",
-                "part_info_list": part_info,
-                **_upload_times(getattr(source, "metadata", {})),
-            }, source, size, cancel,
-        )
+        create_data = {
+            "drive_id": self.drive_id,
+            "parent_file_id": parent["file_id"],
+            "name": name,
+            "type": "file",
+            "size": size,
+            "check_name_mode": "refuse" if new_file else "ignore",
+            "part_info_list": part_info,
+            **_upload_times(getattr(source, "metadata", {})),
+        }
+        try:
+            created, source, _source_consumed = self._create_upload(create_data, source, size, cancel)
+            if new_file and created.get('exist'):
+                # Refuse may return an existing ID. Never adopt or abort it.
+                raise FileExistsError(path)
+        except (AliyunAPIError, FileExistsError) as exc:
+            recoverable = isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in {
+                'AlreadyExist', 'AlreadyExist.File', 'InvalidParentFileId',
+                'NotFound.File', 'NotFound.ParentFile', 'FileIdNotFound',
+            }
+            # Below the rapid threshold create has not read the source at all.
+            # Re-resolve once; never replay a consumed large-file stream.
+            if known is None or not recoverable or size >= self.RAPID_UPLOAD_MIN_SIZE:
+                raise
+            state.invalidate(parent_path or '/')
+            parent = self._resolve(parent_path or '/', targeted=True)
+            self._assert_file_destination(parent['file_id'], name, path)
+            create_data = dict(create_data, parent_file_id=parent['file_id'], check_name_mode='ignore')
+            new_file = False
+            created, source, _source_consumed = self._create_upload(create_data, source, size, cancel)
         file_id = created["file_id"]
         upload_id = created.get("upload_id")
         self.upload_context.file_id = file_id
@@ -861,7 +927,7 @@ class AliyunDriveDriver(StorageDriver):
             # The create response already committed the file; there is no
             # multipart upload session to complete or abort.
             self.upload_context.completed = True
-            self._remove_duplicates(parent["file_id"], name, file_id)
+            self._finish_scanned_upload(path, parent, name, file_id, size, new_file, state)
             if progress:
                 progress(1.0)
             return
@@ -971,9 +1037,17 @@ class AliyunDriveDriver(StorageDriver):
         except TransferCancelled:
             self._abort_upload(final_id)
             raise
-        self._remove_duplicates(parent["file_id"], name, final_id)
+        self._finish_scanned_upload(path, parent, name, final_id, size, new_file, state)
         if progress:
             progress(1.0)
+
+    def _finish_scanned_upload(self, path, parent, name, file_id, size, new_file, state):
+        # Overwrites still check for concurrent same-name folders before deleting
+        # old files. A refused-name create needs no duplicate search.
+        if not new_file:
+            self._remove_duplicates(parent['file_id'], name, file_id)
+        if state is not None:
+            state.put(path, {'file_id': file_id, 'name': name, 'type': 'file', 'size': size})
 
     def _assert_file_destination(self, parent_id, name, path):
         for item in self._find_named(parent_id, name):

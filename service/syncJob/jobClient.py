@@ -251,6 +251,8 @@ class JobTask:
         self.jobClient = vm
         self.job = self.jobClient.job
         self.alistClient = engineService.getClientById(self.job['alistId'])
+        if isinstance(self.alistClient, engineService.TaoSyncClient):
+            self.alistClient = self.alistClient.forSync()
         self.directoryCopyLimits = isinstance(self.alistClient, engineService.TaoSyncClient)
         self.copyLimiter = None if self.directoryCopyLimits else engineService.getCopyLimiter(self.job['alistId'])
         self.createTime = time.time()
