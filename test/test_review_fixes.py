@@ -187,7 +187,19 @@ class CopyItemStatusTest(unittest.TestCase):
         ]
         self.item.checkAndGetStatus()
         self.assertEqual(self.item.status, 2)
+        self.assertFalse(self.item.toRecord()['rapidUpload'])
         self.task.alistClient.copyTaskDelete.assert_called_once_with('tid')
+
+    def test_only_confirmed_successes_contribute_rapid_bytes_to_live_progress(self):
+        for state, rapid in ((2, True), (2, False), (7, True)):
+            item = CopyItem('/src/', '/dst/', 'a.bin', 100, 0, self.task)
+            self.task.alistClient.taskInfo.return_value = {'state': state, 'progress': 100, 'rapidUpload': rapid}
+            item.checkAndGetStatus()
+            self.task.finish.append(item.toRecord())
+        current = self.task.getCurrent()
+        self.assertEqual(current['rapidUploadBytes'], 100)
+        self.assertEqual(current['size']['success'], 200)
+        self.assertEqual(current['num']['success'], 2)
 
     def test_persistent_status_errors_fail_after_retry_limit(self):
         self.task.alistClient.taskInfo.side_effect = Exception('engine down')
@@ -214,9 +226,11 @@ class CopyItemStatusTest(unittest.TestCase):
 
     def test_abort_preserves_copies_already_committed_by_the_engine(self):
         self.task.breakFlag = True
-        self.task.alistClient.taskInfo.return_value = {'state': 2, 'progress': 100, 'error': ''}
+        self.task.alistClient.taskInfo.return_value = {'state': 2, 'progress': 100, 'error': '', 'rapidUpload': True}
         self.item.checkAndGetStatus()
         self.assertEqual(self.item.status, 2)
+        self.assertTrue(self.item.toRecord()['rapidUpload'])
+        self.assertFalse(self.item.toRecord(status=7)['rapidUpload'])
         self.task.alistClient.copyTaskCancel.assert_not_called()
 
     def test_abort_still_cancels_when_the_last_status_query_fails(self):
@@ -515,13 +529,13 @@ class LegacyUpgradeTest(DatabaseTestCase):
         try:
             indexes = {row[0] for row in conn.execute("select name from sqlite_master where type='index'")}
             version = conn.execute("select sqlVersion from user_list").fetchone()[0]
-            items = conn.execute("select count(*) from job_task_item").fetchone()[0]
+            items = conn.execute("select fileName, rapidUpload from job_task_item").fetchall()
         finally:
             conn.close()
         self.assertIn('idx_job_task_item_task', indexes)
         self.assertIn('idx_job_task_job', indexes)
         self.assertEqual(version, sqlInit.CU_VERSION)
-        self.assertEqual(items, 1)
+        self.assertEqual(items, [('old.txt', 0)])
 
     def test_legacy_password_still_logs_in_and_is_upgraded(self):
         self._create_legacy_database()

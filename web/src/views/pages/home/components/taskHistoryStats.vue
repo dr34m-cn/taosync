@@ -23,6 +23,10 @@ const totals = computed(() => operations.reduce((sum, [key]) => {
         <dt>{{ $t(label) }}</dt>
         <dd>{{ task.fileStats[key]?.count ?? 0 }} 个文件 · {{ parseSize(task.fileStats[key]?.size ?? 0) }}</dd>
       </template>
+      <template v-if="task.fileStats.rapidUpload?.count">
+        <dt>秒传</dt>
+        <dd>{{ task.fileStats.rapidUpload.count }} 个文件 · {{ (task.fileStats.rapidUpload.size / 1024 ** 3).toFixed(2) }} GB</dd>
+      </template>
       <template v-if="task.fileStats.failed">
         <dt>{{ $t("task.fail") }}</dt>
         <dd>{{ task.fileStats.failed.count }} 个文件 · {{ parseSize(task.fileStats.failed.size) }}</dd>

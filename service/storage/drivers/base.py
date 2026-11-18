@@ -4,6 +4,9 @@ import threading
 import uuid
 
 
+RAPID_UPLOAD = 'rapid_upload'  # Optional upload/copy result for a confirmed cloud-side hit.
+
+
 class TransferCancelled(Exception):
     """Raised by a driver when an in-flight transfer is cancelled."""
 
@@ -91,7 +94,7 @@ class StorageDriver:
 
     def copy(self, source_path, destination_path, size=None, progress=None, cancel=None, metadata=None):
         """Portable copy fallback used when a backend has no native copy API."""
-        stream_transfer(self, source_path, self, destination_path, size, progress, cancel, metadata)
+        return stream_transfer(self, source_path, self, destination_path, size, progress, cancel, metadata)
 
 
 class _SourceReader:
@@ -143,7 +146,7 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
     source = _SourceReader(source_driver, source_path, transfer_cancel, source_errors, metadata)
     destination_error = None
     try:
-        destination_driver.upload(destination_path, source, size, progress, transfer_cancel)
+        result = destination_driver.upload(destination_path, source, size, progress, transfer_cancel)
     except BaseException as exc:
         destination_error = exc
         internal_cancel.set()
@@ -172,7 +175,7 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
     ):
         if metadata is not None:
             metadata.update(source.metadata)
-        return
+        return result
     # An external cancellation must win over a destination-side EOF/length
     # error, but a normal destination failure must not be masked by the
     # source observing the internal stop event and raising TransferCancelled.

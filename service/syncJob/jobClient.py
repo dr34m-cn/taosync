@@ -116,6 +116,7 @@ class CopyItem:
         self.alistTaskId = None
         self.status = 0
         self.progress = 0.0
+        self.rapidUpload = False
         self.errMsg = None
         self.createTime = int(time.time())
         self.doingKey = None
@@ -193,9 +194,7 @@ class CopyItem:
                                     if info.get('state') in (2, 4, 7):
                                         break
                         if isinstance(info, dict) and info.get('state') in (2, 4, 7):
-                            self.status = info['state']
-                            self.progress = info.get('progress', self.progress)
-                            self.errMsg = info.get('error') or None
+                            self._applyTaskInfo(info)
                         self.alistClient.copyTaskDelete(self.alistTaskId)
                     except Exception as e:
                         self.status = 7
@@ -224,9 +223,7 @@ class CopyItem:
                 }
             if taskInfo['state'] == self.status and taskInfo['progress'] == self.progress:
                 continue
-            self.status = taskInfo['state']
-            self.progress = taskInfo['progress']
-            self.errMsg = taskInfo['error'] if taskInfo['error'] else None
+            self._applyTaskInfo(taskInfo)
             # 删除结束的任务
             if taskInfo['state'] in [2, 4, 7]:
                 try:
@@ -234,6 +231,12 @@ class CopyItem:
                     break
                 except Exception:
                     break
+
+    def _applyTaskInfo(self, info):
+        self.rapidUpload = info['state'] == 2 and info.get('rapidUpload') is True
+        self.status = info['state']
+        self.progress = info.get('progress', self.progress)
+        self.errMsg = info.get('error') or None
 
     def waitForChange(self, interval):
         """等待下一次状态查询；支持完成通知的引擎（内置 TaoSync）在任务结束时立即返回。"""
@@ -252,6 +255,7 @@ class CopyItem:
         self.jobTask.completeCopy(self)
 
     def toRecord(self, status=None, errMsg=None):
+        status = self.status if status is None else status
         return {
             'taskId': self.taskId,
             'srcPath': self.srcPath,
@@ -261,7 +265,8 @@ class CopyItem:
             'fileSize': self.fileSize,
             'type': self.copyType,
             'alistTaskId': self.alistTaskId,
-            'status': self.status if status is None else status,
+            'status': status,
+            'rapidUpload': status == 2 and self.rapidUpload,
             'errMsg': self.errMsg if errMsg is None else errMsg,
             'createTime': self.createTime
         }
@@ -381,6 +386,7 @@ class JobTask:
             'fileName': doItem.fileName,
             'fileSize': doItem.fileSize,
             'status': doItem.status,
+            'rapidUpload': doItem.rapidUpload,
             'type': doItem.copyType,
             'progress': doItem.progress,
             'errMsg': doItem.errMsg,
@@ -418,6 +424,7 @@ class JobTask:
             'duration': int(self.lastWatching - self.createTime),
             'firstSync': int(self.firstSync) if self.firstSync is not None else None,
             'syncDuration': max(0.0, self.lastWatching - firstSync) if firstSync is not None else 0.0,
+            'rapidUploadBytes': sum((item['fileSize'] or 0) for item in currentTasks[2] if item.get('rapidUpload')),
             'num': {},
             'size': {}
         }
@@ -790,6 +797,7 @@ class JobTask:
         if matching:
             for item in matching:
                 item['status'] = 7
+                item['rapidUpload'] = False
                 item['errMsg'] = errMsg
         else:
             self.copyHook(srcPath, None, fileName, fileSize, status=7,

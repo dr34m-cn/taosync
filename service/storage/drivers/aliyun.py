@@ -24,7 +24,7 @@ from urllib3.util import connection as urllib3_connection
 
 from common.fileFingerprint import fileFingerprint
 
-from .base import StorageDriver, TransferCancelled, check_cancel, child_path, normalize_path
+from .base import RAPID_UPLOAD, StorageDriver, TransferCancelled, check_cancel, child_path, normalize_path
 
 
 _GLOBAL_RATE_LOCK = threading.Lock()
@@ -202,7 +202,7 @@ class AliyunDriveDriver(StorageDriver):
     driver_type = "aliyun"
     API_URL = "https://openapi.alipan.com"
     PART_SIZE = 20 * 1024 * 1024
-    RAPID_UPLOAD_MIN_SIZE = 100 * 1024 * 1024
+    RAPID_UPLOAD_THRESHOLD = 10 * 1024 * 1024
     MAX_PARTS = 10000
 
     def __init__(
@@ -778,7 +778,7 @@ class AliyunDriveDriver(StorageDriver):
         endpoint = "/adrive/v1.0/openFile/create"
         check_cancel(cancel)
         # Small files should start streaming without hash/proof reads over SMB.
-        if not self.rapid_upload or size < self.RAPID_UPLOAD_MIN_SIZE:
+        if not self.rapid_upload or size <= self.RAPID_UPLOAD_THRESHOLD:
             return self._request(endpoint, data), source, False
         metadata = getattr(source, "metadata", {})
         content_hash = _sha1(metadata.get("sha1"))
@@ -910,9 +910,9 @@ class AliyunDriveDriver(StorageDriver):
                 'AlreadyExist', 'AlreadyExist.File', 'InvalidParentFileId',
                 'NotFound.File', 'NotFound.ParentFile', 'FileIdNotFound',
             }
-            # Below the rapid threshold create has not read the source at all.
+            # At or below the threshold create has not read the source at all.
             # Re-resolve once; never replay a consumed large-file stream.
-            if known is None or not recoverable or size >= self.RAPID_UPLOAD_MIN_SIZE:
+            if known is None or not recoverable or size > self.RAPID_UPLOAD_THRESHOLD:
                 raise
             state.invalidate(parent_path or '/')
             parent = self._resolve(parent_path or '/', targeted=True)
@@ -930,7 +930,7 @@ class AliyunDriveDriver(StorageDriver):
             self._finish_scanned_upload(path, parent, name, file_id, size, new_file, state)
             if progress:
                 progress(1.0)
-            return
+            return RAPID_UPLOAD
         self.upload_context.upload_id = upload_id
         uploaded_parts = created.get("part_info_list") or []
         if not created.get("rapid_upload"):

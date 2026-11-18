@@ -1,48 +1,15 @@
 <script setup>
-import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { jobGetTaskItem } from "@/api/job";
+import { useRouter } from "vue-router";
+import { useTaskDetail } from "./useTaskDetail";
 import { taskItemStatusKeys } from "@/utils/taskItemStatus";
 import menuRefresh from "./components/menuRefresh.vue";
 import taskDetailTable from "./components/taskDetailTable.vue";
 import { Back } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
-const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
-const firstQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
-const taskItemData = ref({
-  dataList: [],
-  count: 0,
-});
-const params = ref({
-  taskId: firstQueryValue(route.query.taskId) ?? null,
-  pageSize: 10,
-  pageNum: 1,
-  status: null,
-  type: null,
-});
-const loading = ref(false);
-
-const getTaskItemList = () => {
-  if (params.value.taskId == null) return;
-  loading.value = true;
-  const query = { ...params.value };
-  if (query.status === null || query.status === "") delete query.status;
-  if (query.type === null || query.type === "") delete query.type;
-  jobGetTaskItem(query)
-    .then((res) => {
-      res.data.dataList.forEach((item) => {
-        item.progress = parseInt(item.progress || 0);
-        item.progress = item.progress < 100 ? item.progress : 100;
-      });
-      taskItemData.value = res.data;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-};
+const { params, taskItemData, loading, getTaskItemList, filterChange } = useTaskDetail();
 
 const goback = () => {
   router.go(-1);
@@ -60,19 +27,23 @@ const pageChange = (val) => {
     <div class="top-box">
       <div class="top-left">
         <el-button type="primary" :icon="Back" @click="goback" size="small">{{ $t("common.back") }}</el-button>
-        <el-select v-model="params.status" :placeholder="$t('taskDetail.filterStatus')" @change="getTaskItemList" clearable class="filter-select">
+        <el-select v-model="params.status" :placeholder="$t('taskDetail.filterStatus')" @change="filterChange" clearable class="filter-select">
           <el-option :label="$t(item)" :value="index" v-for="(item, index) in taskItemStatusKeys" :key="item" />
         </el-select>
-        <el-select v-model="params.type" :placeholder="$t('taskDetail.filterType')" @change="getTaskItemList" clearable class="type-select">
+        <el-select v-model="params.type" :placeholder="$t('taskDetail.filterType')" @change="filterChange" clearable class="type-select">
           <el-option :label="$t('taskDetail.copyCreate')" :value="0" />
           <el-option :label="$t('taskDetail.delete')" :value="1" />
           <el-option :label="$t('taskDetail.move')" :value="2" />
+        </el-select>
+        <el-select v-model="params.rapidUpload" aria-label="传输方式" class="type-select" @change="filterChange">
+          <el-option label="全部传输方式" value="all" />
+          <el-option label="仅看秒传" :value="1" />
         </el-select>
       </div>
       <div class="top-box-title">{{ t("taskDetail.title") }}</div>
       <menuRefresh :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1" @getData="getTaskItemList" />
     </div>
-    <taskDetailTable class="table-page-box" :loading="loading" :taskItemData="taskItemData" @pageChange="pageChange" />
+    <taskDetailTable v-model:page-num="params.pageNum" class="table-page-box" :loading="loading" :taskItemData="taskItemData" @pageChange="pageChange" />
   </div>
 </template>
 

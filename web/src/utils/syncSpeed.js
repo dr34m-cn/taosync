@@ -3,5 +3,6 @@ export function averageSyncSpeed(current, doneSize) {
   const duration = current.syncDuration ?? (current.firstSync == null
     ? 0
     : current.duration + current.createTime - current.firstSync);
-  return Number.isFinite(duration) && duration > 0 ? doneSize / duration : 0;
+  const transferredBytes = Math.max(0, doneSize - (current.rapidUploadBytes ?? 0));
+  return Number.isFinite(duration) && duration > 0 ? transferredBytes / duration : 0;
 }

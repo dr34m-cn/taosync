@@ -16,3 +16,9 @@ test("scan-only and just-started runs have zero average speed", () => {
 test("older servers still exclude scanning time", () => {
   assert.equal(averageSyncSpeed({ createTime: 100, duration: 610, firstSync: 700 }, 1000), 100);
 });
+
+test("rapid uploads count toward completion but never inflate average speed", () => {
+  const current = { syncDuration: 4, rapidUploadBytes: 100 * 1024 ** 2 };
+  assert.equal(averageSyncSpeed(current, current.rapidUploadBytes + 2048), 512);
+  assert.equal(averageSyncSpeed(current, current.rapidUploadBytes), 0);
+});

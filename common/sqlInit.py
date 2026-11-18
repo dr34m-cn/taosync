@@ -157,6 +157,7 @@ def init_sql(conn):
                                                     # ，7-已失败，8-等待重试中，9-等待重试回调执行中
                                                     # 对于删除任务，只有0-等待、2-成功、7-失败
                        "progress real,"             # 进度，仅限复制任务，否则为空
+                       "rapidUpload integer not null default 0,"
                        "errMsg text,"               # 失败原因
                        "createTime integer DEFAULT (strftime('%s', 'now'))"
                        ")")
@@ -326,6 +327,10 @@ def init_sql(conn):
                    "fingerprint text DEFAULT NULL,"
                    "primary key (jobId, path)"
                    ")")
+    cursor.execute("pragma table_info(job_task_item)")
+    itemColumns = {row[1] for row in cursor.fetchall()}
+    if itemColumns and 'rapidUpload' not in itemColumns:
+        cursor.execute("alter table job_task_item add column rapidUpload integer not null default 0")
     cursor.execute("pragma table_info(job_source_snapshot)")
     snapshotColumns = {row[1] for row in cursor.fetchall()}
     if 'fingerprint' not in snapshotColumns:

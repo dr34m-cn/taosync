@@ -11,6 +11,7 @@ from mapper import storageMapper
 from service.alist.alistClient import checkExs
 from service.storage import storageService
 from service.storage.drivers.base import (
+    RAPID_UPLOAD,
     TransferCancelled,
     check_cancel,
     child_path,
@@ -42,6 +43,7 @@ class _CopyTask:
         self.delete_source = delete_source
         self.state = 0
         self.progress = 0.0
+        self.rapid_upload = False
         self.error = ""
         self.cancel_event = threading.Event()
         self.lock = threading.Lock()
@@ -54,8 +56,17 @@ class _CopyTask:
         self.thread.start()
 
     def _report(self, value):
+        # Publish the final progress together with the transfer method in _succeed.
+        if value >= 1:
+            return
         with self.lock:
             self.progress = round(max(0.0, min(1.0, float(value))) * 100, 2)
+
+    def _succeed(self, result=None):
+        with self.lock:
+            self.rapid_upload = result == RAPID_UPLOAD
+            self.progress = 100.0
+            self.state = 2
 
     def _run(self):
         with self.lock:
@@ -73,19 +84,15 @@ class _CopyTask:
                 self.client._invalidateScanPath(destination_mount, destination_relative)
                 self.client._invalidateMountCache(source_mount["id"])
                 self.client._invalidateMountCache(destination_mount["id"])
-                with self.lock:
-                    self.progress = 100.0
-                    self.state = 2
+                self._succeed()
                 return
             metadata = self.client.fileMetadata(source_mount, source_relative)
             size = int(metadata.get("size") or 0)
             if self.source_path == self.destination_path:
-                with self.lock:
-                    self.progress = 100.0
-                    self.state = 2
+                self._succeed()
                 return
             if source_mount["id"] == destination_mount["id"]:
-                source_driver.copy(
+                result = source_driver.copy(
                     source_relative,
                     destination_relative,
                     size=size,
@@ -96,7 +103,7 @@ class _CopyTask:
                 self.client._invalidateScanPath(destination_mount, destination_relative)
             else:
                 with self.client._scanScope(destination_mount):
-                    stream_transfer(
+                    result = stream_transfer(
                         source_driver,
                         source_relative,
                         destination_driver,
@@ -112,16 +119,12 @@ class _CopyTask:
                 # The destination commit is complete. A late cancellation
                 # must not relabel it or remove its source.
                 if self.cancel_event.is_set():
-                    with self.lock:
-                        self.progress = 100.0
-                        self.state = 2
+                    self._succeed(result)
                     return
                 source_driver.delete(source_relative)
                 self.client._invalidateScanPath(source_mount, source_relative)
                 self.client._invalidateMountCache(source_mount["id"])
-            with self.lock:
-                self.progress = 100.0
-                self.state = 2
+            self._succeed(result)
         except TransferCancelled:
             with self.lock:
                 self.state = 4
@@ -145,6 +148,7 @@ class _CopyTask:
                 "state": self.state,
                 "status": "running" if self.state == 1 else "finished",
                 "progress": self.progress,
+                "rapidUpload": self.rapid_upload,
                 "error": self.error,
             }
 

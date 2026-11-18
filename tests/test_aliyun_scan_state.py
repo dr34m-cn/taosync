@@ -93,6 +93,7 @@ class ScannedUploadTests(unittest.TestCase):
         task_id = self.upload()
         self.assertEqual(self.endpoints(), ['create', 'complete'])
         self.assertEqual(self.base.taskInfo(task_id)['state'], 2)
+        self.assertIs(self.base.taskInfo(task_id)['rapidUpload'], False)
         state = self.client.scan_states[2].get('/folder')
         self.assertEqual(state[1][0]['file_id'], 'new-a')
         self.assertIsNone(self.driver.scan_state.get())
@@ -192,7 +193,7 @@ class ScannedUploadTests(unittest.TestCase):
 
     def test_rapid_commit_updates_scan_without_complete_or_duplicate_query(self):
         self.scan()
-        self.driver.RAPID_UPLOAD_MIN_SIZE = 1
+        self.driver.RAPID_UPLOAD_THRESHOLD = 1
         source = Source()
         source.supports_random_read = True
         source.file_metadata = Mock(return_value={'size': 3, 'sha1': 'A' * 40})
@@ -200,7 +201,13 @@ class ScannedUploadTests(unittest.TestCase):
         self.client.mounts['S'] = dict(self.client.mounts['S'], driver=source)
         self.driver._request.side_effect = lambda endpoint, data: {
             'file_id': 'rapid-a', 'rapid_upload': True}
-        self.upload()
+        # A poll between driver commit and engine success must not see ordinary transferred bytes.
+        def check_before_finish(*_):
+            self.assertEqual(self.client.copyTaskUnDone()[0]['progress'], 0)
+
+        with patch.object(self.client, '_rememberHash', side_effect=check_before_finish):
+            task_id = self.upload()
+        self.assertIs(self.client.taskInfo(task_id)['rapidUpload'], True)
         self.assertEqual(self.endpoints(), ['create'])
         self.driver.session.put.assert_not_called()
         self.assertEqual(self.client.scan_states[2].lookup('/folder', 'a')[1][0]['file_id'], 'rapid-a')

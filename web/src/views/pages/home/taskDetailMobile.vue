@@ -1,49 +1,16 @@
 <script setup>
-import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { Back } from "@element-plus/icons-vue";
-import { jobGetTaskItem } from "@/api/job";
+import { useTaskDetail } from "./useTaskDetail";
 import taskItemStatus, { taskItemStatusKeys } from "@/utils/taskItemStatus";
 import { parseSize, parseTime } from "@/utils/utils";
 import menuRefresh from "./components/menuRefresh.vue";
 import taskProgress from "./components/taskProgress.vue";
 
-const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
-const firstQueryValue = (value) => (Array.isArray(value) ? value[0] : value);
-
-const taskItemData = ref({
-  dataList: [],
-  count: 0,
-});
-const params = ref({
-  taskId: firstQueryValue(route.query.taskId) ?? null,
-  pageSize: 10,
-  pageNum: 1,
-  status: null,
-  type: null,
-});
-const loading = ref(false);
-
-const getTaskItemList = () => {
-  if (params.value.taskId == null) return;
-  loading.value = true;
-  const query = { ...params.value };
-  if (query.status === null || query.status === "") delete query.status;
-  if (query.type === null || query.type === "") delete query.type;
-  jobGetTaskItem(query)
-    .then((res) => {
-      res.data.dataList.forEach((item) => {
-        item.progress = Math.min(parseInt(item.progress || 0), 100);
-      });
-      taskItemData.value = res.data;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-};
+const { params, taskItemData, loading, getTaskItemList, filterChange } = useTaskDetail();
 
 const typeText = (row) => {
   if (row.type === 0) return row.isPath ? t("taskDetail.create") : t("taskDetail.copy");
@@ -54,11 +21,6 @@ const typeText = (row) => {
 const statusText = (row) => (row.status === 7 ? t("taskDetail.failedReason") : taskItemStatus(row.status));
 
 const goback = () => router.go(-1);
-
-const filterChange = () => {
-  params.value.pageNum = 1;
-  getTaskItemList();
-};
 
 const handleCurrentChange = (value) => {
   params.value.pageNum = value;
@@ -86,6 +48,10 @@ const handleCurrentChange = (value) => {
         <el-option :label="$t('taskDetail.delete')" :value="1" />
         <el-option :label="$t('taskDetail.move')" :value="2" />
       </el-select>
+      <el-select v-model="params.rapidUpload" aria-label="传输方式" @change="filterChange">
+        <el-option label="全部传输方式" value="all" />
+        <el-option label="仅看秒传" :value="1" />
+      </el-select>
     </div>
 
     <div class="task-item-list" v-loading="loading">
@@ -93,7 +59,7 @@ const handleCurrentChange = (value) => {
 
       <article v-for="item in taskItemData.dataList" :key="item.id" class="task-item-card">
         <div class="task-item-header">
-          <h2>{{ item.fileName || item.dstPath }}</h2>
+          <h2>{{ item.fileName || item.dstPath }} <el-tag v-if="item.rapidUpload" size="small" type="success">秒传</el-tag></h2>
           <div :class="`operation-type type-${item.type}`">{{ typeText(item) }}</div>
         </div>
 

@@ -345,11 +345,19 @@ def getTaskFileStats(taskIds):
         return []
     placeholders = ','.join('?' for _ in taskIds)
     return sqlBase.fetchall_to_table(f"""
-        select taskId, case when status = 7 then 'failed' when type = 0 then 'copy'
-                            when type = 1 then 'delete' else 'move' end as operation,
-               count(*) as num, coalesce(sum(fileSize), 0) as bytes
-        from job_task_item
-        where taskId in ({placeholders}) and isPath = 0 and status in (2, 7) and type in (0, 1, 2)
+        with files as (
+            select taskId, fileSize, rapidUpload,
+                   case when status = 7 then 'failed' when type = 0 then 'copy'
+                        when type = 1 then 'delete' else 'move' end as operation
+            from job_task_item
+            where taskId in ({placeholders}) and isPath = 0 and status in (2, 7) and type in (0, 1, 2)
+        )
+        select taskId, operation, count(*) as num, coalesce(sum(fileSize), 0) as bytes
+        from (
+            select taskId, operation, fileSize from files
+            union all
+            select taskId, 'rapidUpload', fileSize from files where rapidUpload = 1 and operation in ('copy', 'move')
+        )
         group by taskId, operation
     """, taskIds)
 
@@ -431,12 +439,12 @@ def deleteJobTaskByRunTime(runTime):
 
 def addJobTaskItemMany(jobTaskItemList):
     now = int(time.time())
-    rows = [{**item, 'createTime': item.get('createTime') or now} for item in jobTaskItemList]
+    rows = [{'rapidUpload': False, **item, 'createTime': item.get('createTime') or now} for item in jobTaskItemList]
     sqlBase.execute_manny(
         "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, alistTaskId, status, "
-        "errMsg, createTime) "
+        "errMsg, rapidUpload, createTime) "
         "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg, "
-        ":createTime)",
+        ":rapidUpload, :createTime)",
         rows)
 
 
@@ -444,7 +452,8 @@ def getJobTaskItemList(req):
     return sqlBase.fetchall_to_page("select * from job_task_item where taskId=:taskId "
                                     f"{'and status=:status ' if 'status' in req else ''}"
                                     f"{'and type=:type ' if 'type' in req else ''}"
-                                    "order by createTime desc ", req)
+                                    f"{'and rapidUpload=:rapidUpload ' if 'rapidUpload' in req else ''}"
+                                    "order by createTime desc, id desc ", req)
 
 
 def getUndoneJobTaskItemList(taskId):

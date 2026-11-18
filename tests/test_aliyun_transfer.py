@@ -14,7 +14,7 @@ from service.storage.drivers.aliyun import (
     AliyunAPIError, AliyunDriveDriver, _PartReader, _TransferAdapter, _UploadHTTPSConnection,
     _UploadHTTPSConnectionPool,
 )
-from service.storage.drivers.base import StorageDriver, TransferCancelled, stream_transfer
+from service.storage.drivers.base import RAPID_UPLOAD, StorageDriver, TransferCancelled, stream_transfer
 from service.storage import storageService
 from service.engine import engineService
 
@@ -530,7 +530,7 @@ class RapidUploadTests(unittest.TestCase):
         self.driver = make_driver()
         self.addCleanup(self.driver.session.close)
         # Keep algorithm fixtures small; production boundaries are tested separately.
-        self.driver.RAPID_UPLOAD_MIN_SIZE = 100 * 1024
+        self.driver.RAPID_UPLOAD_THRESHOLD = 100 * 1024
         self.payload = bytes(range(256)) * 513
         self.driver.access_token = 'first-access-token'
         self.driver._wait_rate = Mock()
@@ -572,7 +572,7 @@ class RapidUploadTests(unittest.TestCase):
     def test_prehash_match_uses_sha1_and_possession_proof_without_put(self):
         source = io.BytesIO(self.payload)
         progress = []
-        self.driver.upload('/file', source, len(self.payload), progress.append)
+        self.assertEqual(self.driver.upload('/file', source, len(self.payload), progress.append), RAPID_UPLOAD)
         creates = [item for item in self.requests if item[0].endswith('/create')]
         self.assertEqual(len(creates), 2)
         self.assertEqual(creates[0][1]['pre_hash'], hashlib.sha1(self.payload[:1024]).hexdigest().upper())
@@ -634,7 +634,7 @@ class RapidUploadTests(unittest.TestCase):
     def test_existing_sha1_miss_starts_one_stream_and_uploads_original_bytes(self):
         self.rapid_match = False
         source = self.hashed_source()
-        stream_transfer(source, '/source', self.driver, '/file', len(self.payload))
+        self.assertIsNone(stream_transfer(source, '/source', self.driver, '/file', len(self.payload)))
         self.assertEqual(source.downloads, 1)
         self.assertEqual(self.uploaded, [self.payload])
         self.assertEqual(len([item for item in self.requests if item[0].endswith('/create')]), 1)
@@ -651,7 +651,7 @@ class RapidUploadTests(unittest.TestCase):
         self.assertEqual(self.uploaded, [self.payload])
 
     def test_small_streams_skip_rapid_upload_even_with_existing_hash(self):
-        self.driver.RAPID_UPLOAD_MIN_SIZE = AliyunDriveDriver.RAPID_UPLOAD_MIN_SIZE
+        self.driver.RAPID_UPLOAD_THRESHOLD = AliyunDriveDriver.RAPID_UPLOAD_THRESHOLD
         for hashed in (False, True):
             with self.subTest(hashed=hashed):
                 self.requests.clear()
@@ -676,8 +676,9 @@ class RapidUploadTests(unittest.TestCase):
     def test_production_size_boundary_for_both_rapid_paths(self):
         driver = make_driver()
         self.addCleanup(driver.session.close)
-        self.assertEqual(driver.RAPID_UPLOAD_MIN_SIZE, 104857600)
-        for size in (0, 104857599, 104857600, 104857601):
+        threshold = 10 * 1024 ** 2
+        self.assertEqual(driver.RAPID_UPLOAD_THRESHOLD, threshold)
+        for size in (0, threshold - 1, threshold, threshold + 1):
             for hashed in (False, True):
                 with self.subTest(size=size, hashed=hashed):
                     source = Mock()
@@ -687,7 +688,7 @@ class RapidUploadTests(unittest.TestCase):
                     driver._request = Mock(return_value={'file_id': 'new'})
                     result = driver._create_upload({'size': size}, source, size, None)
                     body = driver._request.call_args.args[1]
-                    if size < 104857600:
+                    if size <= threshold:
                         self.assertEqual(body, {'size': size})
                         self.assertIs(result[1], source)
                         source.read.assert_not_called()

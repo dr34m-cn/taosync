@@ -20,24 +20,15 @@ defineProps({
 });
 const emit = defineEmits(["pageChange"]);
 const isMobile = useMediaQuery("(max-width: 768px)");
-const params = ref({
-  pageSize: 10,
-  pageNum: 1,
-});
+const pageNum = defineModel("pageNum", { type: Number, default: 1 });
+const pageSize = ref(10);
 
 // Live records can share directories and timestamps; file names distinguish each row across polls.
 const rowKey = (row) => row.id != null ? `id:${row.id}` : JSON.stringify([
   row.createTime, row.type, row.isPath, row.srcPath, row.dstPath, row.fileName,
 ]);
 
-const handleSizeChange = (val) => {
-  params.value.pageSize = val;
-  emit("pageChange", params.value);
-};
-const handleCurrentChange = (val) => {
-  params.value.pageNum = val;
-  emit("pageChange", params.value);
-};
+const pageChange = () => emit("pageChange", { pageNum: pageNum.value, pageSize: pageSize.value });
 </script>
 
 <template>
@@ -64,6 +55,7 @@ const handleCurrentChange = (val) => {
       <el-table-column prop="fileName" :label="$t('taskDetail.fileName')">
         <template #default="scope">
           {{ scope.row.fileName || scope.row.dstPath }}
+          <el-tag v-if="scope.row.rapidUpload" size="small" type="success">秒传</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="fileSize" :label="$t('taskDetail.fileSize')" width="120">
@@ -106,13 +98,12 @@ const handleCurrentChange = (val) => {
     </el-table>
     <div class="page-box">
       <el-pagination
-        v-model:current-page="params.pageNum"
-        v-model:page-size="params.pageSize"
+        v-model:current-page="pageNum"
+        v-model:page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
         :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next, jumper'"
         :total="taskItemData.count"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
+        @change="pageChange"
       />
     </div>
   </div>
