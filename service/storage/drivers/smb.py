@@ -1,13 +1,12 @@
 import ntpath
 import stat
 import threading
-import uuid
 from contextlib import contextmanager
 from functools import wraps
 
 from common.fileFingerprint import fileFingerprint
 
-from .base import StorageDriver, check_cancel, normalize_path
+from .base import StorageDriver, check_cancel, normalize_path, transfer_temp_name
 
 
 def _smb_operation(operation):
@@ -302,7 +301,7 @@ class SmbDriver(StorageDriver):
         except FileNotFoundError:
             pass
         client.makedirs(ntpath.dirname(destination), exist_ok=True, **kwargs)
-        temporary = destination + ".taosync-" + uuid.uuid4().hex + ".part"
+        temporary = ntpath.join(ntpath.dirname(destination), transfer_temp_name())
         done = 0
         try:
             with client.open_file(temporary, mode="wb", **kwargs) as target:

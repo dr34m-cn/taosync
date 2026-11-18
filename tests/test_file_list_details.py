@@ -22,6 +22,7 @@ class AlistFileListDetailTests(unittest.TestCase):
 
     def test_detail_api_adds_opaque_fingerprint_and_legacy_api_keeps_shape(self):
         response = {
+            'total': 2,
             'content': [
                 {
                     'name': 'folder',
@@ -49,6 +50,32 @@ class AlistFileListDetailTests(unittest.TestCase):
         self.assertEqual(details['payload.bin']['size'], 4)
         self.assertTrue(details['payload.bin']['fingerprint'].startswith('alist:sha256:'))
         self.assertNotIn('raw-backend-hash', details['payload.bin']['fingerprint'])
+
+    def test_directory_picker_reads_later_pages_and_refreshes_only_once(self):
+        client = self.client()
+        pages = [{'content': [{'name': 'file', 'is_dir': False}], 'total': 2},
+                 {'content': [{'name': 'folder', 'is_dir': True}], 'total': 2}]
+        with patch.object(client, 'post', side_effect=pages) as post, \
+                patch.object(client, '_storageDriverMap', return_value={}), \
+                patch.object(client, 'checkWait') as wait:
+            self.assertEqual(client.filePathList('/cloud'), [{'path': 'folder'}])
+        requests = [call.kwargs['data'] for call in post.call_args_list]
+        self.assertEqual([(r['page'], r['refresh']) for r in requests], [(1, True), (2, False)])
+        self.assertEqual(wait.call_count, 2)
+
+    def test_short_pages_without_a_total_continue_until_empty(self):
+        client = self.client()
+        pages = [{'content': [{'name': name, 'is_dir': False, 'size': 0}]} for name in ('a', 'b')]
+        with patch.object(client, 'post', side_effect=[*pages, {'content': None}]):
+            self.assertEqual(client.fileListApi('/', useCache=1), {'a': 0, 'b': 0})
+
+    def test_inconsistent_directory_pages_are_not_returned_as_a_complete_listing(self):
+        client = self.client()
+        first = {'content': [{'name': 'first', 'is_dir': False, 'size': 1}], 'total': 2}
+        for second in (first, {'content': None, 'total': 2}, {'content': [], 'total': 1}):
+            with self.subTest(second=second), patch.object(client, 'post', side_effect=[first, second]), \
+                    self.assertRaises(ValueError):
+                client.fileListApi('/source', useCache=1)
 
 
 class TaoSyncFileListDetailTests(unittest.TestCase):

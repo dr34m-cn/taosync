@@ -143,6 +143,19 @@ class EngineTestBase(unittest.TestCase):
 
 
 class BuiltinEngineSyncTest(EngineTestBase):
+    def test_sync_to_source_named_child_preserves_siblings_and_reports_this_run(self):
+        from service.syncJob import taskService
+
+        write(self.src, 'Photos/first.jpg', b'img')
+        write(self.dst, 'unrelated.txt', b'keep')
+        job = self._job(src='/S/Photos/', dst='/D/Photos/')
+        self.assertEqual(self._run(job)[0], 2)
+        self.assertEqual(tree(self.dst), {'Photos/': 'DIR', 'Photos/first.jpg': b'img', 'unrelated.txt': b'keep'})
+        task = taskService.getTaskList({'id': job, 'pageNum': 1, 'pageSize': 5})['dataList'][0]
+        self.assertEqual(task['fileStats'], {'copy': {'count': 1, 'size': 3}})
+        self.assertGreaterEqual(task['endTime'], task['runTime'])
+        self.assertEqual(json.loads(task['taskNum'])['endTime'], task['endTime'])
+
     def test_directory_concurrency_persists_and_updates_only_its_live_limiter(self):
         mounts = {row['name']: row for row in storageService.getMountList(self.engineId)}
         source = engineService.getMountCopyLimiter(mounts['S']['id'])

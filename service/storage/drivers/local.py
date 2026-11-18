@@ -2,11 +2,10 @@ import os
 import re
 import shutil
 import stat
-import uuid
 
 from common.fileFingerprint import fileFingerprint
 
-from .base import StorageDriver, check_cancel, normalize_path
+from .base import StorageDriver, check_cancel, normalize_path, transfer_temp_name
 
 
 class LocalDriver(StorageDriver):
@@ -155,7 +154,7 @@ class LocalDriver(StorageDriver):
         if os.path.isdir(destination):
             raise IsADirectoryError(path)
         os.makedirs(os.path.dirname(destination), exist_ok=True)
-        temporary = destination + ".taosync-" + uuid.uuid4().hex + ".part"
+        temporary = os.path.join(os.path.dirname(destination), transfer_temp_name())
         done = 0
         try:
             with open(temporary, "wb") as fp:
@@ -187,7 +186,7 @@ class LocalDriver(StorageDriver):
         if os.path.isdir(destination):
             raise IsADirectoryError(destination_path)
         os.makedirs(os.path.dirname(destination), exist_ok=True)
-        temporary = destination + ".taosync-" + uuid.uuid4().hex + ".part"
+        temporary = os.path.join(os.path.dirname(destination), transfer_temp_name())
         total = os.path.getsize(source) if size is None else size
         done = 0
         try:

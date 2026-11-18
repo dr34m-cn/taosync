@@ -19,7 +19,8 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
     :param errMsg: 错误消息
     :return:
     """
-    duration = int(time.time() - createTime) if createTime else None
+    finished = time.time()
+    duration = int(finished - createTime) if createTime is not None else None
     jobMapper.updateJobTaskStatus(taskId, status, errMsg)
     notifyList = notifyService.getNotifyList(True)
     job = jobMapper.getJobByTaskId(taskId)
@@ -41,6 +42,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
         }
     else:
         taskNum = getCuTaskNum(taskId)
+    taskNum['endTime'] = int(finished)
     jobMapper.updateJobTaskNumMany([{
         'taskId': taskId,
         'taskNum': json.dumps(taskNum)
@@ -83,6 +85,10 @@ def getTaskList(req):
     :return: {id, jobId, status, runTime, createTime}
     """
     jobTaskList = jobMapper.getJobTaskList(req)
+    completed = [item['id'] for item in jobTaskList['dataList'] if item['status'] > 1]
+    fileStats = {taskId: {} for taskId in completed}
+    for row in jobMapper.getTaskFileStats(completed):
+        fileStats[row['taskId']][row['operation']] = {'count': row['num'], 'size': row['bytes']}
     # 需要更新任务数的列表（适配旧版本）
     needUpdateList = []
     for item in jobTaskList['dataList']:
@@ -97,6 +103,14 @@ def getTaskList(req):
                 })
         for k, v in taskNum.items():
             item[k] = v
+        if item['id'] in fileStats:
+            item['fileStats'] = fileStats[item['id']]
+            start = item['runTime'] or item['createTime']
+            if start is not None:
+                if item.get('endTime') is None and item.get('duration') is not None:
+                    item['endTime'] = start + item['duration']
+                elif item.get('duration') is None and item.get('endTime') is not None:
+                    item['duration'] = max(0, item['endTime'] - start)
     if needUpdateList:
         updateThread = threading.Thread(target=jobMapper.updateJobTaskNumMany, args=(needUpdateList,))
         updateThread.start()

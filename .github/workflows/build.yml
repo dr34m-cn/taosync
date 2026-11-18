@@ -20,6 +20,7 @@ jobs:
     outputs:
       TAG_LIST: ${{ steps.getVersion.outputs.TAG_LIST }}
       VERSION: ${{ steps.getVersion.outputs.VERSION }}
+      DOCKER_PLATFORMS: ${{ steps.getVersion.outputs.DOCKER_PLATFORMS }}
 
     steps:
       - name: 检出仓库代码
@@ -32,6 +33,12 @@ jobs:
           tagList=""
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
+          if [[ "$cuVersion" == *dev-test* ]]; then
+            dockerPlatforms='["linux/amd64"]'
+          else
+            dockerPlatforms='["linux/amd64","linux/arm64","linux/arm/v7","linux/386","linux/arm/v6","linux/s390x","linux/ppc64le"]'
+          fi
+          echo "DOCKER_PLATFORMS=$dockerPlatforms" >> "$GITHUB_OUTPUT"
           for version in "${versionList[@]}"; do
             tagList+="-t $DOCKER_USER/$DOCKER_NAME:$version "
           done
@@ -79,14 +86,7 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-          - linux/arm/v7
-          - linux/386
-          - linux/arm/v6
-          - linux/s390x
-          - linux/ppc64le
+        platform: ${{ fromJSON(needs.get-version.outputs.DOCKER_PLATFORMS) }}
 
     steps:
       - name: 替换平台名称中的斜杠为横杠
@@ -443,6 +443,7 @@ jobs:
                 "staticx==0.14.2"
 
               export LD_LIBRARY_PATH="/usr/local/lib:${LIB_PATH}"
+              echo "linux-StaticX-${{ matrix.platform }}" > build-target.txt
               python -m PyInstaller "${APP_NAME}.spec" \
                 --distpath "/app/dist/${{ matrix.platform }}" \
                 --workpath "/app/build/${{ matrix.platform }}" \
@@ -731,6 +732,9 @@ jobs:
             echo "$VERSION" > "$LOG_FILE"
           fi
           echo "LOG_FILE=$LOG_FILE" >> "$GITHUB_ENV"
+
+      - name: 生成各平台可执行文件更新校验清单
+        run: python3 scripts/release-checksums.py dist "$VERSION" > dist/taoSync-checksums.txt
 
       - name: 创建release
         uses: softprops/action-gh-release@v2

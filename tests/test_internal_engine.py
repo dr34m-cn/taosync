@@ -1,11 +1,13 @@
+import ftplib
 import io
 import os
+import posixpath
 import sqlite3
 import tempfile
 import threading
 import time
 import unittest
-from contextlib import closing
+from contextlib import closing, nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -161,6 +163,22 @@ class SqlInitializationTests(unittest.TestCase):
 
 
 class LocalDriverTests(unittest.TestCase):
+    def test_long_destination_survives_failed_upload_then_accepts_upload_and_copy(self):
+        name = 'a' * 220 + '.bin'
+        with tempfile.TemporaryDirectory() as directory:
+            driver = LocalDriver({'root_path': directory})
+            target = Path(directory, name)
+            target.write_bytes(b'old')
+            with self.assertRaisesRegex(IOError, 'expected file size'):
+                driver.upload('/' + name, io.BytesIO(b'x'), size=2)
+            self.assertEqual(target.read_bytes(), b'old')
+            driver.upload('/' + name, io.BytesIO(b'uploaded'), size=8)
+            self.assertEqual(target.read_bytes(), b'uploaded')
+            Path(directory, 'source').write_bytes(b'copied')
+            driver.copy('/source', '/' + name)
+            self.assertEqual(target.read_bytes(), b'copied')
+            self.assertEqual({entry.name for entry in Path(directory).iterdir()}, {'source', name})
+
     def test_path_isolation_and_file_operations(self):
         with tempfile.TemporaryDirectory() as directory:
             driver = LocalDriver({"root_path": directory})
@@ -629,6 +647,44 @@ class AliyunDriveDriverTests(unittest.TestCase):
 
 
 class FtpDriverSafetyTests(unittest.TestCase):
+    def test_long_name_overwrite_and_rollback_use_short_siblings(self):
+        name = '文' * 82 + '.txt'
+        target = '/nested/' + name
+        driver = FtpDriver({'host': 'example.test'})
+        for fail_commit in (False, True):
+            with self.subTest(fail_commit=fail_commit):
+                files = {target: b'old'}
+                ftp = MagicMock()
+                ftp.mlsd.side_effect = lambda path: [('nested', {'type': 'dir'})] if path == '/' else [
+                    (posixpath.basename(p), {'type': 'file'}) for p in files]
+
+                def check_path(path):
+                    self.assertEqual(posixpath.dirname(path), '/nested')
+                    self.assertLessEqual(len(posixpath.basename(path).encode()), 255)
+
+                def store(command, source, blocksize, callback):
+                    path = command.removeprefix('STOR ')
+                    check_path(path)
+                    files[path] = source.read()
+                    callback(files[path])
+
+                def rename(src, dst):
+                    check_path(dst)
+                    if dst in files or (fail_commit and src.endswith('.part') and dst == target):
+                        raise ftplib.error_perm('rename refused')
+                    files[dst] = files.pop(src)
+
+                ftp.storbinary.side_effect = store
+                ftp.rename.side_effect = rename
+                ftp.delete.side_effect = lambda path: files.pop(path, None)
+                with patch.object(driver, '_connect', return_value=nullcontext(ftp)):
+                    if fail_commit:
+                        with self.assertRaises(ftplib.error_perm):
+                            driver.upload(target, io.BytesIO(b'new'), size=3)
+                    else:
+                        driver.upload(target, io.BytesIO(b'new'), size=3)
+                self.assertEqual(files, {target: b'old' if fail_commit else b'new'})
+
     def test_mlsd_metadata_produces_an_opaque_fingerprint_on_request(self):
         ftp = MagicMock()
         ftp.mlsd.return_value = [

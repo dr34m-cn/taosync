@@ -6,12 +6,11 @@ import math
 import posixpath
 import socket
 import stat
-import uuid
 from contextlib import contextmanager
 
 from common.fileFingerprint import fileFingerprint
 
-from .base import StorageDriver, check_cancel, normalize_path
+from .base import StorageDriver, check_cancel, normalize_path, transfer_temp_name
 
 
 class SftpDriver(StorageDriver):
@@ -422,10 +421,7 @@ class SftpDriver(StorageDriver):
                 if not stat.S_ISREG(destination_info.st_mode):
                     raise ValueError("SFTP special files are not supported")
 
-            temporary = posixpath.join(
-                posixpath.dirname(destination),
-                ".taosync-" + uuid.uuid4().hex + ".part",
-            )
+            temporary = posixpath.join(posixpath.dirname(destination), transfer_temp_name())
             done = 0
             try:
                 check_cancel(cancel)

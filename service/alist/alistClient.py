@@ -17,6 +17,7 @@ from common.LNG import G
 # 导致列目录耗时数分钟（#218）。
 NO_CACHE_DRIVERS = {'local'}
 STORAGE_CACHE_SECONDS = 300
+LIST_PAGE_SIZE = 200
 
 
 def checkExs(path, rts, spec):
@@ -197,27 +198,50 @@ class AlistClient:
             for name, detail in details.items()
         }
 
+    def _directoryEntries(self, path, useCache=0, scanInterval=0):
+        page = 1
+        received = 0
+        expected = None
+        seen = set()
+        while True:
+            self.checkWait(path, scanInterval)
+            response = self.post('/api/fs/list', data={
+                'path': path, 'page': page, 'per_page': LIST_PAGE_SIZE,
+                'refresh': page == 1 and self.shouldRefresh(path, useCache),
+            })
+            entries = response['content'] or []
+            total = response.get('total')
+            if page == 1:
+                expected = total
+            received += len(entries)
+            # Never compare against a partial listing (full sync may delete files).
+            if total != expected or (total is not None and (
+                received > total or (not entries and received < total)
+            )):
+                raise ValueError(f'目录分页结果不完整：{path}（第 {page} 页）')
+            if page > 1 and any((item['name'], item['is_dir']) in seen for item in entries):
+                raise ValueError(f'目录分页结果重复：{path}（第 {page} 页）')
+            yield from entries
+            # Without a reported total, only an empty page proves the end:
+            # some servers cap the requested per_page to a smaller value.
+            if received == total or not entries:
+                return
+            seen.update((item['name'], item['is_dir']) for item in entries)
+            page += 1
+
     def fileListDetailApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """Return AList entries with stable metadata while keeping fileListApi compatible."""
-        self.checkWait(path, scanInterval)
-        res = self.post('/api/fs/list', data={
-            'path': path,
-            'refresh': self.shouldRefresh(path, useCache)
-        })['content']
-        if res is not None:
-            rts = {
-                f"{item['name']}/" if item['is_dir'] else item['name']: {
-                    'isDir': 1 if item['is_dir'] else 0,
-                    'size': None if item['is_dir'] else item['size'],
-                    'fingerprint': fileFingerprint(
-                        'alist',
-                        item.get('hash_info') or item.get('hash'),
-                        item.get('modified') or item.get('updated_at'),
-                    ),
-                } for item in res
-            }
-        else:
-            rts = {}
+        rts = {
+            f"{item['name']}/" if item['is_dir'] else item['name']: {
+                'isDir': 1 if item['is_dir'] else 0,
+                'size': None if item['is_dir'] else item['size'],
+                'fingerprint': fileFingerprint(
+                    'alist',
+                    item.get('hash_info') or item.get('hash'),
+                    item.get('modified') or item.get('updated_at'),
+                ),
+            } for item in self._directoryEntries(path, useCache, scanInterval)
+        }
         if spec and rts:
             if rootPath is None:
                 rootPath = path
@@ -230,14 +254,7 @@ class AlistClient:
         :param path:
         :return:
         """
-        res = self.post('/api/fs/list', data={
-            'path': path,
-            'refresh': self.shouldRefresh(path)
-        })['content']
-        if res is not None:
-            return [{'path': item['name']} for item in res if item['is_dir']]
-        else:
-            return []
+        return [{'path': item['name']} for item in self._directoryEntries(path) if item['is_dir']]
 
     def allFileList(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """

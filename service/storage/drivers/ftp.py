@@ -1,13 +1,12 @@
 import ftplib
 import posixpath
 import ssl
-import uuid
 from datetime import datetime, timezone
 from contextlib import contextmanager
 
 from common.fileFingerprint import fileFingerprint
 
-from .base import StorageDriver, check_cancel, normalize_path
+from .base import StorageDriver, check_cancel, normalize_path, transfer_temp_name
 
 
 class FtpDriver(StorageDriver):
@@ -232,7 +231,7 @@ class FtpDriver(StorageDriver):
             self._ensure_directory(ftp, parent)
         with self._connect() as ftp:
             self._assert_root_directory(ftp)
-            temporary = remote + ".taosync-" + uuid.uuid4().hex + ".part"
+            temporary = posixpath.join(parent, transfer_temp_name())
             done = 0
 
             def sent(chunk):
@@ -271,7 +270,7 @@ class FtpDriver(StorageDriver):
                 raise IsADirectoryError(destination) from first_error
             if kind != "file":
                 raise first_error
-            backup = destination + ".taosync-backup-" + uuid.uuid4().hex
+            backup = posixpath.join(posixpath.dirname(destination), transfer_temp_name(".bak"))
             try:
                 ftp.rename(destination, backup)
             except ftplib.all_errors:

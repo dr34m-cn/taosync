@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import taskStatus from "@/utils/taskStatus";
-import { parseTime } from "@/utils/utils";
+import { parseSize, parseTime } from "@/utils/utils";
 
 const props = defineProps({
   task: {
@@ -53,14 +53,14 @@ const successRate = computed(() => {
 
 <template>
   <div class="job-last-run" :class="{ 'is-empty': !task }">
-    <div v-if="task" class="job-last-run-status">
-      <span :class="`bg-status bg-${statusClass}`">{{ statusText }}</span>
-    </div>
-    <span v-else class="job-last-run-empty">{{ statusText }}</span>
-    <div v-if="task" class="job-last-run-metrics">
-      <div>
-        <span>{{ $t("home.executionTime") }}</span>
-        <strong>{{ executionTime }}</strong>
+    <span v-if="!task" class="job-last-run-empty">{{ statusText }}</span>
+    <div v-else class="job-last-run-metrics">
+      <div class="job-last-run-start">
+        <div :class="`bg-status bg-${statusClass}`">{{ statusText }}</div>
+        <div>
+          <span>{{ $t("home.executionTime") }}</span>
+          <strong>{{ executionTime }}</strong>
+        </div>
       </div>
       <div>
         <span>{{ $t("home.duration") }}</span>
@@ -70,9 +70,13 @@ const successRate = computed(() => {
         <span>{{ $t("home.successRate") }}</span>
         <strong>{{ successRate }}</strong>
       </div>
+      <div>
+        <span>{{ $t("task.success") }}</span>
+        <strong>{{ $t("taskDetail.mobileItemCount", { count: task.successFileNum }) }} · {{ parseSize(task.successFileSize) }}</strong>
+      </div>
       <div v-if="failed > 0">
         <span>{{ $t("task.fail") }}</span>
-        <strong class="job-last-run-failed">{{ failed }}</strong>
+        <strong class="job-last-run-failed">{{ failed }} · {{ parseSize(task.failFileSize) }}</strong>
       </div>
     </div>
   </div>
@@ -80,18 +84,17 @@ const successRate = computed(() => {
 
 <style scoped>
 .job-last-run {
-  display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 8px;
 }
 
-.job-last-run-status {
+.job-last-run-start {
   display: flex;
   align-items: center;
+  gap: 12px;
 }
 
-.job-last-run-status .bg-status {
+.job-last-run-start .bg-status {
+  flex: none;
   font-size: 12px;
 }
 
@@ -100,8 +103,8 @@ const successRate = computed(() => {
 }
 
 .job-last-run-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px 16px;
 }
 
@@ -121,12 +124,11 @@ const successRate = computed(() => {
 
 .job-last-run-metrics strong {
   margin-top: 3px;
-  overflow: hidden;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .job-last-run-failed {
@@ -135,7 +137,12 @@ const successRate = computed(() => {
 
 @media (max-width: 860px) {
   .job-last-run-metrics {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .job-last-run-start {
+    grid-column: 1 / -1;
   }
 }
 </style>

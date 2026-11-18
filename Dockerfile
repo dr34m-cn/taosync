@@ -1,7 +1,9 @@
 FROM dr34m/tao-sync:not-for-use-pip-req as builder
 WORKDIR /app
 COPY . /app
-RUN pip install --no-cache-dir -r requirements.txt \
+ARG TARGETPLATFORM
+RUN echo "$TARGETPLATFORM" > build-target.txt \
+    && pip install --no-cache-dir -r requirements.txt \
     && pyinstaller taoSync.spec
 
 FROM dr34m/tao-sync:not-for-use-alpine

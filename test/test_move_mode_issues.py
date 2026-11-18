@@ -129,6 +129,20 @@ class MoveAndOpenListIssueTest(EngineTestBase):
         self.assertTrue(Path(self.src, 'a.txt').exists())
         self.assertTrue(Path(self.src, 'b.txt').exists())
 
+    def test_add_only_sync_compares_all_openlist_pages_219(self):
+        write(self.src, 'common.txt', 'same')
+        write(self.src, 'new.txt', 'new')
+        write(self.dst, 'a-target-only.txt', 'keep')
+        write(self.dst, 'common.txt', 'same')
+        fake, engine = self._openList(src=(self.src, 'Local', 0), dst=(self.dst, 'Local', 0))
+        fake.pageLimit = 1
+        job = self._job(method=0, src='/src/', dst='/dst/', engineId=engine)
+        status, _, items = self._run(job)
+        self.assertEqual(status, 2)
+        self.assertEqual([item[0] for item in items], ['new.txt'])
+        self.assertEqual(tree(self.dst), {'common.txt': b'same', 'new.txt': b'new', 'a-target-only.txt': b'keep'})
+        self.assertEqual(self._run(job)[2], [])
+
     # ------------------------------------------------------------ #218
     def test_openlist_local_storage_is_listed_without_refresh(self):
         for i in range(3):

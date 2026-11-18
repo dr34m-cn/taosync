@@ -1,4 +1,5 @@
 import io
+import ntpath
 import stat
 import threading
 import unittest
@@ -123,6 +124,16 @@ class SmbConnectionTests(unittest.TestCase):
         self.driver.list("/")
         self.assertEqual(len(self.client.connections), 1)
         self.assertFalse(self.client.connections[0].closed)
+
+    def test_long_filename_uses_short_staging_name_inside_same_share_directory(self):
+        name = 'a' * 230 + 'destination'
+        target = ntpath.join(r'\\server\share\nested', name)
+        with patch.object(self.client, 'open_file', wraps=self.client.open_file) as opened:
+            self.driver.upload('/nested/' + name, io.BytesIO(b'data'), size=4)
+        temporary = opened.call_args.args[0]
+        self.assertEqual(ntpath.dirname(temporary), ntpath.dirname(target))
+        self.assertLessEqual(len(ntpath.basename(temporary)), 255)
+        self.assertEqual(self.client.written, {target: b'data'})
 
     def test_failed_operation_discards_its_connection(self):
         error = SMBException("Request requires 1 credits but only 0 credits are available")

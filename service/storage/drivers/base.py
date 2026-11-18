@@ -1,6 +1,7 @@
 import os
 import posixpath
 import threading
+import uuid
 
 
 class TransferCancelled(Exception):
@@ -10,6 +11,11 @@ class TransferCancelled(Exception):
 def check_cancel(cancel):
     if cancel is not None and cancel.is_set():
         raise TransferCancelled("transfer cancelled")
+
+
+def transfer_temp_name(suffix=".part"):
+    """Keep staging and backup names independent of the destination name length."""
+    return f".taosync-{uuid.uuid4().hex}{suffix}"
 
 
 class _CombinedCancel:

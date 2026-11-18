@@ -8,6 +8,7 @@ import logging
 import posixpath
 import threading
 import time
+import weakref
 from collections import defaultdict, deque
 
 from apscheduler.executors.pool import ThreadPoolExecutor as SchedulerThreadPool
@@ -31,6 +32,32 @@ ABORT_DRAIN_SECONDS = 60
 
 _scheduler = None
 _schedulerLock = threading.Lock()
+
+_runGate = threading.Lock()
+_runLocks = weakref.WeakSet()
+_updating = False
+
+
+def acquireRun(lock):
+    with _runGate:
+        if _updating or not lock.acquire(blocking=False):
+            return False
+        _runLocks.add(lock)
+        return True
+
+
+def beginProgramUpdate():
+    global _updating
+    with _runGate:
+        if _updating or any(lock.locked() for lock in _runLocks):
+            raise ValueError('有同步任务或更新正在进行，请稍后重试')
+        _updating = True
+
+
+def cancelProgramUpdate():
+    global _updating
+    with _runGate:
+        _updating = False
 
 
 def getScheduler():
@@ -1470,7 +1497,7 @@ class JobClient:
         执行作业
         :return:
         """
-        if not lockAcquired and not self.runLock.acquire(blocking=False):
+        if not lockAcquired and not acquireRun(self.runLock):
             return
         self.jobDoing = True
         taskId = None
@@ -1498,7 +1525,7 @@ class JobClient:
         手动执行作业
         :return:
         """
-        if not self.runLock.acquire(blocking=False):
+        if not acquireRun(self.runLock):
             raise Exception(G('job_running'))
         self.jobDoing = True
         doJobThread = threading.Thread(target=self.doJob, kwargs={'lockAcquired': True})

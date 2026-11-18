@@ -21,6 +21,7 @@ const treeProps = {
 };
 
 const show = () => {
+  cuPath.value = null;
   dialogShow.value = true;
 };
 
@@ -29,7 +30,7 @@ const getPath = async (path) => {
   try {
     const res = await alistGetPath(props.alistId, path);
     return res.data;
-  } catch (err) {
+  } catch {
     return [];
   } finally {
     pathLoading.value = false;

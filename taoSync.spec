@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
 
@@ -13,7 +14,7 @@ a = Analysis(
     datas=[
         ('web/dist/', 'front'),
         ('locales/', 'locales'),
-    ] + charset_datas,
+    ] + ([('build-target.txt', '.')] if Path('build-target.txt').is_file() else []) + charset_datas,
     hiddenimports=charset_hiddenimports,
     hookspath=[],
     hooksconfig={},

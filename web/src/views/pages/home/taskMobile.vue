@@ -9,6 +9,7 @@ import taskStatus from "@/utils/taskStatus";
 import { parseTime } from "@/utils/utils";
 import menuRefresh from "./components/menuRefresh.vue";
 import taskCurrent from "./components/taskCurrent.vue";
+import taskHistoryStats from "./components/taskHistoryStats.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -151,6 +152,8 @@ const currentChange = (value) => {
           </div>
         </div>
 
+        <taskHistoryStats v-if="item.fileStats" :task="item" class="history-summary" />
+
         <div v-if="item.status == 6 && item.errMsg" class="error-reason">
           <span>{{ $t("common.reason") }}</span>
           {{ item.errMsg }}
@@ -186,6 +189,8 @@ const currentChange = (value) => {
 </template>
 
 <style lang="scss" scoped>
+.history-summary { margin-top: 12px; }
+
 .mobile-task-page {
   min-height: 100%;
   padding: 14px 12px 24px;

@@ -5,6 +5,7 @@ import { parseTime } from "@/utils/utils";
 import { useAppStore } from "@/store/useAppStore";
 import { ElMessage } from "element-plus";
 import { useI18n } from "vue-i18n";
+import ProgramUpdate from './ProgramUpdate.vue';
 
 const appStore = useAppStore();
 const { t } = useI18n();
@@ -73,6 +74,7 @@ onMounted(load);
       </el-form>
       <el-button v-else-if="!loading" @click="load" :icon="'Refresh'">{{ $t("retry") }}</el-button>
     </div>
+    <ProgramUpdate />
     <div class="setting-bottom">
       <span>{{ $t("setting.version") }}</span>
       <a href="https://github.com/dr34m-cn/taosync" target="_blank" rel="noopener noreferrer">{{ $t("setting.github") }}</a>

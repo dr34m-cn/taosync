@@ -47,7 +47,13 @@ def getLatestJobTaskList(jobIds):
             count(item.id) as itemAllNum,
             sum(case when item.status = 2 then 1 else 0 end) as itemSuccessNum,
             sum(case when item.status = 7 then 1 else 0 end) as itemFailNum,
-            sum(case when item.status not in (0, 1, 2, 7) then 1 else 0 end) as itemOtherNum
+            sum(case when item.status not in (0, 1, 2, 7) then 1 else 0 end) as itemOtherNum,
+            count(case when item.status = 2 and item.isPath = 0 and item.type in (0, 2)
+                       then 1 end) as successFileNum,
+            coalesce(sum(case when item.status = 2 and item.isPath = 0 and item.type in (0, 2)
+                              then item.fileSize end), 0) as successFileSize,
+            coalesce(sum(case when item.status = 7 and item.isPath = 0
+                              then item.fileSize end), 0) as failFileSize
         from job_task task
         left join job_task_item item on item.taskId = task.id
         where task.jobId in ({placeholders})
@@ -331,6 +337,21 @@ def updateJobTaskNumMany(taskNums):
 def getJobTaskList(req):
     # 获取任务列表
     return sqlBase.fetchall_to_page("select * from job_task where jobId=:id order by createTime desc ", req)
+
+
+def getTaskFileStats(taskIds):
+    """Aggregate only the completed runs on the requested history page."""
+    if not taskIds:
+        return []
+    placeholders = ','.join('?' for _ in taskIds)
+    return sqlBase.fetchall_to_table(f"""
+        select taskId, case when status = 7 then 'failed' when type = 0 then 'copy'
+                            when type = 1 then 'delete' else 'move' end as operation,
+               count(*) as num, coalesce(sum(fileSize), 0) as bytes
+        from job_task_item
+        where taskId in ({placeholders}) and isPath = 0 and status in (2, 7) and type in (0, 1, 2)
+        group by taskId, operation
+    """, taskIds)
 
 
 def getJobTaskCountByStatus(taskId, status):

@@ -19,6 +19,7 @@ class FakeAlist:
         self.tasks = {}
         self.lock = threading.Lock()
         self.listCalls = []     # (path, refresh)
+        self.pageLimit = 1000
         self.copyFaults = []    # dict(dst_prefix, name_match, mode: 'fail'|'write_then_fail'|'truncate')
         self.port = None
         self.loop = None
@@ -123,7 +124,10 @@ class FakeAlist:
             def post(self):
                 b = self.body()
                 try:
-                    self.ok({'content': fake.list(b['path'], b.get('refresh', False)), 'total': 0})
+                    entries = sorted(fake.list(b['path'], b.get('refresh', False)), key=lambda e: e['name'])
+                    size = min(b.get('per_page', fake.pageLimit), fake.pageLimit)
+                    start = (b.get('page', 1) - 1) * size
+                    self.ok({'content': entries[start:start + size], 'total': len(entries)})
                 except FileNotFoundError as exc:
                     self.fail(500, str(exc))
 

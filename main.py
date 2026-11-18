@@ -2,17 +2,26 @@ import asyncio
 import logging
 import os
 import sys
+from pathlib import Path
+
+from service.system import updateLauncher
+
+if __name__ == '__main__' and getattr(sys, 'frozen', False):
+    if sys.argv[1:2] != [updateLauncher.WORKER]:
+        sys.exit(updateLauncher.supervise(updateLauncher.executable(), sys.argv[1:]))
+    del sys.argv[1]
 
 from tornado.web import Application, RequestHandler, StaticFileHandler
 
 from common.config import getConfig
 from common.LNG import G
-from controller import systemController, jobController, notifyController
+from controller import systemController, jobController, notifyController, updateController
 from service.system import onStart
 
 
 class MainIndex(RequestHandler):
     def get(self):
+        self.set_header('Cache-Control', 'no-store')
         self.render(os.path.join(frontendPath, "front/index.html"))
 
 
@@ -22,12 +31,14 @@ def make_app():
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
         (r"/svr/settings", systemController.Settings),
+        (r"/svr/settings/update", updateController.UpdateInfo),
+        (r"/svr/settings/update/upload", updateController.ProgramUpload),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
         (r"/svr/storage", jobController.Storage),
         (r"/svr/job", jobController.Job),
         (r"/svr/notify", notifyController.Notify),
-        (r"/", MainIndex),
+        (r"/(?:index\.html)?", MainIndex),
         (r"/(.*)", StaticFileHandler,
          {"path": os.path.join(frontendPath, "front")})
     ], cookie_secret=server['passwdStr'])
@@ -36,10 +47,18 @@ def make_app():
 async def main():
     app = make_app()
     logger = logging.getLogger()
-    app.listen(server['port'])
+    restart = asyncio.Event()
+    http = app.listen(server['port'])
+    if getattr(sys, 'frozen', False) and os.getenv('TAO_UPDATE_CHANNEL'):
+        app.settings['restart_for_update'] = restart.set
+        (Path(os.environ['TAO_UPDATE_CHANNEL']) / 'ready').touch()
     successMsg = G('running_success').format(url=f"http://127.0.0.1:{server['port']}/")
     logger.critical(successMsg)
-    await asyncio.Event().wait()
+    await restart.wait()
+    http.stop()
+    await http.close_all_connections()
+    logging.shutdown()
+    os._exit(updateLauncher.RESTART)  # Do not wait for idle scheduler/executor threads.
 
 
 if __name__ == "__main__":

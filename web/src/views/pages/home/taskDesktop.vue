@@ -4,6 +4,7 @@ import { useRoute, useRouter } from "vue-router";
 import { jobDeleteTask, jobGetTask } from "@/api/job";
 import menuRefresh from "./components/menuRefresh.vue";
 import taskCurrent from "./components/taskCurrent.vue";
+import taskHistoryStats from "./components/taskHistoryStats.vue";
 import taskStatus from "@/utils/taskStatus";
 import { parseTime } from "@/utils/utils";
 import { Back, Delete, View } from "@element-plus/icons-vue";
@@ -101,7 +102,7 @@ const currentChange = (val) => {
     </div>
     <taskCurrent @currentChange="currentChange" class="task-current" :style="`height: ${currentHeight}px;`" :jobId="String(params.id || '')" />
     <div class="table-box" :style="`height: calc(100% - 117px - ${currentHeight}px);`">
-      <el-table class="task-table" :data="taskData.dataList" height="100%" v-loading="loading" :empty-text="$t('task.noTask')">
+      <el-table class="task-table" :data="taskData.dataList" height="100%" scrollbar-always-on v-loading="loading" :empty-text="$t('task.noTask')">
         <el-table-column type="index" :label="$t('task.serial')" align="center" width="70" />
         <el-table-column prop="status" :label="$t('task.status')" width="140">
           <template #default="scope">
@@ -123,7 +124,8 @@ const currentChange = (val) => {
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="successNum" :label="$t('task.progress')">
+        <!-- Four 56px badges, their 6px horizontal margins, and 24px of cell padding. -->
+        <el-table-column prop="successNum" :label="$t('task.progress')" min-width="272">
           <template #default="scope">
             <span v-if="scope.row.status == 1">{{ $t("task.syncingProgress") }}</span>
             <div class="progress-list" v-else>
@@ -134,12 +136,18 @@ const currentChange = (val) => {
             </div>
           </template>
         </el-table-column>
+        <el-table-column label="任务统计" min-width="220">
+          <template #default="{ row }">
+            <taskHistoryStats v-if="row.fileStats" :key="row.id" :task="row" />
+            <span v-else>--</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="createTime" :label="$t('common.createdAt')" width="170">
           <template #default="scope">
             {{ parseTime(scope.row.createTime) }}
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.operate')" width="210">
+        <el-table-column :label="$t('common.operate')" width="210" fixed="right">
           <template #default="scope">
             <el-button type="danger" :icon="Delete" @click="delTask(scope.row.id)" :loading="btnLoading" :disabled="scope.row.status == 1" size="small">
               {{ scope.row.status == 1 ? $t("task.deleteUnavailable") : $t("common.delete") }}
@@ -185,6 +193,14 @@ const currentChange = (val) => {
   .page-tip {
     display: flex;
     align-items: center;
+  }
+
+  .progress-list .prg-num {
+    box-sizing: border-box;
+    white-space: nowrap;
+  }
+
+  .page-tip {
     flex-wrap: wrap;
   }
 
