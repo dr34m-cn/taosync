@@ -16,6 +16,10 @@ Do not remove content merely because it is technical. Preserve technology-stack 
 
 Always review and update README.md and README_EN.md together. Keep their user-facing content, examples, screenshots, and meaning synchronized in the same change.
 
+# Release Changelogs
+
+Write `doc/changelog/` entries from the perspective of a user upgrading from the previous released version. When extending an existing entry, review commits since its last edit and merge related changes into the existing bullets. Use the previous release, not the individual commit messages, to classify the result: describe a feature introduced in this release once in its final form under 特性, including any refinements made before release. Use 优化 for improvements to previously released behavior and 修复 only for defects present in the previous release.
+
 # Frontend Preferences
 
 Numeric inputs must not show increment/decrement arrow controls. Use `:controls="false"` for Element Plus `el-input-number` components and hide native number input spinners when applicable.
