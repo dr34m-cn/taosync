@@ -92,18 +92,16 @@ class ReleaseTest(unittest.TestCase):
             self.assertCountEqual(list(manifest(root, 'v1')), [(DIGEST, target) for target in
                              ('darwin-arm64', 'linux-StaticX-arm32', 'linux-arm-v7', 'windows-amd64')])
 
-    def test_only_trusts_matching_target_in_official_manifest(self):
+    def test_only_trusts_matching_target_in_latest_official_manifest(self):
         with patch.dict(os.environ, {'TAO_UPDATE_SHA256': ''}), patch.object(update.requests, 'get') as get, \
                 patch.object(update, 'platform_target', return_value='linux-arm-v7'):
             response = get.return_value.__enter__.return_value
             response.raw.read.return_value = f'{DIGEST} linux-arm-v7\n'.encode()
-            self.assertEqual(update.trusted_digest('v1'), DIGEST)
-            self.assertEqual(get.call_args.args, (update.RELEASES + '/download/v1/taoSync-checksums.txt',))
+            self.assertEqual(update.trusted_digest(), DIGEST)
+            self.assertEqual(get.call_args.args, (update.RELEASES + '/latest/download/taoSync-checksums.txt',))
             response.raw.read.return_value = f'{DIGEST} linux-amd64\n'.encode()
             with self.assertRaises(ValueError):
-                update.trusted_digest('')
-            with self.assertRaises(ValueError):
-                update.trusted_digest('../untrusted')
+                update.trusted_digest()
 
 
 class LauncherTest(unittest.TestCase):

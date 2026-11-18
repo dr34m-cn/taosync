@@ -36,24 +36,21 @@ def info():
             'result': launcher.read_json(Path(os.environ['TAO_UPDATE_CHANNEL']) / 'result') if enabled else {}}
 
 
-def trusted_digest(tag):
+def trusted_digest():
     pinned = os.getenv('TAO_UPDATE_SHA256')
     if pinned:
         if not re.fullmatch('[a-fA-F0-9]{64}', pinned):
             raise ValueError('部署时配置的 TAO_UPDATE_SHA256 无效')
         return pinned.lower()
-    if tag and not re.fullmatch(r'v[0-9][0-9A-Za-z.\-]{0,63}', tag):
-        raise ValueError('发布标签格式不正确')
-    location = f'download/{tag}' if tag else 'latest/download'
     try:
-        with requests.get(f'{RELEASES}/{location}/taoSync-checksums.txt', timeout=(5, 15), stream=True) as res:
+        with requests.get(f'{RELEASES}/latest/download/taoSync-checksums.txt', timeout=(5, 15), stream=True) as res:
             res.raise_for_status()
             # The upload never supplies a URL or a trusted digest.
             manifest = res.raw.read(16385, decode_content=True)
             if len(manifest) > 16384:
                 raise ValueError('发布校验清单过大')
     except (requests.RequestException, OSError) as exc:
-        raise ValueError('无法获取官方发布校验清单，请检查发布标签或网络；离线部署可预设 TAO_UPDATE_SHA256') from exc
+        raise ValueError('无法获取最新正式版的校验清单，请检查网络；离线部署可预设 TAO_UPDATE_SHA256') from exc
     for line in manifest.decode('ascii').splitlines():
         fields = line.split()
         if len(fields) == 2 and fields[1] == platform_target() and re.fullmatch('[0-9a-f]{64}', fields[0]):

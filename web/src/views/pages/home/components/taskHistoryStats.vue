@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { parseTime, parseSize } from "@/utils/utils";
+import { formatDuration, parseTime, parseSize } from "@/utils/utils";
 
 const props = defineProps({ task: { type: Object, required: true } });
 const operations = [
@@ -18,7 +18,7 @@ const totals = computed(() => operations.reduce((sum, [key]) => {
     <dl>
       <dt>{{ $t("current.startAt") }}</dt><dd>{{ parseTime(task.runTime || task.createTime) || "未记录" }}</dd>
       <dt>结束时间</dt><dd>{{ parseTime(task.endTime) || "未记录" }}</dd>
-      <dt>{{ $t("home.duration") }}</dt><dd>{{ task.duration == null ? "未记录" : `${task.duration} ${$t("time.second")}` }}</dd>
+      <dt>{{ $t("home.duration") }}</dt><dd>{{ task.duration == null ? "未记录" : formatDuration(task.duration, $t) }}</dd>
       <template v-for="[key, label] in operations" :key="key">
         <dt>{{ $t(label) }}</dt>
         <dd>{{ task.fileStats[key]?.count ?? 0 }} 个文件 · {{ parseSize(task.fileStats[key]?.size ?? 0) }}</dd>

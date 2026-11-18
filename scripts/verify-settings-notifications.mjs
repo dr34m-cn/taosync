@@ -16,10 +16,18 @@ try {
     const { context, page, errors } = await preparePage(browser, frontendUrl, mobile);
     const settings = { task_save: 0, timeout: 72, source_full_scan_days: 15, aliyun_auth_server: 'https://auth.example' };
     const writes = [];
+    const uploads = [];
     const notices = [];
     const testNotices = [];
     let rejected = false;
     let renamed = false;
+    await context.route('**/svr/settings/update', route => route.fulfill({ json: { code: 200, data: {
+      supported: true, pinned: false, target: 'windows-amd64', architecture: 'AMD64', maxBytes: 32,
+    } } }));
+    await context.route('**/svr/settings/update/upload', route => {
+      uploads.push(route.request());
+      return route.fulfill({ status: 400, json: { msg: '模拟校验未通过' } });
+    });
     await context.route('**/svr/settings', async route => {
       if (route.request().method() === 'PUT') {
         const { settings: changed } = route.request().postDataJSON();
@@ -72,6 +80,47 @@ try {
       await page.getByRole('spinbutton', { name: '源目录完整比对周期' }).waitFor();
       assert.equal(await page.locator('.setting input[type=password]').count(), 0);
       const retention = page.getByRole('spinbutton', { name: '任务记录保留时间' });
+      const rows = await page.locator('.settings-fields .el-form-item').evaluateAll((items, mobile) => items.map(item => {
+        const label = item.querySelector('label').getBoundingClientRect();
+        const input = item.querySelector('input').getBoundingClientRect();
+        if (mobile ? label.bottom > input.top : label.right > input.left) return null;
+        return Math.round(input.top);
+      }), mobile);
+      assert.equal(rows.length, 4);
+      assert.ok(rows.every(top => top !== null));
+      assert.equal(new Set(rows).size, 4);
+
+      const update = page.getByRole('region', { name: '程序更新' });
+      assert.equal(await update.getByRole('link', { name: 'GitHub Releases' }).getAttribute('href'), 'https://github.com/dr34m-cn/taosync/releases');
+      const install = update.getByRole('button', { name: '更新并重启' });
+      const drop = name => update.locator('.el-upload-dragger').evaluate((el, name) => {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(new File(['drop'], name));
+        el.dispatchEvent(new DragEvent('drop', { dataTransfer, bubbles: true, cancelable: true }));
+      }, name);
+      const chooser = page.waitForEvent('filechooser');
+      await update.getByText('点击选择').click();
+      await (await chooser).setFiles({ name: 'first.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('pick') });
+      await update.getByText('first.exe', { exact: true }).waitFor();
+      await drop('second.exe');
+      await update.getByText('second.exe', { exact: true }).waitFor();
+      await update.getByText('first.exe', { exact: true }).waitFor({ state: 'detached' });
+      for (const size of [0, 33]) {
+        await update.locator('input[type=file]').setInputFiles({ name: 'invalid.exe', mimeType: 'application/octet-stream', buffer: Buffer.alloc(size) });
+        await update.getByText(/请选择非空/).waitFor();
+        assert.equal(await install.isDisabled(), true);
+      }
+      await drop('update.exe');
+      await install.click();
+      const confirm = page.getByRole('dialog', { name: '确认更新程序' });
+      await confirm.getByRole('button', { name: '取消' }).click();
+      assert.equal(uploads.length, 0);
+      await install.click();
+      await confirm.getByRole('button', { name: '更新并重启' }).click();
+      await update.getByText('模拟校验未通过').waitFor();
+      assert.equal(uploads.length, 1);
+      assert.equal(uploads[0].headers()['x-taosync-release'], undefined);
+      assert.equal(uploads[0].postDataBuffer().toString(), 'drop');
       await retention.fill('7');
       await retention.press('Tab');
       const timeout = page.getByRole('spinbutton', { name: '任务执行超时' });

@@ -27,16 +27,16 @@ const changeCollapse = function changeCollapse(val) {
 .app-main {
     width: 100%;
     height: 100vh;
+    height: 100dvh;
     box-sizing: border-box;
     position: relative;
     overflow-y: auto;
 
     .app-header {
-        position: fixed;
+        // Stay inside the scrollport so the native scrollbar keeps its full-height gutter.
+        position: sticky;
         z-index: 2;
         top: 0;
-        left: 0;
-        right: 0;
         height: 50px;
         width: 100%;
         box-sizing: border-box;
@@ -63,9 +63,8 @@ const changeCollapse = function changeCollapse(val) {
 
     .app-content {
         width: 100%;
-        height: 100%;
+        height: calc(100% - 50px);
         padding-left: 201px;
-        padding-top: 50px;
         transition: all .3s ease-in-out;
         box-sizing: border-box;
     }
@@ -102,8 +101,8 @@ const changeCollapse = function changeCollapse(val) {
         .app-content,
         .content-collapse {
             height: auto;
-            min-height: 100vh;
-            min-height: 100dvh;
+            min-height: calc(100vh - 50px);
+            min-height: calc(100dvh - 50px);
             padding-left: 0;
             padding-bottom: calc(64px + env(safe-area-inset-bottom));
         }

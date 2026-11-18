@@ -85,7 +85,7 @@ class ProgramUpload(BaseHandler):
             self.stream.flush()
             os.fsync(self.stream.fileno())
             self.stream.close()
-            expected = await asyncio.to_thread(update.trusted_digest, self.request.headers.get('X-TaoSync-Release', ''))
+            expected = await asyncio.to_thread(update.trusted_digest)
             if self.request.connection.stream.closed():
                 return
             if not self.authenticated():

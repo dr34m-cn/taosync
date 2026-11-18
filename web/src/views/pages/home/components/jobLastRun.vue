@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import taskStatus from "@/utils/taskStatus";
-import { parseSize, parseTime } from "@/utils/utils";
+import { formatDuration, parseSize, parseTime } from "@/utils/utils";
 
 const props = defineProps({
   task: {
@@ -33,17 +33,7 @@ const statusClass = computed(() => {
 
 const executionTime = computed(() => parseTime(props.task?.runTime || props.task?.createTime) || "--");
 
-const durationText = computed(() => {
-  if (props.task?.duration === null || props.task?.duration === undefined) return "--";
-  const seconds = Math.max(0, Number(props.task.duration) || 0);
-  const units = [
-    { value: Math.floor(seconds / 86400), unit: t("time.day") },
-    { value: Math.floor((seconds % 86400) / 3600), unit: t("time.hour") },
-    { value: Math.floor((seconds % 3600) / 60), unit: t("time.minute") },
-    { value: Math.floor(seconds % 60), unit: t("time.second") },
-  ].filter((item) => item.value > 0);
-  return units.length ? units.map((item) => `${item.value}${item.unit}`).join(" ") : `0${t("time.second")}`;
-});
+const durationText = computed(() => props.task?.duration == null ? "--" : formatDuration(props.task.duration, t));
 
 const successRate = computed(() => {
   if (total.value === 0) return "--";

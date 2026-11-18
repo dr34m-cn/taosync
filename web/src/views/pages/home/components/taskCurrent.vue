@@ -4,7 +4,7 @@ import { jobGetTaskCurrent, jobPut } from "@/api/job";
 import taskCurrentEcharts from "./taskCurrentEcharts.vue";
 import taskDetailTable from "./taskDetailTable.vue";
 import taskProgress from "./taskProgress.vue";
-import { parseSize, parseTime } from "@/utils/utils";
+import { formatDuration, parseSize, parseTime } from "@/utils/utils";
 import { averageSyncSpeed } from "@/utils/syncSpeed";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useI18n } from "vue-i18n";
@@ -64,23 +64,6 @@ const toTable = computed(() => {
   };
 });
 
-const formatSeconds = (seconds) => {
-  seconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
-  const days = Math.floor(seconds / (24 * 3600));
-  const hours = Math.floor((seconds % (24 * 3600)) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const timeUnits = [
-    { value: days, unit: t("time.day") },
-    { value: hours, unit: t("time.hour") },
-    { value: minutes, unit: t("time.minute") },
-    { value: secs, unit: t("time.second") },
-  ];
-  const nonZeroUnits = timeUnits.filter((unit) => unit.value > 0);
-  if (nonZeroUnits.length === 0) return `0${t("time.second")}`;
-  return nonZeroUnits.map((unit) => `${unit.value}${unit.unit}`).join(" ");
-};
-
 const calcSpeedAndSize = (nextCurrent) => {
   const doingSize = nextCurrent.doingTask.reduce((sum, obj) => {
     return sum + (obj.fileSize || 0) * ((obj.progress || 0) / 100.0);
@@ -104,7 +87,7 @@ const calcSpeedAndSize = (nextCurrent) => {
     speedAvg,
     speed,
     remainTime,
-    remainTimeText: formatSeconds(displayRemainTime),
+    remainTimeText: formatDuration(displayRemainTime, t),
     allProgress: allSize > 0 ? (doneSize / allSize) * 100 : 0,
   };
 };
@@ -152,7 +135,7 @@ const dealWithCurrent = (nextCurrent) => {
     if (current.value === null) {
       show();
     }
-    nextCurrent.durationText = formatSeconds(nextCurrent.duration);
+    nextCurrent.durationText = formatDuration(nextCurrent.duration, t);
     const calcs = calcSpeedAndSize(nextCurrent);
     if (cuTaskSelect.value === 1) {
       cuTaskList.value = nextCurrent.doingTask;

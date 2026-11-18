@@ -61,6 +61,18 @@ export function parseTime(time, pattern) {
   return time_str;
 }
 
+export function formatDuration(seconds, t) {
+  let remaining = Math.floor(Number(seconds));
+  if (!Number.isFinite(remaining) || remaining <= 0) return `0${t("time.second")}`;
+  const parts = [];
+  for (const [unit, size] of [["day", 86400], ["hour", 3600], ["minute", 60], ["second", 1]]) {
+    const value = Math.floor(remaining / size);
+    if (value) parts.push(`${value}${t(`time.${unit}`)}`);
+    remaining %= size;
+  }
+  return parts.join(" ");
+}
+
 // 大小换算
 export function parseSize(val) {
   if (val === null || val === undefined || Number.isNaN(Number(val))) {
