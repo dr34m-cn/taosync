@@ -181,6 +181,26 @@ def mount_paths_overlap(mounts, first_path, second_path):
     second_mount, second_relative = _resolve_mount(lookup, second_path)
     if first_mount is None or second_mount is None:
         return False
+    if 'crypt' in (first_mount['driverType'], second_mount['driverType']):
+        if first_mount is second_mount:
+            return virtual_paths_overlap(first_relative, second_relative,
+                                         case_sensitive=first_mount['config'].get('encrypt_dir_names', False))
+        # Physical ciphertext names cannot be inferred from logical names
+        # without the key. Compare the selected backing subtree conservatively.
+        by_id = {row['id']: row for row in lookup.values()}
+
+        def backing(mount, relative):
+            if mount['driverType'] != 'crypt':
+                return mount, relative
+            config = mount['config']
+            return by_id.get(config.get('target_mount_id')), config.get('target_path', '/')
+
+        first_mount, first_relative = backing(first_mount, first_relative)
+        second_mount, second_relative = backing(second_mount, second_relative)
+        if first_mount is None or second_mount is None:
+            return True
+        if first_mount is second_mount and virtual_paths_overlap(first_relative, second_relative, case_sensitive=False):
+            return True
     first_type = str(first_mount.get("driverType") or "").strip().lower()
     second_type = str(second_mount.get("driverType") or "").strip().lower()
     if first_type != second_type:

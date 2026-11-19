@@ -59,10 +59,18 @@ def child_path(directory, name):
 
 
 class StorageDriver:
-    """Small common contract shared by local, network and cloud drivers."""
+    """Driver contract for physical storage and virtual mounts.
+
+    Implement list/mkdir/delete plus sequential download-to-writer and
+    upload-from-reader. Read bounded chunks until EOF (short reads are valid),
+    propagate cancellation, and only publish a complete destination. Cross-
+    driver copies then work through stream_transfer without pairwise adapters.
+    """
 
     driver_type = "base"
     supports_random_read = False
+    allow_rapid_upload = True
+    requires_verified_eof = False
 
     def list(self, path, details=False):
         raise NotImplementedError
@@ -103,6 +111,8 @@ class _SourceReader:
         self.errors = errors
         self.metadata = dict(metadata or {})
         self.can_read_range = isinstance(driver, StorageDriver) and driver.supports_random_read is True
+        self.allow_rapid_upload = getattr(driver, 'allow_rapid_upload', True)
+        self.remaining = None
         self.pipe = None
         self.producer = None
 
@@ -117,16 +127,26 @@ class _SourceReader:
             self.pipe = os.fdopen(read_fd, "rb", buffering=0)
 
             def produce():
-                try:
-                    with os.fdopen(write_fd, "wb", buffering=0) as target:
+                # Publish the error before closing the pipe (waking the EOF reader).
+                with os.fdopen(write_fd, "wb", buffering=0) as target:
+                    try:
                         self.driver.download(self.path, target, None, self.cancel)
-                except BaseException as exc:
-                    self.errors.append(exc)
-                    self.cancel.internal.set()
+                    except BaseException as exc:
+                        self.errors.append(exc)
+                        self.cancel.internal.set()
 
             self.producer = threading.Thread(target=produce, name="taosync-transfer-source", daemon=True)
             self.producer.start()
-        return self.pipe.read(size)
+        data = self.pipe.read(size)
+        if self.remaining is not None and size != 0:
+            self.remaining -= len(data)
+            if self.remaining == 0 and self.pipe.read(1):
+                raise IOError('source exceeded the expected plaintext size')
+            if self.errors:
+                raise self.errors[0]
+            if self.remaining < 0 or (not data and self.remaining):
+                raise IOError('source length differs from the expected plaintext size')
+        return data
 
     def close(self):
         if self.pipe is not None:
@@ -146,6 +166,12 @@ def stream_transfer(source_driver, source_path, destination_driver, destination_
     source = _SourceReader(source_driver, source_path, transfer_cancel, source_errors, metadata)
     destination_error = None
     try:
+        if getattr(source_driver, 'requires_verified_eof', False) is True and size is not None:
+            # Some destinations consume exactly Content-Length (even zero) and
+            # commit without a final read. Authenticate EOF before that commit.
+            source.remaining = size
+            if size == 0:
+                source.read(1)
         result = destination_driver.upload(destination_path, source, size, progress, transfer_cancel)
     except BaseException as exc:
         destination_error = exc

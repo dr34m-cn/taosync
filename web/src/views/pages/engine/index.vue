@@ -36,6 +36,7 @@ import {
 } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import CloudFiles from "./CloudFiles.vue";
+import CryptTargetFolder from "./CryptTargetFolder.vue";
 
 const { t } = useI18n();
 const alistList = ref([]);
@@ -106,8 +107,9 @@ const sftpTreeProps = {
   isLeaf: "leaf",
 };
 
-const driverTypes = ["local", "smb", "ftp", "sftp", "aliyun"];
+const driverTypes = ["local", "smb", "ftp", "sftp", "aliyun", "crypt"];
 const driverConfigKeys = {
+  crypt: ["target_mount_id", "target_path", "encryption_key", "encrypt_dir_names"],
   local: ["root_path"],
   smb: ["host", "port", "share", "root_path", "domain", "username", "password"],
   ftp: ["host", "port", "root_path", "username", "password", "passive", "tls"],
@@ -142,6 +144,7 @@ const driverConfigKeys = {
 
 const driverDefaults = (driverType) => {
   const defaults = {
+    crypt: { target_mount_id: null, target_path: "/", encryption_key: "", encrypt_dir_names: false },
     local: {
       root_path: "",
     },
@@ -255,6 +258,17 @@ const editRule = computed(() => ({
   url: [requiredRule("engine.addressRule")],
 }));
 
+const cryptLocked = computed(() => mountEditFlag.value && mountData.value?.driverType === "crypt");
+const cryptTargets = computed(() => directoryList.value.filter(mount => mount.driverType !== "crypt"
+  && (mount.engineId == null || mount.engineId === mountData.value?.engineId)));
+const cryptTarget = computed(() => cryptTargets.value.find(mount => mount.id === mountData.value?.config.target_mount_id));
+
+function selectCryptTarget(id) {
+  if (cryptLocked.value || mountData.value?.driverType !== "crypt") return;
+  mountData.value.config.target_mount_id = id;
+  mountData.value.config.target_path = "/";
+}
+
 const resetAliyunRoot = () => {
   aliyunBrowseEpoch += 1;
   aliyunTreeKey.value += 1;
@@ -283,19 +297,21 @@ watch(
 );
 
 const loadAliyunRootNode = async (node, resolve, reject) => {
+  if (mountData.value?.driverType !== "aliyun") return reject();
   if (node.level === 0) {
     resolve([{ id: "root", name: "/", path: "/" }]);
     return;
   }
   const epoch = aliyunBrowseEpoch;
+  const config = mountData.value.config;
   try {
     const res = await storageAliyunBrowse({
       engineId: mountData.value.engineId,
       ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
       parentId: node.data.id,
-      config: mountPayload().config,
+      config: pickDriverConfig("aliyun", config),
     });
-    if (epoch !== aliyunBrowseEpoch || !mountShow.value) {
+    if (epoch !== aliyunBrowseEpoch || !mountShow.value || config !== mountData.value?.config) {
       reject();
       return;
     }
@@ -333,6 +349,12 @@ const mountRules = computed(() => {
     driverType: [requiredRule("engine.driverTypeRule", "change")],
   };
   const driverType = mountData.value?.driverType;
+  if (driverType === "crypt" && !cryptLocked.value) {
+    rules["config.target_mount_id"] = [{ ...requiredRule("engine.cryptTargetRule", "change"),
+      type: "enum", enum: cryptTargets.value.map(mount => mount.id) }];
+    rules["config.target_path"] = [requiredRule("engine.cryptFolder", "change")];
+    rules["config.encryption_key"] = [{ ...requiredRule("engine.cryptKeyRule"), whitespace: true }];
+  }
   if (driverType === "local") {
     rules["config.root_path"] = [requiredRule("engine.rootPathRule")];
   }
@@ -689,17 +711,19 @@ const delAlist = (alistId) => {
 };
 
 const getDirectoryList = () => {
-  if (!currentEngine.value) return Promise.resolve();
+  const engineId = currentEngine.value?.id;
+  if (!engineId) return Promise.resolve();
   directoryLoading.value = true;
-  return storageGet(currentEngine.value.id)
+  return storageGet(engineId)
     .then((res) => {
+      if (currentEngine.value?.id !== engineId) return;
       directoryList.value = res.data || [];
       currentEngine.value.directoryCount = directoryList.value.length;
       const engine = alistList.value.find((item) => item.id === currentEngine.value.id);
       if (engine) engine.directoryCount = directoryList.value.length;
     })
     .finally(() => {
-      directoryLoading.value = false;
+      if (currentEngine.value?.id === engineId) directoryLoading.value = false;
     });
 };
 
@@ -751,6 +775,7 @@ const editMount = (mount) => {
     config: {
       ...driverDefaults(mount.driverType),
       ...(mount.config || {}),
+      ...(mount.driverType === "crypt" ? { encryption_key: "", target_path: mount.config?.target_path } : {}),
       ...(mount.driverType === "aliyun" ? {
         auth_mode: mount.config?.auth_mode || (mount.config?.auth_service_url ? "service" : "direct"),
         root_folder_path: mount.config?.root_folder_path || (mount.config?.root_folder_id && mount.config.root_folder_id !== "root" ? "" : "/"),
@@ -767,6 +792,7 @@ const editMount = (mount) => {
 };
 
 const handleDriverChange = (driverType) => {
+  if (mountEditFlag.value) return;
   resetSftpTest();
   resetAliyunAuth();
   localBrowseShow.value = false;
@@ -794,13 +820,9 @@ const closeMount = () => {
   mountShow.value = false;
 };
 
-const sftpTestConfig = () => {
-  const config = {};
-  for (const key of driverConfigKeys.sftp) {
-    config[key] = mountData.value?.config?.[key];
-  }
-  return config;
-};
+function pickDriverConfig(driverType, config) {
+  return Object.fromEntries(driverConfigKeys[driverType].map(key => [key, config[key]]));
+}
 
 const normalizeSftpDirectories = (data, currentRoot) => {
   const options = [];
@@ -833,7 +855,7 @@ const sftpBrowsePayload = (path) => ({
   ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
   path,
   config: {
-    ...sftpTestConfig(),
+    ...pickDriverConfig("sftp", mountData.value.config),
     root_path: sftpTestRootPath.value,
   },
 });
@@ -932,7 +954,7 @@ const testSftpConnection = async () => {
     action: "sftpTest",
     engineId: mountData.value.engineId,
     ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
-    config: sftpTestConfig(),
+    config: pickDriverConfig("sftp", mountData.value.config),
   };
   sftpTestLoading.value = true;
   try {
@@ -1102,17 +1124,15 @@ const selectSmbShare = (share) => {
 };
 
 const mountPayload = () => {
-  const config = {};
-  for (const key of driverConfigKeys[mountData.value.driverType]) {
-    config[key] = mountData.value.config[key];
-  }
+  // The only editable setting on a saved crypt mount has its own update contract.
+  if (cryptLocked.value) return { id: mountData.value.id, copyConcurrency: mountData.value.copyConcurrency };
   return {
     ...(mountEditFlag.value ? { id: mountData.value.id } : {}),
     engineId: mountData.value.engineId,
     name: mountData.value.name.trim(),
     driverType: mountData.value.driverType,
     copyConcurrency: mountData.value.copyConcurrency,
-    config,
+    config: pickDriverConfig(mountData.value.driverType, mountData.value.config),
   };
 };
 
@@ -1163,6 +1183,10 @@ const delMount = (mount) => {
 
 const mountSummary = (mount) => {
   const config = mount.config || {};
+  if (mount.driverType === "crypt") {
+    const target = directoryList.value.find(item => item.id === config.target_mount_id);
+    return target ? `/${target.name}${config.target_path === "/" ? "" : config.target_path || ""}` : "—";
+  }
   if (mount.driverType === "local") return config.root_path || "-";
   if (mount.driverType === "smb") {
     const root = config.root_path ? `/${String(config.root_path).replace(/^[/\\]+/, "")}` : "";
@@ -1347,6 +1371,7 @@ onBeforeUnmount(() => {
       :title="mountEditFlag ? $t('engine.editDirectory') : $t('engine.addDirectory')"
       :append-to-body="true"
       :close-on-click-modal="false"
+      @close="mountData?.driverType === 'crypt' && (mountData.config.encryption_key = '')"
     >
       <el-form
         v-if="mountData"
@@ -1361,7 +1386,12 @@ onBeforeUnmount(() => {
             <el-input v-model="mountData.name" :disabled="mountEditFlag" :placeholder="$t('engine.mountNamePlaceholder')" />
           </el-form-item>
           <el-form-item prop="driverType" :label="$t('engine.driverType')">
-            <el-select v-model="mountData.driverType" :disabled="mountEditFlag" @change="handleDriverChange">
+            <el-tooltip v-if="cryptLocked" :content="$t('engine.cryptLocked')" placement="top">
+              <div class="crypt-locked-control" tabindex="0">
+                <el-input :model-value="driverLabel('crypt')" disabled />
+              </div>
+            </el-tooltip>
+            <el-select v-else v-model="mountData.driverType" :disabled="mountEditFlag" @change="handleDriverChange">
               <el-option v-for="driverType in driverTypes" :key="driverType" :label="driverLabel(driverType)" :value="driverType" />
             </el-select>
           </el-form-item>
@@ -1370,7 +1400,34 @@ onBeforeUnmount(() => {
             <el-input-number v-model="mountData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" :controls="false" />
           </el-form-item>
 
-          <template v-if="mountData.driverType === 'local'">
+          <template v-if="mountData.driverType === 'crypt'">
+            <el-tooltip :disabled="!cryptLocked" :content="$t('engine.cryptLocked')" placement="top">
+              <div class="mount-form-grid form-span-2" :class="{ 'crypt-locked-control': cryptLocked }" :tabindex="cryptLocked ? 0 : undefined">
+                <el-form-item prop="config.target_mount_id" :label="$t('engine.cryptTarget')">
+                  <el-input v-if="cryptLocked" :model-value="cryptTarget?.name || mountData.config.target_mount_id || '—'" disabled />
+                  <el-select v-else :model-value="mountData.config.target_mount_id" @update:model-value="selectCryptTarget"
+                    :placeholder="$t('engine.cryptTargetRule')" :no-data-text="$t('engine.cryptNoTargets')">
+                    <el-option v-for="target in cryptTargets" :key="target.id" :label="target.name" :value="target.id" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item prop="config.target_path" :label="$t('engine.cryptFolder')">
+                  <el-input v-if="cryptLocked" :model-value="mountData.config.target_path || '—'" disabled />
+                  <CryptTargetFolder v-else :key="mountData.config.target_mount_id" :mount="cryptTarget"
+                    :engine-id="mountData.engineId" v-model="mountData.config.target_path" />
+                </el-form-item>
+                <el-form-item prop="config.encryption_key" :label="$t('engine.cryptKey')">
+                  <el-input v-if="cryptLocked" type="password" :placeholder="$t('engine.cryptKeySaved')" disabled />
+                  <el-input v-else v-model="mountData.config.encryption_key" type="password" show-password autocomplete="new-password" />
+                </el-form-item>
+                <el-form-item prop="config.encrypt_dir_names" :label="$t('engine.cryptDirNames')">
+                  <el-switch v-model="mountData.config.encrypt_dir_names" :disabled="cryptLocked" />
+                </el-form-item>
+              </div>
+            </el-tooltip>
+            <el-alert v-if="!cryptLocked" class="form-span-2" type="warning" show-icon :closable="false" :title="$t('engine.cryptWarning')" />
+          </template>
+
+          <template v-else-if="mountData.driverType === 'local'">
             <el-form-item class="form-span-2" prop="config.root_path" :label="$t('engine.rootPath')">
               <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.localRootPlaceholder')">
                 <template #append>
@@ -2114,6 +2171,15 @@ onBeforeUnmount(() => {
 
 :global(.mount-editor-dialog .form-span-2) {
   grid-column: 1 / -1;
+}
+
+:global(.mount-editor-dialog .crypt-locked-control) {
+  width: 100%;
+  cursor: help;
+}
+
+:global(.mount-editor-dialog .crypt-locked-control .is-disabled) {
+  pointer-events: none;
 }
 
 :global(.mount-editor-dialog .el-select),

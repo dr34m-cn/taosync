@@ -45,4 +45,5 @@ def createDriver(
 
 
 def getDriverTypes():
-    return list(DRIVER_TYPES.keys())
+    # A crypt view needs an existing driver instance, built by the engine.
+    return [*DRIVER_TYPES, 'crypt']

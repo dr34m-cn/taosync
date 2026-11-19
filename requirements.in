@@ -7,3 +7,4 @@ pathspec==0.12.1
 PyYAML==6.0.3
 smbprotocol>=1.12,<2
 paramiko>=3.5,<5
+cryptography>=42

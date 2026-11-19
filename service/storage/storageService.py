@@ -4,6 +4,7 @@ from mapper import storageMapper
 from mapper.alistMapper import getEngineById
 from service.storage import discoveryService
 from service.storage.factory import SECRET_FIELDS, createDriver, getDriverTypes
+from service.storage import mountConfig
 from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
 
 
@@ -28,7 +29,10 @@ def _sanitized(row):
     row = dict(row)
     config = dict(row.get("config") or {})
     secret_state = {}
-    for field in SECRET_FIELDS.get(row["driverType"], set()):
+    fields = SECRET_FIELDS.get(row["driverType"], set())
+    if row["driverType"] == "crypt" or "encryption_key" in config:
+        fields = fields | {"encryption_key"}
+    for field in fields:
         secret_state[field] = bool(config.get(field))
         config[field] = ""
     row["config"] = config
@@ -112,6 +116,45 @@ def _normalizeDriverConfig(driverType, config):
     if driverType == "local":
         driver.list("/")
     return dict(getattr(driver, "config", config))
+
+
+def _validateCryptTarget(engineId, config):
+    from service.engine import engineService
+
+    target = storageMapper.getMountById(config["target_mount_id"])
+    if target["engineId"] != engineId or not target["enabled"] or target["driverType"] == "crypt":
+        raise ValueError("crypt target must be an enabled regular mount on the same engine")
+    client = engineService.getClientById(engineId)
+    mount, _ = client.resolve("/" + target["name"])
+    if (mount["id"] != target["id"] or mount["driverType"] != target["driverType"]
+            or mountConfig.backingLocation(target["driverType"], mount["config"], runtime=True)
+            != mountConfig.backingLocation(target["driverType"], target["config"], runtime=True)
+            or mount["authVersion"] != target["authVersion"]):
+        raise ValueError("target mount changed; reload and retry")
+    driver = client.getDriver(mount)
+    path = config["target_path"]
+    try:
+        # Walk only directories exposed by the driver. A directly addressed
+        # path could otherwise traverse a link the parent's listing hides.
+        parent = "/"
+        for part in path.strip("/").split("/") if path != "/" else ():
+            if not any(e["name"] == part and e["is_dir"] for e in driver.list(parent)):
+                raise FileNotFoundError
+            parent = parent.rstrip("/") + "/" + part
+        driver.list(path)
+    except Exception:
+        raise ValueError("crypt target directory does not exist or is inaccessible") from None
+    if target["driverType"] == "aliyun":
+        # This read can itself refresh tokens or discover the drive ID. Accept
+        # the new version only if the live driver still matches that target.
+        current = storageMapper.getMountById(target["id"])
+        if (current["authVersion"] != target["authVersion"]
+                or mountConfig.backingLocation("aliyun", current["config"], runtime=True)
+                != mountConfig.backingLocation("aliyun", target["config"], runtime=True)
+                or current["config"].get("drive_id") != driver.drive_id):
+            raise ValueError("target mount changed; reload and retry")
+        return current
+    return target
 
 
 def _aliyunAuthMode(config):
@@ -290,6 +333,7 @@ def _sftpRequestConfig(data):
         if old["driverType"] != "sftp":
             raise ValueError("storage directory is not an SFTP mount")
 
+    mountConfig.checkDriverFields("sftp", rawConfig)
     return _prepareSftpConfig(rawConfig, old=old)
 
 
@@ -316,6 +360,7 @@ def browseAliyun(data):
         old = storageMapper.getMountById(int(data["mountId"]))
         if int(old["engineId"]) != engineId or old["driverType"] != "aliyun":
             raise ValueError("storage directory does not belong to the selected Aliyun engine")
+    mountConfig.checkDriverFields("aliyun", raw)
     config = _prepareAliyunConfig(raw, old=old)
     authFields = ("auth_mode", "auth_service_url", "client_id", "client_secret",
                   "refresh_token", "api_url", "oauth_url")
@@ -396,6 +441,7 @@ def _smbRequestConfig(data):
             config["password"] = old["config"].get("password", "")
         else:
             config["password"] = ""
+    mountConfig.checkDriverFields("smb", rawConfig)
     return config
 
 
@@ -411,27 +457,30 @@ def addMount(data):
     _requireTaoSync(engineId)
     name = _cleanName(data.get("name"))
     driverType = str(data.get("driverType") or "").strip().lower()
-    raw_config = data.get("config") or {}
+    raw_config = data.get("config", {})
     if not isinstance(raw_config, dict):
         raise ValueError("storage configuration must be an object")
-    if driverType == "sftp":
+    mountConfig.checkDriverFields(driverType, raw_config)
+    _validateUniqueName(engineId, name)
+    target = None
+    if driverType == "crypt":
+        config = mountConfig.cryptConfig(raw_config)
+        target = _validateCryptTarget(engineId, config)
+    elif driverType == "sftp":
         config = _prepareSftpConfig(raw_config)
     elif driverType == "aliyun":
         config = _prepareAliyunConfig(raw_config)
     else:
         config = dict(raw_config)
-    _validateUniqueName(engineId, name)
-    config = _normalizeDriverConfig(driverType, config)
-    mountId = storageMapper.addMount(
-        {
-            "engineId": engineId,
-            "name": name,
-            "driverType": driverType,
-            "config": config,
-            "enabled": 1,
-            "copyConcurrency": validateCopyConcurrency(data.get("copyConcurrency", 5)),
-        }
-    )
+    mount = {
+        "engineId": engineId,
+        "name": name,
+        "driverType": driverType,
+        "config": config if target else _normalizeDriverConfig(driverType, config),
+        "enabled": 1,
+        "copyConcurrency": validateCopyConcurrency(data.get("copyConcurrency", 5)),
+    }
+    mountId = storageMapper.addMount(mount, target=target) if target else storageMapper.addMount(mount)
     _invalidateEngine(engineId)
     return mountId
 
@@ -455,10 +504,16 @@ def updateMount(data):
     driverType = str(data.get("driverType") or old["driverType"]).strip().lower()
     if driverType != old["driverType"]:
         raise ValueError("storage driver type cannot be changed")
-    raw_config = data.get("config") or {}
+    expectedVersion = int(old.get("configVersion", 1))
+    if "configVersion" in data and data["configVersion"] != expectedVersion:
+        raise ValueError("storage configuration changed; reload and retry")
+    raw_config = data.get("config", {})
     if not isinstance(raw_config, dict):
         raise ValueError("storage configuration must be an object")
-    if driverType == "sftp":
+    mountConfig.checkDriverFields(driverType, raw_config)
+    if driverType == "crypt":
+        config = mountConfig.cryptConfig(raw_config, old=old["config"])
+    elif driverType == "sftp":
         config = _prepareSftpConfig(raw_config, old=old)
     elif driverType == "aliyun":
         config = _prepareAliyunConfig(raw_config, old=old)
@@ -494,16 +549,29 @@ def updateMount(data):
             config.pop(key, None)
     elif driveChanged:
         config.pop("drive_id", None)
-    config = _normalizeDriverConfig(driverType, config)
+    if driverType != "crypt":
+        config = _normalizeDriverConfig(driverType, config)
+    enabled = int(data.get("enabled", old.get("enabled", 1)))
+    movesBacking = driverType != "crypt" and (
+        enabled != 1 or mountConfig.backingLocation(driverType, config)
+        != mountConfig.backingLocation(driverType, old["config"])
+    )
+    cloudSessionChanged = driverType == "aliyun" and any(
+        (config.get(key) or "") != (old["config"].get(key) or "")
+        for key in ("drive_id", "access_token", "refresh_proof")
+    )
     mount = {
         "id": mountId,
+        "expectedVersion": expectedVersion,
+        "expectedConcurrency": old.get("copyConcurrency", 5),
+        "changesBackingLocation": movesBacking,
         "name": name,
         "driverType": driverType,
         "config": config,
-        "enabled": int(data.get("enabled", old.get("enabled", 1))),
+        "enabled": enabled,
         "copyConcurrency": concurrency,
         "authVersion": int(old.get("authVersion", 1)) + (
-            1 if authChanged or driveChanged else 0
+            1 if authChanged or driveChanged or cloudSessionChanged else 0
         ),
     }
     updateMountCopyConcurrency(mountId, concurrency, persist=lambda: storageMapper.updateMount(mount))

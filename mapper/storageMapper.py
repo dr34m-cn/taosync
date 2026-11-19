@@ -21,7 +21,7 @@ def getMountList(engineId):
 def getMountById(mountId):
     rows = sqlBase.fetchall_to_table("select * from storage_mount where id=?", (mountId,))
     if not rows:
-        raise Exception("storage mount not found")
+        raise ValueError("storage mount not found")
     row = rows[0]
     try:
         row["config"] = json.loads(row["config"] or "{}")
@@ -30,24 +30,47 @@ def getMountById(mountId):
     return row
 
 
-def addMount(mount):
-    return sqlBase.execute_insert(
+def addMount(mount, target=None):
+    query = (
         "insert into storage_mount (engineId, name, driverType, config, enabled, copyConcurrency) "
-        "values (:engineId, :name, :driverType, :config, :enabled, :copyConcurrency)",
-        {
-            **mount,
-            "config": json.dumps(mount["config"], ensure_ascii=False),
-            "enabled": mount.get("enabled", 1),
-            "copyConcurrency": mount.get("copyConcurrency", 5),
-        },
+        "select :engineId, :name, :driverType, :config, :enabled, :copyConcurrency"
     )
+    values = {**mount, "config": json.dumps(mount["config"], ensure_ascii=False),
+              "enabled": mount.get("enabled", 1), "copyConcurrency": mount.get("copyConcurrency", 5)}
+    if mount["driverType"] != "crypt":
+        return sqlBase.execute_insert(query, values)
+    # Check the exact backing row that was probed, atomically with the insert.
+    if not target or target["id"] != mount["config"]["target_mount_id"]:
+        raise ValueError("crypt mount requires a validated target")
+    return _insertCrypt(query, values, target)
 
 
-def updateMount(mount):
-    sqlBase.execute_update(
+@sqlBase.connect_sql
+def _insertCrypt(conn, query, values, target):
+    cursor = conn.execute(query + " from storage_mount where id=:target and engineId=:engineId "
+                          "and enabled=1 and driverType!='crypt' and configVersion=:version",
+                          {**values, "target": target["id"], "version": target["configVersion"]})
+    if cursor.rowcount != 1:
+        raise ValueError("target mount changed; reload and retry")
+    conn.commit()
+    return cursor.lastrowid
+
+
+def _isReferenced(conn, mountId):
+    # Disabled crypt mounts still own their reference and may be enabled again.
+    return conn.execute("select 1 from storage_mount where driverType='crypt' and "
+                        "json_extract(config, '$.target_mount_id')=? limit 1", (mountId,)).fetchone() is not None
+
+
+@sqlBase.connect_sql
+def updateMount(conn, mount):
+    conn.execute("begin immediate")
+    if mount["changesBackingLocation"] and _isReferenced(conn, mount["id"]):
+        raise ValueError("cannot disable or relocate a mount referenced by a crypt mount")
+    cursor = conn.execute(
         "update storage_mount set name=:name, driverType=:driverType, config=:config, enabled=:enabled, "
         "configVersion=configVersion + 1, authVersion=:authVersion, copyConcurrency=:copyConcurrency "
-        "where id=:id",
+        "where id=:id and configVersion=:expectedVersion and copyConcurrency=:expectedConcurrency",
         {
             **mount,
             "config": json.dumps(mount["config"], ensure_ascii=False),
@@ -55,54 +78,40 @@ def updateMount(mount):
             "copyConcurrency": mount.get("copyConcurrency", 5),
         },
     )
+    if cursor.rowcount != 1:
+        raise ValueError("storage configuration changed; reload and retry")
+    conn.commit()
 
 
 @sqlBase.connect_sql
 def updateMountTokens(conn, mountId, expectedAuthVersion, tokenValues, expectedTokens=None):
     """Merge rotated cloud tokens only if the originating config is current."""
-    cursor = conn.cursor()
-    try:
-        for _ in range(3):
-            cursor.execute(
-                "select config, configVersion, authVersion from storage_mount where id=?",
-                (mountId,),
-            )
-            row = cursor.fetchone()
-            if row is None or int(row[2]) != int(expectedAuthVersion):
-                return None
-            try:
-                config = json.loads(row[0] or "{}")
-            except (TypeError, ValueError):
-                config = {}
-            if expectedTokens and any(
-                config.get(key) != value for key, value in expectedTokens.items()
-            ):
-                # Another driver already rotated this token set. Return the
-                # current config so the caller can adopt it instead of
-                # overwriting a still-valid refresh token.
-                return {"conflict": True, "config": config}
-            config.update(tokenValues)
-            cursor.execute(
-                "update storage_mount set config=?, configVersion=configVersion + 1 "
-                "where id=? and configVersion=? and authVersion=?",
-                (
-                    json.dumps(config, ensure_ascii=False),
-                    mountId,
-                    row[1],
-                    expectedAuthVersion,
-                ),
-            )
-            if cursor.rowcount == 1:
-                conn.commit()
-                return True
+    conn.execute("begin immediate")
+    row = conn.execute("select config from storage_mount where id=? and driverType='aliyun' and authVersion=?",
+                       (mountId, expectedAuthVersion)).fetchone()
+    if row is None:
         return None
-    finally:
-        cursor.close()
+    config = json.loads(row[0])
+    if expectedTokens and any(config.get(key) != value for key, value in expectedTokens.items()):
+        return {"conflict": True, "config": config}
+    driveId = config.get("drive_id")
+    if driveId and tokenValues.get("drive_id", driveId) != driveId and _isReferenced(conn, mountId):
+        return {"conflict": True, "config": config}
+    config.update(tokenValues)
+    conn.execute("update storage_mount set config=?, configVersion=configVersion + 1 where id=?",
+                 (json.dumps(config, ensure_ascii=False), mountId))
+    conn.commit()
+    return True
 
 
 def updateCopyConcurrency(mountId, value):
     sqlBase.execute_update("update storage_mount set copyConcurrency=? where id=?", (value, mountId))
 
 
-def removeMount(mountId):
-    sqlBase.execute_update("delete from storage_mount where id=?", (mountId,))
+@sqlBase.connect_sql
+def removeMount(conn, mountId):
+    conn.execute("begin immediate")
+    if _isReferenced(conn, mountId):
+        raise ValueError("remove the referencing crypt mount first")
+    conn.execute("delete from storage_mount where id=?", (mountId,))
+    conn.commit()

@@ -778,7 +778,8 @@ class AliyunDriveDriver(StorageDriver):
         endpoint = "/adrive/v1.0/openFile/create"
         check_cancel(cancel)
         # Small files should start streaming without hash/proof reads over SMB.
-        if not self.rapid_upload or size <= self.RAPID_UPLOAD_THRESHOLD:
+        if (not self.rapid_upload or size <= self.RAPID_UPLOAD_THRESHOLD
+                or getattr(source, 'allow_rapid_upload', True) is False):
             return self._request(endpoint, data), source, False
         metadata = getattr(source, "metadata", {})
         content_hash = _sha1(metadata.get("sha1"))

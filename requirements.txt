@@ -5,6 +5,7 @@
 APScheduler==3.11.0
 charset-normalizer==3.4.9
 configparser==7.2.0
+cryptography==49.0.0
 paramiko==4.0.0
 pathspec==0.12.1
 PyYAML==6.0.3
@@ -16,7 +17,6 @@ tornado==6.5.5
 bcrypt==5.0.0
 certifi==2026.7.22
 cffi==2.1.0
-cryptography==49.0.0
 idna==3.18
 invoke==3.0.3
 pycparser==3.0

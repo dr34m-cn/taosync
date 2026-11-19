@@ -276,6 +276,16 @@ engine:
   mountNamePlaceholder: 用于作业路径的顶层目录名称
   driverType: 网盘类型
   rootPath: 根目录
+  cryptTarget: 目标挂载
+  cryptTargetRule: 请选择目标挂载
+  cryptNoTargets: 请先在此引擎中添加存储挂载
+  cryptFolder: 目标文件夹
+  cryptKey: 加密密钥
+  cryptKeyRule: 请输入加密密钥
+  cryptKeySaved: 密钥已保存
+  cryptDirNames: 加密文件夹名称
+  cryptLocked: 保存后，存储类型、目标位置、加密密钥和文件夹名称加密设置均不可更改。
+  cryptWarning: 请使用专用根目录。已有明文文件不会自动加密。请单独备份密钥，以便恢复数据。
   localRootPlaceholder: 请输入本机已存在的目录路径
   browseLocalDirectory: 浏览本地目录
   localBrowserTitle: 选择本地目录
@@ -367,6 +377,7 @@ engine:
   refreshTokenRule: 请输入 Refresh Token
   mountDeleteConfirm: "将删除目录“{name}”，使用该目录的作业将无法运行，仍要删除吗？"
   drivers:
+    crypt: 加密目录
     local: 本地目录
     smb: SMB
     ftp: FTP

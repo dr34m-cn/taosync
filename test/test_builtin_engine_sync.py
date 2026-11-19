@@ -1,4 +1,5 @@
 """End-to-end sync scenarios on the built-in TaoSync engine with local mounts."""
+import hashlib
 import json
 import os
 import shutil
@@ -143,6 +144,63 @@ class EngineTestBase(unittest.TestCase):
 
 
 class BuiltinEngineSyncTest(EngineTestBase):
+    def test_encrypted_folder_backup_and_restore_through_sync_jobs(self):
+        backing = self.base / 'dst' / 'vaults'
+        source = Path(self.src)
+        payload = os.urandom(3 * 1024 * 1024 + 117)
+        write(self.src, '资料/跨块.bin', payload)
+        write(self.src, '资料/空文件', b'')
+        (source / '空目录').mkdir()
+        physical_mount = next(row for row in storageService.getMountList(self.engineId) if row['name'] == 'D')
+        for hide_dirs in (False, True):
+            with self.subTest(encrypt_dir_names=hide_dirs):
+                suffix = str(int(hide_dirs))
+                mount_name = 'Crypt' + suffix
+                root = backing / suffix
+                root.mkdir(parents=True)
+                restore_name = 'Restored' + suffix
+                restored = self._dir(restore_name)
+                self._mount(restore_name, restored)
+                storageService.addMount({
+                    'engineId': self.engineId, 'name': mount_name, 'driverType': 'crypt',
+                    'config': {'target_mount_id': physical_mount['id'], 'target_path': '/vaults/' + suffix,
+                               'encryption_key': 'integration-secret', 'encrypt_dir_names': hide_dirs},
+                })
+
+                status, error, items = self._run(self._job(dst='/' + mount_name + '/'))
+                self.assertEqual(status, 2, (error, items))
+                self.assertEqual((root / '资料').is_dir(), not hide_dirs)
+                files = [p for p in root.rglob('*') if p.is_file()]
+                self.assertEqual(len(files), 2)
+                for file in files:
+                    self.assertNotIn(file.name, ('跨块.bin', '空文件'))
+                    self.assertGreater(file.stat().st_size, 0)
+                cipher_file = max(files, key=lambda p: p.stat().st_size)
+                wire = cipher_file.read_bytes()
+                self.assertNotIn(payload[:256], wire)
+                self.assertGreater(len(wire), len(payload))
+
+                # Re-open solely from persisted mount data. Check the logical
+                # directory API and then restore via the real scheduler/engine.
+                engineService.invalidateClient(self.engineId)
+                client = engineService.getClientById(self.engineId)
+                self.assertEqual(client.allFileList('/' + mount_name),
+                                 {'空目录/': {}, '资料/': {'空文件': 0, '跨块.bin': len(payload)}})
+                status, error, items = self._run(self._job(src='/' + mount_name + '/', dst='/' + restore_name + '/'))
+                self.assertEqual(status, 2, (error, items))
+                restored_file = Path(restored, '资料', '跨块.bin')
+                self.assertEqual(hashlib.sha256(restored_file.read_bytes()).digest(), hashlib.sha256(payload).digest())
+                self.assertEqual(tree(restored), tree(self.src))
+
+                # Tamper with the last tag after earlier records have streamed.
+                # The failed copy must not replace a prior valid destination.
+                cipher_file.write_bytes(wire[:-1] + bytes([wire[-1] ^ 1]))
+                task = client.copyFile('/' + mount_name + '/资料', '/' + restore_name + '/资料', '跨块.bin')
+                client.waitTask(task, 10)
+                self.assertEqual(client.taskInfo(task)['state'], 7, client.taskInfo(task))
+                self.assertEqual(restored_file.read_bytes(), payload)
+                self.assertEqual(list(Path(restored).rglob('*.part')), [])
+
     def test_sync_to_source_named_child_preserves_siblings_and_reports_this_run(self):
         from service.syncJob import taskService
 

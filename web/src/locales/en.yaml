@@ -275,6 +275,16 @@ engine:
   mountName: Directory Name
   mountNamePlaceholder: Top-level directory name used in job paths
   driverType: Storage Type
+  cryptTarget: Target mount
+  cryptTargetRule: Select a target mount
+  cryptNoTargets: Add a storage mount to this engine first
+  cryptFolder: Target folder
+  cryptKey: Encryption key
+  cryptKeyRule: Enter an encryption key
+  cryptKeySaved: Saved key
+  cryptDirNames: Encrypt folder names
+  cryptLocked: The storage type, target location, encryption key and folder name setting are locked after saving.
+  cryptWarning: Use a dedicated root folder. Existing plaintext files are not converted. Keep a separate copy of the key for recovery.
   rootPath: Root Path
   localRootPlaceholder: Enter an existing local directory path
   browseLocalDirectory: Browse local directories
@@ -367,6 +377,7 @@ engine:
   refreshTokenRule: Please enter a Refresh Token
   mountDeleteConfirm: "Delete directory '{name}'? Jobs using it will no longer run."
   drivers:
+    crypt: Encrypted Directory
     local: Local Directory
     smb: SMB
     ftp: FTP

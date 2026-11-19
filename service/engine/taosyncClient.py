@@ -21,6 +21,8 @@ from service.storage.drivers.base import (
 from service.storage.factory import createDriver
 from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
 from service.storage.drivers.aliyun import AliyunDriveDriver
+from service.storage.drivers.crypt import CryptDriver
+from service.storage.mountConfig import getMountEncryptionKey
 from service.storage.drivers.scanState import ScanState
 
 
@@ -113,6 +115,8 @@ class _CopyTask:
                         self.cancel_event,
                         metadata,
                     )
+                if destination_mount['driverType'] == 'crypt':
+                    self.client._invalidateScanPath(destination_mount, destination_relative)
                 self.client._rememberHash(source_mount, source_relative, metadata)
             self.client._invalidateMountCache(destination_mount["id"])
             if self.delete_source:
@@ -178,7 +182,12 @@ class TaoSyncClient:
         self.cache_ttl = 15.0
         self.hash_cache = OrderedDict()
         self.hash_cache_lock = threading.Lock()
-        for row in storageMapper.getMountList(self.alistId):
+        rows = storageMapper.getMountList(self.alistId)
+        by_id = {}
+        self.related_mounts = {}
+        # Load the physical drivers first. A filter shares its backing driver's
+        # credentials, connections and locks regardless of database row order.
+        for row in sorted(rows, key=lambda row: row['driverType'] == 'crypt'):
             mount_id = int(row["id"])
             auth_version = int(row.get("authVersion") or 1)
 
@@ -200,14 +209,19 @@ class TaoSyncClient:
 
             row = dict(row)
             try:
-                row["driver"] = createDriver(
-                    row["driverType"],
-                    row["config"],
-                    save_config=save_config,
-                    load_config=load_config,
-                    refresh_lock=_get_mount_refresh_lock(mount_id, auth_version),
-                    auth_version=auth_version,
-                )
+                config = row['config']
+                if row['driverType'] == 'crypt':
+                    target = by_id.get(config['target_mount_id'])
+                    if target is None or target['driverType'] == 'crypt':
+                        raise ValueError('encryption target directory is unavailable')
+                    row['driver'] = CryptDriver(self.getDriver(target), config['target_path'],
+                                                getMountEncryptionKey(config), config['encrypt_dir_names'])
+                    self.related_mounts.setdefault(target['id'], {target['id']}).add(mount_id)
+                else:
+                    row['driver'] = createDriver(
+                        row['driverType'], config, save_config=save_config, load_config=load_config,
+                        refresh_lock=_get_mount_refresh_lock(mount_id, auth_version), auth_version=auth_version,
+                    )
                 row["driverError"] = ""
             except Exception as exc:
                 # Keep a bad/offline mount visible and repairable without
@@ -215,6 +229,8 @@ class TaoSyncClient:
                 row["driver"] = None
                 row["driverError"] = str(exc)
             self.mounts[row["name"]] = row
+            by_id[mount_id] = row
+        self.related_mounts = {mount_id: group for group in self.related_mounts.values() for mount_id in group}
 
     def updateAlistId(self, alistId):
         self.alistId = int(alistId)
@@ -237,6 +253,12 @@ class TaoSyncClient:
         return nullcontext()
 
     def _invalidateScanPath(self, mount, path):
+        if mount['driverType'] == 'crypt':
+            config = mount['config']
+            state = getattr(self, 'scan_states', {}).get(config['target_mount_id'])
+            if state is not None:
+                state.invalidate(config['target_path'])
+            return
         state = getattr(self, 'scan_states', {}).get(mount['id'])
         if state is not None:
             state.invalidate(posixpath.dirname(path) or '/')
@@ -283,7 +305,8 @@ class TaoSyncClient:
             if mount_id is None:
                 self.entry_cache.clear()
             else:
-                for key in [key for key in self.entry_cache if key[0] == mount_id]:
+                related = self.related_mounts.get(mount_id, {mount_id})
+                for key in [key for key in self.entry_cache if key[0] in related]:
                     self.entry_cache.pop(key, None)
         owner = getattr(self, 'cache_owner', None)
         if owner is not None:
@@ -368,6 +391,8 @@ class TaoSyncClient:
         if relative != "/":
             with self._scanScope(mount):
                 self.getDriver(mount).mkdir(relative)
+            if mount['driverType'] == 'crypt':
+                self._invalidateScanPath(mount, relative)
             self._invalidateMountCache(mount["id"])
 
     def deleteFile(self, path, names, scanInterval=0):
@@ -384,6 +409,8 @@ class TaoSyncClient:
                 # Source-snapshot retries may repeat a delete that already
                 # succeeded for another target before a later operation failed.
                 pass
+            if mount['driverType'] == 'crypt':
+                self._invalidateScanPath(mount, relative)
             self._invalidateMountCache(mount["id"])
 
     def fileSize(self, mount, relative):
