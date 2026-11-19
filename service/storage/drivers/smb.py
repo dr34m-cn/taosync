@@ -1,3 +1,4 @@
+import errno
 import ntpath
 import stat
 import threading
@@ -145,16 +146,24 @@ class SmbDriver(StorageDriver):
             getattr(entry, "is_symlink", lambda: False)()
         )
 
+    def _stat(self, client, remote):
+        try:
+            return client.stat(remote, follow_symlinks=False, **self._connection_kwargs())
+        except OSError as exc:
+            # smbclient reports missing names and parents as SMBOSError(ENOENT).
+            if exc.errno == errno.ENOENT and not isinstance(exc, FileNotFoundError):
+                raise FileNotFoundError(exc.errno, exc.strerror, remote) from exc
+            raise
+
     def _assert_no_reparse(self, client, remote, allow_missing=False):
         """Reject SMB symbolic links/junctions before following them."""
-        kwargs = self._connection_kwargs()
         root = self.root.rstrip("\\")
         relative = remote[len(root):].strip("\\")
         current = root
         for part in relative.split("\\") if relative else []:
             current = current + "\\" + part
             try:
-                info = client.stat(current, follow_symlinks=False, **kwargs)
+                info = self._stat(client, current)
             except FileNotFoundError:
                 if allow_missing:
                     return
@@ -162,8 +171,11 @@ class SmbDriver(StorageDriver):
             if getattr(info, "st_file_attributes", 0) & 0x400:
                 raise ValueError("SMB symbolic links and reparse points are not supported")
 
-    @_smb_operation
     def list(self, path, details=False):
+        return self.list_filtered(path, None, details)
+
+    @_smb_operation
+    def list_filtered(self, path, include, details=False):
         client = self._client()
         remote = self._remote(path)
         self._assert_no_reparse(client, remote)
@@ -173,6 +185,10 @@ class SmbDriver(StorageDriver):
                 if self._entry_is_reparse(entry):
                     continue
                 is_dir = entry.is_dir(follow_symlinks=False)
+                # stat reopens the path. A concurrent publish can already have
+                # renamed a staging file that the encrypted view never needs.
+                if include is not None and not include(entry.name, is_dir):
+                    continue
                 info = entry.stat(follow_symlinks=False)
                 size = None if is_dir else info.st_size
                 mtime_ns = getattr(info, "st_mtime_ns", None)
@@ -199,7 +215,7 @@ class SmbDriver(StorageDriver):
         client = self._client()
         remote = self._remote(path, allow_root=False)
         self._assert_no_reparse(client, remote)
-        info = client.stat(remote, follow_symlinks=False, **self._connection_kwargs())
+        info = self._stat(client, remote)
         if stat.S_ISDIR(info.st_mode):
             raise IsADirectoryError(path)
         if not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
@@ -231,7 +247,7 @@ class SmbDriver(StorageDriver):
     def _delete(self, client, remote):
         kwargs = self._connection_kwargs()
         self._assert_no_reparse(client, remote)
-        info = client.stat(remote, follow_symlinks=False, **kwargs)
+        info = self._stat(client, remote)
         if not stat.S_ISDIR(info.st_mode):
             client.remove(remote, **kwargs)
             return
@@ -254,7 +270,7 @@ class SmbDriver(StorageDriver):
         remote = self._remote(path, allow_root=False)
         self._assert_no_reparse(client, remote)
         kwargs = self._connection_kwargs()
-        size = client.stat(remote, follow_symlinks=False, **kwargs).st_size
+        size = self._stat(client, remote).st_size
         done = 0
         with client.open_file(remote, mode="rb", **kwargs) as source:
             while True:
@@ -296,7 +312,7 @@ class SmbDriver(StorageDriver):
         self._assert_no_reparse(client, destination, allow_missing=True)
         kwargs = self._connection_kwargs()
         try:
-            if stat.S_ISDIR(client.stat(destination, follow_symlinks=False, **kwargs).st_mode):
+            if stat.S_ISDIR(self._stat(client, destination).st_mode):
                 raise IsADirectoryError(path)
         except FileNotFoundError:
             pass

@@ -48,6 +48,10 @@ _RECORD = _CHUNK + _TAG
 _MAX_RECORDS = 1 << 32
 
 
+def is_reserved_backup_name(name):
+    return name[:4].lower() == 'tsb-'
+
+
 def encrypted_size(n):
     """Exact wire length for n plaintext bytes, or None for unknown size."""
     if n is None:
@@ -121,7 +125,7 @@ class BackupCipher:
 
     def decode_name(self, physical, is_dir):
         """Accept ASCII case variations, never return a foreign name as cleartext."""
-        if physical[:4].lower() != 'tsb-':
+        if not is_reserved_backup_name(physical):
             raise ForeignBackupName('not a backup name')
         if len(physical) > 255 or not physical.isascii() or not physical.lower().startswith(_PREFIX):
             raise InvalidBackupName('invalid or unsupported backup name')

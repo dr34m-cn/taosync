@@ -6,7 +6,7 @@ from collections import Counter
 from contextlib import contextmanager
 
 from .base import StorageDriver, child_path, normalize_path
-from ..backupCipher import BackupCipher, ForeignBackupName, decrypted_size, encrypted_size
+from ..backupCipher import BackupCipher, decrypted_size, encrypted_size, is_reserved_backup_name
 
 
 class CryptDriver(StorageDriver):
@@ -52,16 +52,14 @@ class CryptDriver(StorageDriver):
         return item
 
     def list(self, path, details=False):
-        rows = self.backing.list(self._directory(path), details=details)
+        def visible(name, is_dir):
+            return (is_dir and not self.encrypt_dir_names) or is_reserved_backup_name(name)
+
+        rows = self.backing.list_filtered(self._directory(path), visible, details=details)
         entries = []
         kinds = {}
         for row in rows:
-            try:
-                entry = self._entry(row)
-            except ForeignBackupName:
-                # Plain entries and staging files belong only to the physical
-                # view. A reserved but damaged/wrong-key name still fails hard.
-                continue
+            entry = self._entry(row)
             if kinds.setdefault(entry['name'], entry['is_dir']) != entry['is_dir']:
                 raise ValueError('a file and a directory share the same logical backup name')
             entries.append(entry)

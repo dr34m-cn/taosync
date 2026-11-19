@@ -4,13 +4,15 @@ import stat
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from smbprotocol.exceptions import SMBException
+from smbprotocol.exceptions import SMBException, SMBOSError
+from smbprotocol.header import NtStatus
 
 from service.storage.drivers.base import stream_transfer
+from service.storage.drivers.crypt import CryptDriver
 from service.storage.drivers.smb import SmbDriver
 
 
@@ -58,7 +60,7 @@ class _Client:
         if self.stat_hook:
             self.stat_hook(path, connection)
         if path.endswith("destination"):
-            raise FileNotFoundError(path)
+            raise SMBOSError(NtStatus.STATUS_OBJECT_NAME_NOT_FOUND, path)
         mode = stat.S_IFREG if path.endswith("source") else stat.S_IFDIR
         return SimpleNamespace(st_size=len(self.payload), st_mode=mode, st_file_attributes=0)
 
@@ -134,6 +136,57 @@ class SmbConnectionTests(unittest.TestCase):
         self.assertEqual(ntpath.dirname(temporary), ntpath.dirname(target))
         self.assertLessEqual(len(ntpath.basename(temporary)), 255)
         self.assertEqual(self.client.written, {target: b'data'})
+
+    def test_smb_backup_creates_missing_clear_directory_and_encrypted_file(self):
+        vault = CryptDriver(self.driver, '/backup', 'test passphrase', False)
+        root = r'\\server\share\backup'
+        directories = {root}
+
+        def stat_path(path, connection):
+            if path.startswith(root) and path not in directories:
+                status = (NtStatus.STATUS_OBJECT_NAME_NOT_FOUND if ntpath.dirname(path) in directories
+                          else NtStatus.STATUS_OBJECT_PATH_NOT_FOUND)
+                raise SMBOSError(status, path)
+
+        self.client.stat_hook = stat_path
+        with patch.object(self.client, 'makedirs', side_effect=lambda path, **kw: directories.add(path)):
+            vault.mkdir('/桃桃')
+            self.assertIn(ntpath.join(root, '桃桃'), directories)
+            # Upload may also arrive before its parent directory was created.
+            stream_transfer(self.driver, '/source', vault, '/新目录/文件', len(self.client.payload))
+        self.assertIn(ntpath.join(root, '新目录'), directories)
+        target = ntpath.join(root, '新目录', vault.cipher.encode_name('文件', False))
+        restored = io.BytesIO()
+        writer = vault.cipher.decrypt_writer(restored)
+        writer.write(self.client.written[target])
+        writer.finish()
+        self.assertEqual(restored.getvalue(), self.client.payload)
+
+    def test_crypt_scan_during_smb_upload_publish(self):
+        vault = CryptDriver(self.driver, '/backup', 'test passphrase', False)
+        name = '.taosync-' + 'a' * 32 + '.part'
+        missing = SMBOSError(NtStatus.STATUS_OBJECT_NAME_NOT_FOUND, ntpath.join(self.driver.root, 'backup', name))
+        # scandir returned the old name before another upload renamed it.
+        staged = SimpleNamespace(name=name, is_dir=lambda **kw: False, stat=Mock(side_effect=missing))
+        encrypted = SimpleNamespace(name=vault.cipher.encode_name('existing', False), is_dir=lambda **kw: False,
+                                    stat=lambda **kw: SimpleNamespace(st_size=vault.cipher.encrypted_size(3)))
+        with patch.object(self.client, 'scandir', side_effect=lambda *a, **kw: nullcontext([staged, encrypted])):
+            for details in (False, True):
+                self.assertEqual([row['name'] for row in vault.list('/', details=details)], ['existing'])
+            staged.stat.assert_not_called()
+            # A live staging file remains visible to a physical scan (used by recursive delete).
+            staged.stat.side_effect = None
+            staged.stat.return_value = SimpleNamespace(st_size=7)
+            self.assertIn(name, [row['name'] for row in self.driver.list('/backup')])
+
+    def test_failed_destination_probe_does_not_start_upload(self):
+        error = SMBOSError(NtStatus.STATUS_ACCESS_DENIED, r'\\server\share\private')
+        with patch.object(self.client, 'stat', side_effect=error), patch.object(self.client, 'makedirs') as mkdir:
+            with self.assertRaises(SMBOSError) as caught:
+                self.driver.upload('/private/file', io.BytesIO(b'data'), 4)
+            self.assertIs(caught.exception, error)
+            mkdir.assert_not_called()
+            self.assertEqual(self.client.written, {})
 
     def test_failed_operation_discards_its_connection(self):
         error = SMBException("Request requires 1 credits but only 0 credits are available")

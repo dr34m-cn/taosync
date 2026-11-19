@@ -75,6 +75,10 @@ class StorageDriver:
     def list(self, path, details=False):
         raise NotImplementedError
 
+    def list_filtered(self, path, include, details=False):
+        """List matching entries. Drivers may filter before fetching metadata."""
+        return [entry for entry in self.list(path, details=details) if include(entry['name'], entry['is_dir'])]
+
     def mkdir(self, path):
         raise NotImplementedError
 
