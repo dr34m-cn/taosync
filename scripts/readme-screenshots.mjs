@@ -216,10 +216,10 @@ async function openJob(state, create = false) {
     await selectField(page, dialog(page), '引擎', 'TaoSync');
     await dialog(page).getByPlaceholder('用来标识你的作业，选填').fill('家庭相册备份');
     await button(dialog(page), '选择选择目录').first().click();
-    await page.locator('.el-tree-node__label').getByText('家庭相册', { exact: true }).click();
+    await dialog(page).getByText('家庭相册', { exact: true }).click();
     await button(dialog(page), '确定').click();
     await button(dialog(page), '选择选择目录').first().click();
-    await page.locator('.el-tree-node__label').getByText('家庭备份', { exact: true }).click();
+    await dialog(page).getByText('家庭备份', { exact: true }).click();
     await button(dialog(page), '确定').click();
     if (mobile) await dialog(page).locator('.el-drawer__body').evaluate(x => { x.scrollTop = 0; });
   } else {
@@ -301,7 +301,7 @@ export const scenes = [
     await mount(s, 2); await button(dialog(s.page), '测试连接').click();
     await s.page.getByText('连接已测试', { exact: true }).waitFor();
     await s.page.getByRole('button', { name: '选择目录', exact: true }).click();
-    await s.page.locator('.el-tree-node__label').getByText('家庭相册', { exact: true }).click();
+    await s.dialog(page).getByText('家庭相册', { exact: true }).click();
     await s.page.waitForTimeout(3000);
   } },
   { id: 'directory-aliyun', zh: '阿里云盘目录配置', en: 'Aliyun Drive Directory Settings', run: s => mount(s, 4) },

@@ -1425,6 +1425,7 @@ onBeforeUnmount(() => {
               </div>
             </el-tooltip>
             <el-alert v-if="!cryptLocked" class="form-span-2" type="warning" show-icon :closable="false" :title="$t('engine.cryptWarning')" />
+            <el-alert v-if="!cryptLocked" class="form-span-2" style="margin-top: 8px" type="error" show-icon :closable="false" :title="$t('engine.cryptKeyLossWarning')" />
           </template>
 
           <template v-else-if="mountData.driverType === 'local'">

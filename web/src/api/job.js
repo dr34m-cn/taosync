@@ -20,6 +20,15 @@ export function alistGetPath(alistId, path) {
   });
 }
 
+export function alistCreateDirectory(alistId, parent, name) {
+  return request({
+    url: "/alist",
+    headers: { isMask: false },
+    method: "post",
+    data: { action: "mkdir", alistId, parent, name },
+  });
+}
+
 export function alistPost(data) {
   return request({
     url: "/alist",

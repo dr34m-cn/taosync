@@ -81,3 +81,7 @@ task_end_msg_error: 失败原因为：{}
 notify_error: 发送通知过程中失败，原因为：{}
 notify_test_msg: 这是一条由您自己发送的 TaoSync 测试消息，当你看到这条消息，说明你的配置是正确可用的。
 invalid_username: "用户名不能为空，最多64个字符，不能包含控制字符"
+
+invalid_directory_name: "请输入有效的目录名"
+root_directory_creation_forbidden: "不能在根目录下新建目录"
+directory_name_exists: "该位置已存在同名文件或目录"

@@ -27,6 +27,8 @@ class Alist(BaseHandler):
     @run_on_executor
     @handle_request
     def post(self, req):
+        if req.get('action') == 'mkdir':
+            return alistService.createDirectory(req['alistId'], req['parent'], req['name'])
         alistService.addClient(req)
 
     @run_on_executor

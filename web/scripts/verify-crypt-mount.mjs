@@ -53,6 +53,7 @@ try {
     await field('网盘类型').locator('.el-select').click();
     await option('加密目录').click();
     await form.getByText(/专用根目录.*明文.*备份密钥/).waitFor();
+    await form.locator('.el-alert--warning + .el-alert--error').getByText('务必妥善保管秘钥，一旦秘钥和本程序数据库都丢失，您将永远失去被加密的文件', { exact: true }).waitFor();
   }
   async function chooseMount(name) {
     const select = field('目标挂载');

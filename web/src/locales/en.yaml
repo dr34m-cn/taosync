@@ -285,6 +285,7 @@ engine:
   cryptDirNames: Encrypt folder names
   cryptLocked: The storage type, target location, encryption key and folder name setting are locked after saving.
   cryptWarning: Use a dedicated root folder. Existing plaintext files are not converted. Keep a separate copy of the key for recovery.
+  cryptKeyLossWarning: Keep your encryption key safe. If you lose both the key and the TaoSync database, your encrypted files will be permanently unrecoverable.
   rootPath: Root Path
   localRootPlaceholder: Enter an existing local directory path
   browseLocalDirectory: Browse local directories
@@ -478,6 +479,9 @@ notify:
 refresh:
   auto: Auto refresh
 pathSelect:
+  newFolder: New folder
+  name: Folder name
+  invalidName: Enter a single folder name
   title: Select Directory
   selectFirst: Select a path first
 setting:

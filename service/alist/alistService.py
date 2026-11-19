@@ -10,6 +10,7 @@ from mapper.alistMapper import getAlistById, addAlist, removeAlist, getAlistList
 from mapper.storageMapper import getMountList
 from service.alist.alistClient import AlistClient
 from service.engine import engineService
+from service.storage.drivers.base import child_path, normalize_path
 
 def getClientList():
     """
@@ -132,3 +133,20 @@ def getChildPath(alistId, path):
     :return:
     """
     return engineService.getChildPath(alistId, path)
+
+
+def createDirectory(alistId, parent, name):
+    if not isinstance(parent, str) or not parent.startswith('/'):
+        raise ValueError('an absolute parent path is required')
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(G('invalid_directory_name'))
+    parent = normalize_path(parent)
+    if parent == '/':
+        raise ValueError(G('root_directory_creation_forbidden'))
+    path = child_path(parent, name)
+    client = getClientById(alistId)
+    entries = client.fileListApi(parent)
+    if name in entries or name + '/' in entries:
+        raise FileExistsError(G('directory_name_exists'))
+    client.mkdir(path)
+    return path + '/'

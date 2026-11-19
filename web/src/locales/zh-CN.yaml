@@ -286,6 +286,7 @@ engine:
   cryptDirNames: 加密文件夹名称
   cryptLocked: 保存后，存储类型、目标位置、加密密钥和文件夹名称加密设置均不可更改。
   cryptWarning: 请使用专用根目录。已有明文文件不会自动加密。请单独备份密钥，以便恢复数据。
+  cryptKeyLossWarning: 务必妥善保管秘钥，一旦秘钥和本程序数据库都丢失，您将永远失去被加密的文件
   localRootPlaceholder: 请输入本机已存在的目录路径
   browseLocalDirectory: 浏览本地目录
   localBrowserTitle: 选择本地目录
@@ -478,6 +479,9 @@ notify:
 refresh:
   auto: 自动刷新
 pathSelect:
+  newFolder: 新建目录
+  name: 目录名
+  invalidName: 请输入单个有效的目录名
   title: 选择目录
   selectFirst: 请先选择路径
 setting:
