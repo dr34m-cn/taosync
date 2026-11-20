@@ -9,9 +9,9 @@ from types import SimpleNamespace
 from unittest import mock
 from urllib.parse import parse_qs, unquote
 
-from common import config
+from common import config, sqlInit
 from service.notify import custom, notifyService, push
-from service.syncJob import jobClient
+from service.syncJob import jobClient, taskService
 
 
 class SettingsTest(unittest.TestCase):
@@ -33,6 +33,34 @@ class SettingsTest(unittest.TestCase):
         self.env.stop()
         os.chdir(self.cwd)
         self.temp.cleanup()
+
+    def test_common_notification_fields_are_independent_of_channel_params(self):
+        sqlInit.init_sql()
+        configBody = {'method': 1, 'enable': 1, 'params': '{"sendKey":"test"}'}
+        notifyService.addNewNotify(configBody.copy())
+        row, = notifyService.getNotifyList()
+        self.assertEqual(row['onlyFailed'], 0)
+        self.assertIsNone(row['remark'])
+        notifyService.editNotify({**row, 'onlyFailed': 1, 'remark': '  值班  '})
+        notifyService.editNotify({**configBody, 'id': row['id']})  # legacy client
+        row, = notifyService.getNotifyList()
+        self.assertEqual((row['onlyFailed'], row['remark'], row['params']), (1, '值班', configBody['params']))
+
+    def test_notification_filter_is_per_channel(self):
+        channels = [{'onlyFailed': 1}, {'onlyFailed': 0}]
+        self.enterContext(mock.patch.object(notifyService, 'getNotifyList', return_value=channels))
+        send = self.enterContext(mock.patch.object(notifyService, 'sendNotify'))
+        mapper = self.enterContext(mock.patch.object(taskService, 'jobMapper'))
+        mapper.getJobByTaskId.return_value = dict(remark='', srcPath='/a', dstPath='/b')
+        self.enterContext(mock.patch.object(taskService, 'G', side_effect=lambda k: [''] * 9 if k == 'task_status' else ''))
+        for status, failed, success, alert in ((2, 0, 0, False), (2, 0, 2, False), (3, 1, 1, True),
+                                               (6, 0, 0, True), (5, 0, 0, True), (7, 0, 0, False), (7, 1, 0, True)):
+            with self.subTest(status=status, failed=failed, success=success):
+                counts = dict(allNum=failed+success, successNum=success, failNum=failed)
+                with mock.patch.object(taskService, 'getCuTaskNum', return_value=counts):
+                    taskService.updateJobTaskStatus(4, status)
+                self.assertEqual([call.args[0] for call in send.call_args_list], channels if alert else channels[1:])
+                send.reset_mock()
 
     def test_default_is_15_days_and_old_hours_are_converted(self):
         self.assertEqual(config.getSettings()['source_full_scan_days'], 15)

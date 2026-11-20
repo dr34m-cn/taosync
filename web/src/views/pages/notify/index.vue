@@ -86,6 +86,8 @@ const addShow = () => {
   editFlag.value = false;
   editData.value = {
     enable: 1,
+    onlyFailed: 0,
+    remark: '',
     method: 1,
     params: {
       sendKey: "",
@@ -276,6 +278,7 @@ onMounted(() => {
           <el-icon v-else class="notify-logo" :size="40"><Connection v-if="item.method === 5" /><Bell v-else /></el-icon>
           <div class="notify-info">
             <div class="card-item-user">{{ notifyMethod(item.method) }}</div>
+            <div v-if="item.remark" class="notify-remark">{{ item.remark }}</div>
             <div :class="`card-item-enable enable-${item.enable == 1 ? 'enable' : 'disable'}`">
               {{ item.enable == 1 ? $t("notify.enabled") : $t("notify.disabled") }}
             </div>
@@ -303,6 +306,12 @@ onMounted(() => {
       <el-form :model="editData" :rules="editRule[editData.method]" ref="formRef" v-if="editShow" label-width="110px">
         <el-form-item prop="enable" :label="$t('common.enabled')">
           <el-switch v-model="editData.enable" :active-value="1" :inactive-value="0" />
+        </el-form-item>
+        <el-form-item label="仅失败通知" prop="onlyFailed">
+          <el-switch v-model="editData.onlyFailed" :active-value="1" :inactive-value="0" />
+        </el-form-item>
+        <el-form-item label="通知备注" prop="remark">
+          <el-input v-model="editData.remark" placeholder="选填" clearable />
         </el-form-item>
         <el-form-item prop="method" :label="$t('notify.method')" class="notify-method-form-item">
           <el-select v-model="editData.method" @change="methodChange" style="width: 100%">
@@ -523,6 +532,13 @@ onMounted(() => {
 
     .notify-info {
       margin-left: 12px;
+      min-width: 0;
+    }
+
+    .notify-remark {
+      margin-top: 4px;
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
     }
 
     .card-item-user {

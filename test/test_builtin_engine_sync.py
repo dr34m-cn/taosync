@@ -503,6 +503,22 @@ class BuiltinEngineSyncTest(EngineTestBase):
         jobService.editJobClient(edit)
         self.assertEqual(jobService.getJobClientById(job).job['remark'], 'edited')
 
+    def test_edit_enabled_schedule_replaces_trigger_and_respects_disabled_state(self):
+        job = self._job()
+        base = dict(jobService.getJobClientById(job).job, isCron=0, interval=45)
+        jobService.editJobClient(base.copy())
+        old = jobService.getJobClientById(job)
+        oldSchedule = old.scheduledJob
+        jobService.editJobClient(dict(base, interval=90))
+        current = jobService.getJobClientById(job)
+        self.assertIsNone(current.scheduled.get_job(oldSchedule.id))
+        self.assertEqual(current.scheduledJob.trigger.interval.total_seconds(), 90*60)
+        self.assertIsNotNone(current.scheduledJob.next_run_time)
+        self.assertEqual(jobMapper.getJobById(job)['enable'], 1)
+        jobService.editJobClient(dict(base, enable=0))
+        self.assertIsNone(jobService.getJobClientById(job).scheduledJob.next_run_time)
+        self.assertEqual(jobMapper.getJobById(job)['enable'], 0)
+
     # ------------------------------------------------------------ 8
     def test_file_directory_conflicts_converge_in_one_run(self):
         write(self.src, 'x', 'file')

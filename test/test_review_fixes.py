@@ -674,6 +674,49 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
                               body=json.dumps({'userName': 'admin', 'passwd': 'admin-pass'}))
         return response.headers['Set-Cookie'].split(';', 1)[0]
 
+    def test_api_key_lifecycle_and_manual_job(self):
+        path = '/svr/settings/api-key'
+        cookie = {'Cookie': self._login_cookie()}
+
+        def change(action):
+            res = self.fetch(path, method='PUT', headers=cookie, body=json.dumps({'action': action}))
+            self.assertEqual(res.headers['Cache-Control'], 'no-store')
+            return json.loads(res.body)['data']
+
+        def rejected(key):
+            res = self.fetch('/svr/user', headers={**cookie, 'Authorization': key})
+            self.assertEqual(res.code, 401)
+            self.assertEqual(json.loads(res.body)['code'], 401)
+            self.assertNotIn('Set-Cookie', res.headers)
+
+        self.assertEqual(json.loads(self.fetch(path, headers=cookie).body)['data'], {'enabled': False})
+        self.assertEqual(json.loads(self.fetch(path, method='PUT', body='{"action":"enable"}').body)['code'], 401)
+        rejected('f' * 64)
+        first = change('enable')['key']
+        self.assertRegex(first, '^[0-9a-f]{64}$')
+        self.assertNotEqual(sqlBase.fetch_first_val('select digest from api_key'), first)
+        self.assertEqual(change('enable'), {'enabled': True})
+        self.assertEqual(json.loads(self.fetch(path, headers=cookie).body)['data'], {'enabled': True})
+        headers = {'Authorization': first}
+        self.assertEqual(json.loads(self.fetch('/svr/user', headers=headers).body)['data']['userName'], 'admin')
+        with mock.patch('controller.jobController.jobService.doJobManual') as run:
+            res = self.fetch('/svr/job', method='PUT', headers=headers, body='{"id":123,"pause":null}')
+            self.assertEqual(json.loads(res.body)['code'], 200)
+            run.assert_called_once_with(123)
+        upload = '/svr/settings/update/upload'
+        self.assertEqual(self.fetch(upload, method='POST', headers=headers, body='').code, 403)
+        second = change('reset')['key']
+        self.assertNotEqual(first, second)
+        rejected(first)
+        rejected('Bearer ' + second)
+        self.assertEqual(self.fetch(upload, method='POST', headers=headers, body='').code, 401)
+        self.assertEqual(json.loads(self.fetch('/svr/user', headers={'Authorization': second}).body)['code'], 200)
+        self.assertEqual(change('disable'), {'enabled': False})
+        rejected(second)
+        self.assertEqual(json.loads(self.fetch('/svr/user', headers=cookie).body)['code'], 200)
+        self.assertNotIn(change('enable')['key'], (first, second))
+        rejected(second)
+
     def test_rename_refreshes_cookie_invalidates_old_session_and_preserves_password(self):
         cookie = self._login_cookie()
         oldHash = userMapper.getUserById(1)['passwd']

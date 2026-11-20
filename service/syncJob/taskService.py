@@ -66,7 +66,10 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
             content += G('task_end_msg_error').format(statusName)
         elif status == 6 and errMsg is not None:
             content += G('task_end_msg_error').format(errMsg)
+        hasFailure = status in (3, 5, 6) or taskNum['failNum'] > 0
         for notify in notifyList:
+            if notify.get('onlyFailed') and not hasFailure:
+                continue
             try:
                 notifyService.sendNotify(notify, title, content, needNotSync)
             except Exception as e:

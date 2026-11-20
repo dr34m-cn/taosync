@@ -469,6 +469,7 @@ def make_business_app(server_cfg):
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
         (r"/svr/settings", systemController.Settings),
+        (r"/svr/settings/api-key", systemController.ApiKey),
         (r"/svr/settings/update", UpdateInfo),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),

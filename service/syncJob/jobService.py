@@ -4,6 +4,8 @@
 """
 import json
 import logging
+import threading
+import time
 
 from common.LNG import G
 from mapper import jobMapper
@@ -13,6 +15,7 @@ from service.syncJob.fileRetry import FileRetryTask
 
 # 作业客户端列表，key为jobId,value为jobClient
 jobClientList = {}
+_configLock = threading.RLock()
 
 MAX_SQLITE_INTEGER = 9223372036854775807
 SOURCE_SNAPSHOT_FIELDS = jobMapper.SOURCE_SNAPSHOT_FIELDS
@@ -79,12 +82,10 @@ def getJobClientById(jobId):
     """
     jobId = int(jobId)
     global jobClientList
-    if jobId in jobClientList:
+    with _configLock:
+        if jobId not in jobClientList:
+            jobClientList[jobId] = jobClient.JobClient(jobMapper.getJobById(jobId))
         return jobClientList[jobId]
-    job = jobMapper.getJobById(jobId)
-    client = jobClient.JobClient(job)
-    jobClientList[jobId] = client
-    return client
 
 
 def cleanJobInput(job):
@@ -161,26 +162,34 @@ def editJobClient(job):
     }
     """
     jobId = int(job['id'])
-    cleanJobInput(job)
-    client = getJobClientById(jobId)
-    if client.job['enable'] == 1 and client.job['isCron'] != 2:
-        raise Exception(G('disable_then_edit'))
-    if client.runLock.locked():
-        # 运行中（含禁用后仍在收尾）的作业不允许编辑，否则会静默中止当前任务并可能与新任务重叠
-        raise Exception(G('job_running_cannot_edit'))
+    with _configLock:
+        client = getJobClientById(jobId)
+        if not jobClient.acquireRun(client.runLock):
+            raise Exception(G('job_running_cannot_edit'))
+        try:
+            cleanJobInput(job)
+            _replaceIdleClient(jobId, client, job)
+        finally:
+            client.runLock.release()
+
+
+def _replaceIdleClient(jobId, client, job):
     clearSnapshot = any(client.job.get(key) != job.get(key) for key in SOURCE_SNAPSHOT_FIELDS)
     oldJob = client.job.copy()
     client.stopJob(remove=True)
     global jobClientList
     newClient = None
     try:
-        newClient = jobClient.JobClient(job)
+        if oldJob['enable'] and oldJob['isCron'] != 2 and job['enable'] and job['isCron'] != 2:
+            time.sleep(0.2)
+        # Share the held lock: neither old nor new callbacks can run before commit.
+        newClient = jobClient.JobClient(job, runLock=client.runLock)
         jobMapper.updateJob(job, clearSourceSnapshot=clearSnapshot)
     except Exception:
         if newClient is not None:
             newClient.stopJob(remove=True)
         try:
-            jobClientList[jobId] = jobClient.JobClient(oldJob)
+            jobClientList[jobId] = jobClient.JobClient(oldJob, runLock=client.runLock)
         except Exception as restoreError:
             logging.getLogger().exception(restoreError)
         raise
@@ -276,13 +285,13 @@ def removeJobClient(jobId):
     :return:
     """
     jobId = int(jobId)
-    client = getJobClientById(jobId)
-    # 先标记，运行中的任务结束时据此跳过入库并清理自身记录
-    client.removed = True
-    client.stopJob(remove=True)
-    jobMapper.deleteJob(jobId)
-    global jobClientList
-    del jobClientList[jobId]
+    with _configLock:
+        client = getJobClientById(jobId)
+        # 先标记，运行中的任务结束时据此跳过入库并清理自身记录
+        client.removed = True
+        client.stopJob(remove=True)
+        jobMapper.deleteJob(jobId)
+        del jobClientList[jobId]
 
 
 def continueJob(jobId):
@@ -290,8 +299,8 @@ def continueJob(jobId):
     启用作业
     :param jobId:
     """
-    client = getJobClientById(jobId)
-    client.resumeJob()
+    with _configLock:
+        getJobClientById(jobId).resumeJob()
 
 
 def pauseJob(jobId):
@@ -299,10 +308,11 @@ def pauseJob(jobId):
     禁用作业
     :param jobId:
     """
-    client = getJobClientById(jobId)
-    if client.job['isCron'] == 2:
-        raise Exception(G('cannot_disable_manual_job'))
-    client.stopJob()
+    with _configLock:
+        client = getJobClientById(jobId)
+        if client.job['isCron'] == 2:
+            raise Exception(G('cannot_disable_manual_job'))
+        client.stopJob()
 
 
 def abortJob(jobId):

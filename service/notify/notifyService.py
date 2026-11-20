@@ -23,7 +23,7 @@ def addNewNotify(notify):
     :return:
     """
     validateNotify(notify)
-    notifyMapper.addNotify(notify)
+    notifyMapper.addNotify({'onlyFailed': 0, 'remark': None, **notify})
 
 
 def editNotify(notify):
@@ -37,6 +37,12 @@ def editNotify(notify):
 
 
 def validateNotify(notify):
+    if 'onlyFailed' in notify and notify['onlyFailed'] not in (0, 1):
+        raise ValueError('仅失败通知必须是开关值')
+    if notify.get('remark') is not None:
+        if not isinstance(notify['remark'], str):
+            raise ValueError('通知备注必须是文本')
+        notify['remark'] = notify['remark'].strip() or None
     params = json.loads(notify['params'])
     if notify['method'] == 5:
         custom.validate(params)

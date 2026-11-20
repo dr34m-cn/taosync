@@ -5,7 +5,7 @@ from tornado.concurrent import run_on_executor
 from common.LNG import language
 from common.config import getSettings, updateSettings
 from controller.baseController import BaseHandler, handle_request, cookieName
-from service.system import userService
+from service.system import apiKey, userService
 
 
 class Login(BaseHandler):
@@ -46,7 +46,8 @@ class User(BaseHandler):
     def put(self, req):
         if 'userName' in req:
             user = userService.editUserName(req['__user']['id'], req['userName'])
-            self.set_session_cookie(user)
+            if 'Authorization' not in self.request.headers:
+                self.set_session_cookie(user)
             return {key: value for key, value in user.items() if key not in ('passwd', 'sqlVersion')}
         userService.editPasswd(req['__user']['id'], req['passwd'], req['oldPasswd'])
 
@@ -62,6 +63,19 @@ class Settings(BaseHandler):
     @handle_request
     def put(self, req):
         return updateSettings(req['settings'])
+
+
+class ApiKey(BaseHandler):
+    def set_default_headers(self):
+        self.set_header('Cache-Control', 'no-store')
+
+    @handle_request
+    def get(self, req):
+        return apiKey.status()
+
+    @handle_request
+    def put(self, req):
+        return apiKey.change(req.get('action'), req['__user']['id'])
 
 
 class Language(BaseHandler):

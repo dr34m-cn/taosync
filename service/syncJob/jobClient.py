@@ -1455,7 +1455,7 @@ class JobTask:
 
 
 class JobClient:
-    def __init__(self, job, isInit=False):
+    def __init__(self, job, isInit=False, runLock=None):
         """
         初始化job
         :param job: {id(新增时不需要), enable, srcPath, dstPath, alistId, useCacheT, scanIntervalT, useCacheS, scanIntervalS, method, interval, exclude, cron相关}
@@ -1473,7 +1473,7 @@ class JobClient:
         self.scheduled = None
         self.scheduledJob = None
         self.jobDoing = False
-        self.runLock = threading.Lock()
+        self.runLock = runLock if runLock is not None else threading.Lock()
         # 作业已被删除（运行中的任务据此清理自身记录）
         self.removed = False
         # 正在执行中的作业信息；仅在内存中，不入库，高速读写；执行完毕后批量入库，如果遇到异常终止，不会补偿入库
@@ -1506,6 +1506,10 @@ class JobClient:
         :return:
         """
         if not lockAcquired and not acquireRun(self.runLock):
+            return
+        # An already queued scheduler callback can outlive its old schedule.
+        if not self.job['enable']:
+            self.finishRun()
             return
         self.jobDoing = True
         taskId = None

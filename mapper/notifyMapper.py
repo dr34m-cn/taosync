@@ -16,7 +16,8 @@ def addNotify(notify):
     :param notify:
     :return:
     """
-    sqlBase.execute_insert("insert into notify(enable, method, params) values (:enable, :method, :params)", notify)
+    sqlBase.execute_insert("insert into notify(enable, method, params, onlyFailed, remark) "
+                           "values (:enable, :method, :params, :onlyFailed, :remark)", notify)
 
 
 def editNotify(notify):
@@ -25,7 +26,9 @@ def editNotify(notify):
     :param notify:
     :return:
     """
-    sqlBase.execute_update("update notify set enable=:enable, method=:method, params=:params where id = :id", notify)
+    # Older clients do not send common fields; preserve them on edit.
+    fields = [key for key in ('enable', 'method', 'params', 'onlyFailed', 'remark') if key in notify]
+    sqlBase.execute_update('update notify set ' + ', '.join(f'{key}=:{key}' for key in fields) + ' where id=:id', notify)
 
 
 def updateNotifyStatus(notifyId, enable):

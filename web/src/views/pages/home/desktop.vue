@@ -265,10 +265,6 @@ const disableJobShow = (row, isDel) => {
 };
 
 const editJobShow = (row) => {
-  if (row.enable && row.isCron !== 2) {
-    ElMessage.error(t("home.editDisabledTip"));
-    return;
-  }
   if (alistList.value.length === 0) {
     getAlistList();
   }
@@ -497,6 +493,10 @@ onMounted(() => {
       <el-table-column type="expand">
         <template #default="props">
           <div class="form-box">
+            <div class="form-box-item">
+              <div class="form-box-item-label">作业ID</div>
+              <div class="form-box-item-value">{{ props.row.id }}</div>
+            </div>
             <div class="form-box-item">
               <div class="form-box-item-label">{{ $t("home.methodView") }}</div>
               <div class="form-box-item-value">{{ methodText(props.row.method) }}</div>

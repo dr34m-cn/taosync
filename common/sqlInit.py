@@ -45,7 +45,7 @@ def init_sql(conn):
                 )
             for table in ('job_source_snapshot', 'job_source_snapshot_meta',
                           'storage_mount', 'notify', 'job_task_item', 'job_task',
-                          'job', 'alist_list', 'user_list'):
+                          'job', 'alist_list', 'api_key', 'user_list'):
                 cursor.execute("drop table if exists " + table)
             userTableExists = False
     passwd = None
@@ -281,6 +281,14 @@ def init_sql(conn):
                                        "add column fingerprint text DEFAULT NULL")
             cursor.execute(f"update user_list set sqlVersion={cuVersion}")
             conn.commit()
+    # No row means API authentication is disabled (including on upgrade).
+    cursor.execute("create table if not exists api_key("
+                   "slot integer primary key check(slot=1), userId integer not null, digest text not null)")
+    notifyColumns = {row[1] for row in cursor.execute('pragma table_info(notify)')}
+    if notifyColumns and 'onlyFailed' not in notifyColumns:
+        cursor.execute('alter table notify add column onlyFailed integer not null default 0')
+    if notifyColumns and 'remark' not in notifyColumns:
+        cursor.execute('alter table notify add column remark text')
     # Keep the built-in engine present even when a migration was interrupted.
     cursor.execute("create table if not exists alist_list("
                    "id integer primary key autoincrement, remark text, url text,"

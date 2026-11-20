@@ -31,6 +31,7 @@ def make_app():
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
         (r"/svr/settings", systemController.Settings),
+        (r"/svr/settings/api-key", systemController.ApiKey),
         (r"/svr/settings/update", updateController.UpdateInfo),
         (r"/svr/settings/update/upload", updateController.ProgramUpload),
         (r"/svr/language", systemController.Language),

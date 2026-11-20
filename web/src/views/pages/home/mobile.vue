@@ -283,10 +283,6 @@ const addShow = async () => {
 };
 
 const editJobShow = async (row) => {
-  if (row.enable && row.isCron !== 2) {
-    ElMessage.error(t("home.editDisabledTip"));
-    return;
-  }
   await ensureAlistList();
   editData.value = JSON.parse(JSON.stringify(row));
   editData.value.dstPath = splitPaths(editData.value.dstPath);
@@ -410,6 +406,7 @@ onMounted(getJobList);
         </div>
 
         <div class="job-meta">
+          <div><span>作业ID</span><strong>{{ item.id }}</strong></div>
           <div>
             <span>{{ $t("home.methodView") }}</span>
             <strong>{{ methodText(item.method) }}</strong>

@@ -7,7 +7,7 @@ from tornado.web import RequestHandler
 from common import commonService, commonUtils
 from common.LNG import G, set_context_lang
 from common.config import getConfig
-from service.system import userService
+from service.system import apiKey, userService
 
 cookieName = 'tao_sync'
 
@@ -54,6 +54,14 @@ class BaseHandler(RequestHandler):
                                expires_days=getConfig()['server']['expires'],
                                httponly=True, samesite='Lax')
 
+    def authenticated_user(self):
+        if 'Authorization' in self.request.headers:
+            return apiKey.resolveUser(self.request.headers['Authorization'])
+        try:
+            return resolveSessionUser(self.get_current_user())
+        except (TypeError, ValueError):
+            return None
+
 
 def _unauthorized(handler, msgKey):
     handler.clear_cookie(cookieName)
@@ -63,22 +71,18 @@ def _unauthorized(handler, msgKey):
 
 def handle_request(func):
     def wrapper(self):
-        uri = self.request.uri
         lang = self.request.headers.get("Accept-Language", None)
         set_context_lang(lang)
-        user = self._get_signed_user_cookie()
         trueUser = None
-        if not uri.startswith('/svr/noAuth'):
-            if user is None:
-                _unauthorized(self, 'sign_in')
-                return
-            try:
-                cUser = json.loads(user)
-            except (TypeError, ValueError):
-                cUser = None
-            trueUser = resolveSessionUser(cUser)
+        if 'Authorization' in self.request.headers or not self.request.path.startswith('/svr/noAuth/'):
+            trueUser = self.authenticated_user()
             if trueUser is None:
-                _unauthorized(self, 'login_expired')
+                if 'Authorization' in self.request.headers:
+                    self.set_status(401)
+                    self.set_header('Content-Type', 'application/json; charset=UTF-8')
+                    self.write(commonService.result_map('API 密钥无效或已禁用', 401))
+                else:
+                    _unauthorized(self, 'login_expired' if self.get_cookie(cookieName) else 'sign_in')
                 return
         try:
             req = commonService.get_post_data(self)

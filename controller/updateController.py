@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tornado.web import stream_request_body
 
-from controller.baseController import BaseHandler, handle_request, resolveSessionUser
+from controller.baseController import BaseHandler, handle_request
 from service.syncJob import jobClient
 from service.system import programUpdate as update
 
@@ -34,10 +34,7 @@ class ProgramUpload(BaseHandler):
         self.finish({'code': code, 'data': None, 'msg': message})
 
     def authenticated(self):
-        try:
-            return resolveSessionUser(self.get_current_user()) is not None
-        except (ValueError, TypeError):
-            return False
+        return self.authenticated_user() is not None
 
     def prepare(self):
         headers = self.request.headers
