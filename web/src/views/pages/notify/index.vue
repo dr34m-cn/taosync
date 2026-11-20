@@ -307,11 +307,11 @@ onMounted(() => {
         <el-form-item prop="enable" :label="$t('common.enabled')">
           <el-switch v-model="editData.enable" :active-value="1" :inactive-value="0" />
         </el-form-item>
-        <el-form-item label="仅失败通知" prop="onlyFailed">
+        <el-form-item :label="$t('notify.onlyFailed')" prop="onlyFailed">
           <el-switch v-model="editData.onlyFailed" :active-value="1" :inactive-value="0" />
         </el-form-item>
-        <el-form-item label="通知备注" prop="remark">
-          <el-input v-model="editData.remark" placeholder="选填" clearable />
+        <el-form-item :label="$t('notify.remark')" prop="remark">
+          <el-input v-model="editData.remark" :placeholder="$t('notify.optional')" clearable />
         </el-form-item>
         <el-form-item prop="method" :label="$t('notify.method')" class="notify-method-form-item">
           <el-select v-model="editData.method" @change="methodChange" style="width: 100%">

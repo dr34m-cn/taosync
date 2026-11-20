@@ -85,7 +85,7 @@ def handle_request(func):
                 if 'Authorization' in self.request.headers:
                     self.set_status(401)
                     self.set_header('Content-Type', 'application/json; charset=UTF-8')
-                    self.write(commonService.result_map('API 密钥无效或已禁用', 401))
+                    self.write(commonService.result_map(G('api_key_invalid'), 401))
                 else:
                     _unauthorized(self, 'login_expired' if self.get_cookie(self.session_cookie_name) else 'sign_in')
                 return

@@ -15,6 +15,11 @@ same_exists: 已存在相同数据，请检查！
 sign_in: 请登录
 login_expired: 登录失效
 running_success: 启动成功：{url}
+api_key_invalid: API 密钥无效或已禁用
+notify_invalid_only_failed: 仅失败通知必须是开关值
+notify_invalid_remark: 通知备注必须是文本
+api_key_unknown_action: 未知的 API 密钥操作
+api_key_enable_first: 请先开启 API 密钥
 https_invalid_pair: 请上传 PEM 格式的证书链和匹配的无密码私钥，每个文件不超过 256 KiB。
 https_port_unavailable: 无法监听 HTTPS 端口 8025，请检查端口是否被占用。
 https_storage_error: 无法读写 HTTPS 配置，请检查数据目录权限。
@@ -39,6 +44,18 @@ task_info_retry: "查询复制任务状态失败（第 {}/{} 次），稍后重�
 task_timeout_abort: "任务 {} 执行超过 {} 小时，已按超时中止"
 copy_interrupted: 任务结束时该复制仍未确认完成，已停止跟踪，请在引擎中核对结果
 source_empty_protect: "来源目录 {} 为空，但目标目录 {} 仍有内容。为防止存储掉线等情况误删目标，本次已跳过同步；如确需清空目标，请手动处理"
+file_retry_invalid_name: "无效的文件名"
+file_retry_delete_not_allowed: "当前作业配置不允许重试此删除操作"
+file_retry_source_or_method_changed: "文件不属于当前作业的来源或同步方式已变更"
+file_retry_invalid_path: "无效的文件路径"
+file_retry_excluded: "文件已被当前作业排除"
+file_retry_wrong_destination: "文件不属于当前作业的目标目录"
+file_retry_source_missing_or_size: "源文件不存在或不符合当前大小限制"
+file_retry_source_conflict: "来源路径已存在同名项，已阻止删除"
+file_retry_target_directory: "目标已变为目录，已阻止删除"
+file_retry_target_size_changed: "目标文件大小已变化或不符合当前大小限制"
+file_retry_ineligible: "只可重试已结束任务中的失败文件"
+file_retry_already_retried: "该文件已重试，请刷新查看结果"
 job_running_cannot_edit: 有作业在进行中，请先停止作业再编辑
 do_job_err: 执行任务失败，原因为：{}
 src: 来源

@@ -5,6 +5,7 @@
 import time
 
 from common import sqlBase
+from common.fileRetryReason import FileRetryError, storedReason
 from common.LNG import G
 
 SOURCE_SNAPSHOT_FIELDS = (
@@ -41,6 +42,7 @@ def getLatestJobTaskList(jobIds):
             task.jobId,
             task.status,
             task.errMsg,
+            task.retryReason,
             task.runTime,
             task.taskNum,
             task.createTime,
@@ -390,7 +392,8 @@ def addJobTask(jobTask):
 
 
 def updateJobTaskStatus(taskId, status, errMsg=None):
-    sqlBase.execute_update(f"update job_task set status=?, errMsg=? where id=?", (status, errMsg, taskId))
+    text, reason = storedReason(errMsg)
+    sqlBase.execute_update("update job_task set status=?, errMsg=?, retryReason=? where id=?", (status, text, reason, taskId))
 
 
 def updateJobTaskStatusByStatus():
@@ -439,12 +442,16 @@ def deleteJobTaskByRunTime(runTime):
 
 def addJobTaskItemMany(jobTaskItemList):
     now = int(time.time())
-    rows = [{'rapidUpload': False, **item, 'createTime': item.get('createTime') or now} for item in jobTaskItemList]
+    rows = []
+    for item in jobTaskItemList:
+        text, reason = storedReason(item['errMsg'])
+        rows.append({'rapidUpload': False, **item, 'errMsg': text, 'retryReason': reason,
+                     'createTime': item.get('createTime') or now})
     sqlBase.execute_manny(
         "insert into job_task_item (taskId, srcPath, dstPath, isPath, fileName, fileSize, type, alistTaskId, status, "
-        "errMsg, rapidUpload, createTime) "
+        "errMsg, retryReason, rapidUpload, createTime) "
         "VALUES (:taskId, :srcPath, :dstPath, :isPath, :fileName, :fileSize, :type, :alistTaskId, :status, :errMsg, "
-        ":rapidUpload, :createTime)",
+        ":retryReason, :rapidUpload, :createTime)",
         rows)
 
 
@@ -462,7 +469,7 @@ def getRetryItem(taskId, itemId):
         "where i.taskId=? and i.id=? and t.status>1 and i.status=7 and i.isPath=0 "
         "and i.type in (0,1,2) and i.fileName is not null", (taskId, itemId))
     if not rows:
-        raise ValueError('只可重试已结束任务中的失败文件')
+        raise FileRetryError('file_retry_ineligible')
     return rows[0]
 
 
@@ -478,16 +485,18 @@ def createFileRetry(conn, item):
             '(select 1 from job_task where id=retryTaskId and status in (0,1,2))',
             (taskId, item['id'], item['taskId'], item['retryTaskId']))
         if changed.rowcount != 1:
-            raise ValueError('该文件已重试，请刷新查看结果')
+            raise FileRetryError('file_retry_already_retried')
     return taskId
 
 
 def getFileRetryResults(taskIds):
     placeholders = ','.join('?' for _ in taskIds)
     return sqlBase.fetchall_to_table(
-        f'select t.id,t.jobId,t.status, coalesce(t.errMsg,(select i.errMsg from job_task_item i '
-        f'where i.taskId=t.id and i.status=7 order by i.id limit 1)) as errMsg '
-        f'from job_task t where t.id in ({placeholders})', tuple(taskIds))
+        'select t.id,t.jobId,t.status,coalesce(t.errMsg,i.errMsg) as errMsg, '
+        'coalesce(t.retryReason,i.retryReason) as retryReason from job_task t '
+        'left join job_task_item i on t.errMsg is null and t.retryReason is null and i.id=('
+        'select id from job_task_item where taskId=t.id and status=7 order by id limit 1) '
+        f'where t.id in ({placeholders})', tuple(taskIds))
 
 
 def getUndoneJobTaskItemList(taskId):

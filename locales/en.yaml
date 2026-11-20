@@ -15,6 +15,11 @@ same_exists: The same data already exists, please check!
 sign_in: Please sign in
 login_expired: Login expired
 running_success: "Running at: {url}"
+api_key_invalid: API key is invalid or disabled
+notify_invalid_only_failed: Notify only on failure must be either on or off
+notify_invalid_remark: Notification note must be text
+api_key_unknown_action: Unknown API key action
+api_key_enable_first: Enable the API key first
 https_invalid_pair: Upload a PEM certificate chain and its matching unencrypted private key (up to 256 KiB each).
 https_port_unavailable: Cannot listen on HTTPS port 8025. Check whether the port is already in use.
 https_storage_error: Cannot read or save the HTTPS configuration. Check the data directory permissions.
@@ -39,6 +44,18 @@ task_info_retry: "Failed to query copy task status (attempt {}/{}), will retry: 
 task_timeout_abort: "Task {} ran longer than {} hours and was stopped as timed out"
 copy_interrupted: The copy was still unconfirmed when the task ended and is no longer tracked; please verify the result in the engine
 source_empty_protect: "Source {} is empty while target {} still has content. To avoid wiping the target when storage goes offline, this run was skipped; clear the target manually if that is intended"
+file_retry_invalid_name: "The file name is invalid"
+file_retry_delete_not_allowed: "The current job configuration does not allow retrying this deletion"
+file_retry_source_or_method_changed: "The file is outside the current source directory or the sync method has changed"
+file_retry_invalid_path: "The file path is invalid"
+file_retry_excluded: "The current job excludes this file"
+file_retry_wrong_destination: "The file is outside the current job's target directories"
+file_retry_source_missing_or_size: "The source file is missing or does not meet the current size limits"
+file_retry_source_conflict: "Deletion blocked: the source contains an item with the same name"
+file_retry_target_directory: "Deletion blocked: the target is now a directory"
+file_retry_target_size_changed: "The target file size has changed or does not meet the current size limits"
+file_retry_ineligible: "Only failed files from finished tasks can be retried"
+file_retry_already_retried: "This file has already been retried. Refresh to see the result."
 job_running_cannot_edit: The job is running. Wait for it to finish or abort it before editing
 do_job_err: "Task execution failed due to: {}"
 src: source

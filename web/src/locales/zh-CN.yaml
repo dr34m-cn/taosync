@@ -118,6 +118,7 @@ jobLinks:
   confirmClear: "清空此关联的调度日志？"
   confirmClearAll: "清空所有关联的调度日志？"
 home:
+  jobId: 作业ID
   jobManagement: 作业管理
   mobileJobCount: 共 {count} 个作业
   mobileEmpty: 暂无作业，创建第一个同步作业
@@ -270,6 +271,10 @@ current:
   abortConfirm: 中止任务不影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？
   abortSent: 中止指令已发送，请等待中止完成
 taskDetail:
+  retryQueued: 等待重试
+  retrySucceeded: 重试成功
+  retryFailed: 重试失败
+  retryStatus: '重试：{status}'
   mobileItemCount: 共 {count} 个文件任务
   mobileNoItems: 暂无符合条件的文件任务
   title: 任务详情
@@ -442,6 +447,8 @@ engine:
   tokenRule: 请输入令牌，请到 AList 管理 - 设置 - 其他中复制，保存后不要重置令牌否则令牌失效
   deleteConfirm: 操作不可逆，将永久删除该引擎，请确认没有作业使用该引擎，否则会导致错误，仍要删除吗？
 notify:
+  onlyFailed: 仅失败通知
+  remark: 通知备注
   loading: 加载中
   empty: 暂无通知配置，请新增
   add: 新增
@@ -524,6 +531,21 @@ pathSelect:
   invalidName: 请输入单个有效的目录名
   title: 选择目录
   selectFirst: 请先选择路径
+apiKey:
+  title: API 密钥
+  help: 使用说明
+  helpTitle: API 密钥使用说明
+  enable: 启用 API 密钥
+  reset: 重置
+  reload: 重新加载状态
+  confirmHint: 继续后，使用当前密钥的脚本将无法调用接口。
+  resetTitle: 重置 API 密钥？
+  disableTitle: 禁用 API 密钥？
+  newKey: 新 API 密钥
+  notice: 密钥仅显示一次，请立即复制并妥善保管。关闭后无法再次查看；如未保存，请重置密钥。
+  copy: 复制密钥
+  copied: 已复制
+  close: 关闭
 https:
   enable: 启用 HTTPS（8025 端口）
   certificate: 证书链（PEM）

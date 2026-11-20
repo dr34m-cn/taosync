@@ -5,9 +5,9 @@
 import json
 import logging
 import threading
-import time
 
 from common.LNG import G
+from common.fileRetryReason import renderReason
 from mapper import jobLinkMapper, jobMapper
 from service.storage import storageService
 from service.syncJob import jobClient, jobLinks, taskService
@@ -178,24 +178,15 @@ def editJobClient(job):
 
 def _replaceIdleClient(jobId, client, job):
     clearSnapshot = any(client.job.get(key) != job.get(key) for key in SOURCE_SNAPSHOT_FIELDS)
-    oldJob = client.job.copy()
-    client.stopJob(remove=True)
-    global jobClientList
-    newClient = None
+    # Both callbacks share the held run lock. Keep the old trigger (and its
+    # next fire time) until the replacement configuration is persisted.
+    newClient = jobClient.JobClient(job, runLock=client.runLock)
     try:
-        if oldJob['enable'] and oldJob['isCron'] != 2 and job['enable'] and job['isCron'] != 2:
-            time.sleep(0.2)
-        # Share the held lock: neither old nor new callbacks can run before commit.
-        newClient = jobClient.JobClient(job, runLock=client.runLock)
         jobMapper.updateJob(job, clearSourceSnapshot=clearSnapshot)
     except Exception:
-        if newClient is not None:
-            newClient.stopJob(remove=True)
-        try:
-            jobClientList[jobId] = jobClient.JobClient(oldJob, runLock=client.runLock)
-        except Exception as restoreError:
-            logging.getLogger().exception(restoreError)
+        newClient.stopJob(remove=True)
         raise
+    client.stopJob(remove=True)
     jobClientList[jobId] = newClient
 
 
@@ -287,6 +278,7 @@ def getTaskDetails(req):
     if ids:
         retries = {run['id']: run for run in jobMapper.getFileRetryResults(ids)}
         for run in retries.values():
+            renderReason(run)
             client = jobClientList.get(run['jobId'])
             task = client.currentJobTask if client else None
             if run['status'] < 2 and isinstance(task, FileRetryTask) and task.taskId == run['id']:
@@ -382,7 +374,7 @@ def getJobList(req):
         task.pop('itemSuccessNum', None)
         task.pop('itemFailNum', None)
         task.pop('itemOtherNum', None)
-        row['lastTask'] = task
+        row['lastTask'] = renderReason(task)
     return result
 
 

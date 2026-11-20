@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest import mock
 from urllib.parse import parse_qs, unquote
 
-from common import config, sqlInit
+from common import LNG, config, sqlInit
 from service.notify import custom, notifyService, push
 from service.syncJob import jobClient, taskService
 
@@ -45,6 +45,29 @@ class SettingsTest(unittest.TestCase):
         notifyService.editNotify({**configBody, 'id': row['id']})  # legacy client
         row, = notifyService.getNotifyList()
         self.assertEqual((row['onlyFailed'], row['remark'], row['params']), (1, '值班', configBody['params']))
+        notifyService.editNotify({**row, 'remark': '  '})
+        row, = notifyService.getNotifyList(True)
+        self.assertEqual((row['onlyFailed'], row['remark']), (1, None))
+        notifyService.updateNotifyStatus(row['id'], 0)
+        self.assertEqual(notifyService.getNotifyList(True), [])
+
+    def test_invalid_common_fields_do_not_write(self):
+        notify = dict(enable=1, method=1, params='{}')
+        with mock.patch.object(notifyService, 'notifyMapper') as mapper:
+            for lang, switch, remark in (('en', 'on or off', 'must be text'), ('zh_CN', '开关值', '必须是文本')):
+                with mock.patch.object(LNG, 'get_context_lang', return_value=lang):
+                    for fields, message in (({'onlyFailed': 2}, switch), ({'onlyFailed': '0'}, switch), ({'remark': 123}, remark)):
+                        for save in (notifyService.addNewNotify, notifyService.editNotify):
+                            with self.subTest(lang=lang, fields=fields, save=save), self.assertRaisesRegex(ValueError, message):
+                                save({**notify, **fields})
+            self.assertFalse(mapper.mock_calls)
+
+    def test_manual_channel_test_bypasses_failure_and_empty_filters(self):
+        notify = dict(onlyFailed=1, method=1, params='{"sendKey":"test","notSendNull":true}', remark='internal')
+        with mock.patch.object(notifyService, 'G', return_value='test message'), \
+                mock.patch.object(notifyService.sc, 'send') as send:
+            notifyService.testNotify(notify)
+        send.assert_called_once_with('test', 'TaoSync Test', (10, 30), 'test message')
 
     def test_notification_filter_is_per_channel(self):
         channels = [{'onlyFailed': 1}, {'onlyFailed': 0}]
@@ -54,6 +77,7 @@ class SettingsTest(unittest.TestCase):
         mapper.getJobByTaskId.return_value = dict(remark='', srcPath='/a', dstPath='/b')
         self.enterContext(mock.patch.object(taskService, 'G', side_effect=lambda k: [''] * 9 if k == 'task_status' else ''))
         for status, failed, success, alert in ((2, 0, 0, False), (2, 0, 2, False), (3, 1, 1, True),
+                                               (3, 0, 0, True), (4, 0, 0, False), (4, 1, 0, True),
                                                (6, 0, 0, True), (5, 0, 0, True), (7, 0, 0, False), (7, 1, 0, True)):
             with self.subTest(status=status, failed=failed, success=success):
                 counts = dict(allNum=failed+success, successNum=success, failNum=failed)

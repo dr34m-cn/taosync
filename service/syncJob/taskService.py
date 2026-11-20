@@ -5,6 +5,7 @@ import time
 
 from common import commonUtils
 from common.LNG import G
+from common.fileRetryReason import renderReason
 from mapper import jobLinkMapper, jobMapper
 from service.syncJob import jobLinks
 from service.notify import notifyService
@@ -103,6 +104,7 @@ def getTaskList(req):
     # 需要更新任务数的列表（适配旧版本）
     needUpdateList = []
     for item in jobTaskList['dataList']:
+        renderReason(item)
         if item['taskNum']:
             taskNum = json.loads(item['taskNum'])
         else:
@@ -158,4 +160,7 @@ def getTaskItemList(req):
     }
     :return:
     """
-    return jobMapper.getJobTaskItemList(req)
+    result = jobMapper.getJobTaskItemList(req)
+    for row in result['dataList'] if isinstance(result, dict) else result:
+        renderReason(row)
+    return result

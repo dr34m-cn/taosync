@@ -342,6 +342,11 @@ def init_sql(conn):
         cursor.execute("alter table job_task_item add column rapidUpload integer not null default 0")
     if itemColumns and 'retryTaskId' not in itemColumns:
         cursor.execute("alter table job_task_item add column retryTaskId integer")
+    if itemColumns and 'retryReason' not in itemColumns:
+        cursor.execute("alter table job_task_item add column retryReason text")
+    taskColumns = {row[1] for row in cursor.execute('pragma table_info(job_task)')}
+    if taskColumns and 'retryReason' not in taskColumns:
+        cursor.execute("alter table job_task add column retryReason text")
     cursor.execute("pragma table_info(job_source_snapshot)")
     snapshotColumns = {row[1] for row in cursor.fetchall()}
     if 'fingerprint' not in snapshotColumns:

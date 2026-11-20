@@ -1,14 +1,17 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { ElMessageBox } from 'element-plus';
 import { CopyDocument, Key, QuestionFilled, Refresh } from '@element-plus/icons-vue';
 import { useClipboard } from '@vueuse/core';
 import { marked } from 'marked';
 import { changeApiKey, getApiKeyStatus } from '@/api/settings';
-import guide from './api-key.md?raw';
+import guideZh from './api-key.md?raw';
+import guideEn from './api-key.en.md?raw';
 
 const help = ref(false);
-const guideHtml = marked.parse(guide); // Only the bundled Markdown file is rendered.
+const { t, locale } = useI18n();
+const guideHtml = computed(() => marked.parse(locale.value === 'en' ? guideEn : guideZh));
 const enabled = ref(null);
 const busy = ref(false);
 const key = ref('');
@@ -30,9 +33,9 @@ async function change(action) {
   busy.value = true;
   try {
     if (action !== 'enable') {
-      const verb = action === 'reset' ? '重置' : '禁用';
-      const confirmed = await ElMessageBox.confirm(`${verb}后，使用当前密钥的脚本将无法调用接口。`, `${verb} API 密钥？`, {
-        confirmButtonText: verb, cancelButtonText: '取消', type: 'warning',
+      const resetting = action === 'reset';
+      const confirmed = await ElMessageBox.confirm(t('apiKey.confirmHint'), t(resetting ? 'apiKey.resetTitle' : 'apiKey.disableTitle'), {
+        confirmButtonText: t(resetting ? 'apiKey.reset' : 'common.disable'), cancelButtonText: t('common.cancel'), type: 'warning',
       }).then(() => true, () => false);
       if (!confirmed) return;
     }
@@ -53,25 +56,25 @@ onMounted(load);
 <template>
   <section aria-labelledby="api-key-title" :aria-busy="busy">
     <header class="key-heading">
-      <h2 id="api-key-title" class="section-heading"><el-icon><Key /></el-icon>API 密钥</h2>
-      <el-button link type="primary" :icon="QuestionFilled" @click="help = true">使用说明</el-button>
+      <h2 id="api-key-title" class="section-heading"><el-icon><Key /></el-icon>{{ t('apiKey.title') }}</h2>
+      <el-button link type="primary" :icon="QuestionFilled" @click="help = true">{{ t('apiKey.help') }}</el-button>
       <div v-if="enabled !== null" class="controls">
-        <el-switch :model-value="enabled" :disabled="busy" aria-label="启用 API 密钥" @change="change($event ? 'enable' : 'disable')" />
-        <span>{{ enabled ? '已启用' : '已禁用' }}</span>
-        <el-button v-if="enabled" size="small" :icon="Refresh" :disabled="busy" @click="change('reset')">重置</el-button>
+        <el-switch :model-value="enabled" :disabled="busy" :aria-label="t('apiKey.enable')" @change="change($event ? 'enable' : 'disable')" />
+        <span>{{ t(enabled ? 'notify.enabled' : 'notify.disabled') }}</span>
+        <el-button v-if="enabled" size="small" :icon="Refresh" :disabled="busy" @click="change('reset')">{{ t('apiKey.reset') }}</el-button>
       </div>
-      <el-button v-else-if="!busy" size="small" :icon="Refresh" @click="load">重新加载状态</el-button>
+      <el-button v-else-if="!busy" size="small" :icon="Refresh" @click="load">{{ t('apiKey.reload') }}</el-button>
     </header>
-    <el-dialog :model-value="!!key" title="新 API 密钥" width="min(540px, 92vw)" append-to-body destroy-on-close
+    <el-dialog :model-value="!!key" :title="t('apiKey.newKey')" width="min(540px, 92vw)" append-to-body destroy-on-close
       :close-on-click-modal="false" @close="key = ''">
-      <p class="key-notice">密钥仅显示一次，请立即复制并妥善保管。关闭后无法再次查看；如未保存，请重置密钥。</p>
+      <p class="key-notice">{{ t('apiKey.notice') }}</p>
       <code class="issued-key">{{ key }}</code>
       <template #footer>
-        <el-button :icon="CopyDocument" @click="copy(key)">{{ copied ? '已复制' : '复制密钥' }}</el-button>
-        <el-button type="primary" @click="key = ''">关闭</el-button>
+        <el-button :icon="CopyDocument" @click="copy(key)">{{ t(copied ? 'apiKey.copied' : 'apiKey.copy') }}</el-button>
+        <el-button type="primary" @click="key = ''">{{ t('apiKey.close') }}</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="help" title="API 密钥使用说明" width="min(640px, 92vw)" append-to-body>
+    <el-dialog v-model="help" :title="t('apiKey.helpTitle')" width="min(640px, 92vw)" append-to-body>
       <article class="key-guide" v-html="guideHtml" />
     </el-dialog>
   </section>

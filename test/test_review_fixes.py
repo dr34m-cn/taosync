@@ -720,6 +720,25 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         self.assertNotIn(change('enable')['key'], (first, second))
         rejected(second)
 
+    def test_api_key_errors_follow_request_language(self):
+        path = '/svr/settings/api-key'
+        headers = {**JSON_HEADERS, 'Cookie': self._login_cookie()}
+        enabled = self.fetch(path, method='PUT', headers=headers, body=json.dumps({'action': 'enable'}))
+        retired = json.loads(enabled.body)['data']['key']
+        self.fetch(path, method='PUT', headers=headers, body=json.dumps({'action': 'disable'}))
+        for lang, invalid, unknown, disabled in (
+                ('en', 'API key is invalid or disabled', 'Unknown API key action', 'Enable the API key first'),
+                ('zh-CN', 'API 密钥无效或已禁用', '未知的 API 密钥操作', '请先开启 API 密钥')):
+            with self.subTest(lang=lang):
+                res = self.fetch('/svr/user', headers={'Accept-Language': lang, 'Authorization': retired})
+                self.assertEqual(res.code, 401)
+                self.assertEqual(json.loads(res.body), {'code': 401, 'data': None, 'msg': invalid})
+                for action, message in (('unknown', unknown), ('reset', disabled)):
+                    res = self.fetch(path, method='PUT', headers={**headers, 'Accept-Language': lang},
+                                     body=json.dumps({'action': action}))
+                    self.assertEqual(res.code, 200)
+                    self.assertEqual(json.loads(res.body), {'code': 500, 'data': None, 'msg': message})
+
     def test_existing_unprefixed_api_key_remains_valid_until_reset(self):
         legacy = 'a' * 64
         sqlBase.execute_insert('insert into api_key(slot, userId, digest) values (1, 1, ?)',

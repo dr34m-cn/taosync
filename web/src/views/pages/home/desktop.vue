@@ -495,7 +495,7 @@ onMounted(() => {
         <template #default="props">
           <div class="form-box">
             <div class="form-box-item">
-              <div class="form-box-item-label">作业ID</div>
+              <div class="form-box-item-label">{{ $t('home.jobId') }}</div>
               <div class="form-box-item-value">{{ props.row.id }}</div>
             </div>
             <div class="form-box-item">

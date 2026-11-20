@@ -118,6 +118,7 @@ jobLinks:
   confirmClear: "Clear the dispatch log for this link?"
   confirmClearAll: "Clear dispatch logs for all job links?"
 home:
+  jobId: Job ID
   jobManagement: Job Management
   mobileJobCount: "{count} jobs"
   mobileEmpty: No jobs yet. Create your first sync job.
@@ -270,6 +271,10 @@ current:
   abortConfirm: Running or waiting items will be canceled. Completed items are not affected. Continue?
   abortSent: Abort command sent. Please wait.
 taskDetail:
+  retryQueued: Waiting to retry
+  retrySucceeded: Retry succeeded
+  retryFailed: Retry failed
+  retryStatus: 'Retry: {status}'
   mobileItemCount: "{count} file tasks"
   mobileNoItems: No matching file tasks
   title: Task Details
@@ -442,6 +447,8 @@ engine:
   tokenRule: Please enter token copied from AList admin settings
   deleteConfirm: This engine will be permanently deleted. Make sure no job is using it. Continue?
 notify:
+  onlyFailed: Notify only on failure
+  remark: Notification note
   loading: Loading
   empty: No notification config yet. Add one.
   add: Add
@@ -524,6 +531,21 @@ pathSelect:
   invalidName: Enter a single folder name
   title: Select Directory
   selectFirst: Select a path first
+apiKey:
+  title: API key
+  help: Usage guide
+  helpTitle: API key usage guide
+  enable: Enable API key
+  reset: Reset
+  reload: Reload status
+  confirmHint: Scripts using the current key will no longer be able to call the API.
+  resetTitle: Reset API key?
+  disableTitle: Disable API key?
+  newKey: New API key
+  notice: This key is shown only once. Copy it now and store it securely. If you close this dialog without saving the key, reset it to get a new one.
+  copy: Copy key
+  copied: Copied
+  close: Close
 https:
   enable: Enable HTTPS on port 8025
   certificate: Certificate chain (PEM)

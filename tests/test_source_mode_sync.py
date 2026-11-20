@@ -519,20 +519,19 @@ class SourceModeEditTest(unittest.TestCase):
     def runEdit(self, oldJob, newJob, updateSideEffect=None):
         oldClient = SimpleNamespace(job=oldJob, stopJob=mock.Mock(), runLock=threading.Lock())
         newClient = SimpleNamespace(jobId=8, stopJob=mock.Mock())
-        restoredClient = SimpleNamespace(jobId=8, stopJob=mock.Mock())
         originalClients = jobService.jobClientList
         jobService.jobClientList = {8: oldClient}
         try:
             with mock.patch.object(jobService, 'getJobClientById', return_value=oldClient), \
                     mock.patch.object(jobService.storageService, 'getEngineById', return_value={'engineType': 'alist'}), \
-                    mock.patch.object(jobService.jobClient, 'JobClient', side_effect=[newClient, restoredClient]) as clientFactory, \
+                    mock.patch.object(jobService.jobClient, 'JobClient', return_value=newClient) as clientFactory, \
                     mock.patch.object(jobService.jobMapper, 'updateJob', side_effect=updateSideEffect) as updateJob:
                 if updateSideEffect is None:
                     jobService.editJobClient(newJob)
                 else:
                     with self.assertRaises(Exception):
                         jobService.editJobClient(newJob)
-                return oldClient, newClient, restoredClient, clientFactory, updateJob, jobService.jobClientList.get(8)
+                return oldClient, newClient, clientFactory, updateJob, jobService.jobClientList.get(8)
         finally:
             jobService.jobClientList = originalClients
 
@@ -540,7 +539,7 @@ class SourceModeEditTest(unittest.TestCase):
         oldJob = self.completeJob()
         newJob = {**oldJob, 'sourceMode': 1}
 
-        _old, _new, _restored, _factory, updateJob, registered = self.runEdit(oldJob, newJob)
+        _old, _new, _factory, updateJob, registered = self.runEdit(oldJob, newJob)
 
         updateJob.assert_called_once_with(newJob, clearSourceSnapshot=False)
         self.assertIsNotNone(registered)
@@ -549,22 +548,22 @@ class SourceModeEditTest(unittest.TestCase):
         oldJob = self.completeJob()
         newJob = {**oldJob, 'srcPath': '/new-source/'}
 
-        _old, _new, _restored, _factory, updateJob, _registered = self.runEdit(oldJob, newJob)
+        _old, _new, _factory, updateJob, _registered = self.runEdit(oldJob, newJob)
 
         updateJob.assert_called_once_with(newJob, clearSourceSnapshot=True)
 
-    def test_failed_update_stops_new_client_and_restores_old_configuration(self):
+    def test_failed_update_stops_new_client_and_keeps_old_client(self):
         oldJob = self.completeJob()
         newJob = {**oldJob, 'dstPath': '/new-target/'}
 
-        oldClient, newClient, restoredClient, clientFactory, _update, registered = self.runEdit(
+        oldClient, newClient, clientFactory, _update, registered = self.runEdit(
             oldJob, newJob, updateSideEffect=RuntimeError('database failed')
         )
 
-        oldClient.stopJob.assert_called_once_with(remove=True)
+        oldClient.stopJob.assert_not_called()
         newClient.stopJob.assert_called_once_with(remove=True)
-        self.assertEqual(clientFactory.call_args_list[1].args[0], oldJob)
-        self.assertIs(registered, restoredClient)
+        clientFactory.assert_called_once_with(newJob, runLock=oldClient.runLock)
+        self.assertIs(registered, oldClient)
 
 
 class JobRunLockTest(unittest.TestCase):

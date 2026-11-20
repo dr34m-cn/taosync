@@ -407,7 +407,7 @@ onMounted(getJobList);
         </div>
 
         <div class="job-meta">
-          <div><span>作业ID</span><strong>{{ item.id }}</strong></div>
+          <div><span>{{ $t('home.jobId') }}</span><strong>{{ item.id }}</strong></div>
           <div>
             <span>{{ $t("home.methodView") }}</span>
             <strong>{{ methodText(item.method) }}</strong>

@@ -4,6 +4,7 @@ import re
 import secrets
 
 from common import sqlBase
+from common.LNG import G
 
 
 def _digest(key):
@@ -21,7 +22,7 @@ def change(conn, action, userId):
         conn.commit()
         return {'enabled': False}
     if action not in ('enable', 'reset'):
-        raise ValueError('未知的 API 密钥操作')
+        raise ValueError(G('api_key_unknown_action'))
     key = 't-' + secrets.token_hex(32)
     if action == 'enable':
         updated = conn.execute('insert or ignore into api_key(slot, userId, digest) values (1, ?, ?)',
@@ -29,7 +30,7 @@ def change(conn, action, userId):
     else:
         updated = conn.execute('update api_key set digest=?, userId=? where slot=1', (_digest(key), userId))
         if not updated.rowcount:
-            raise ValueError('请先开启 API 密钥')
+            raise ValueError(G('api_key_enable_first'))
     conn.commit()
     return {'enabled': True, **({'key': key} if updated.rowcount else {})}
 
