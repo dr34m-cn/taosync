@@ -1,15 +1,15 @@
+import asyncio
 import os
 import platform
-import re
 import sys
 from pathlib import Path
 
-import requests
+from apiServer.trust_manifest import MAX_MANIFEST_BYTES, SHA256, parse_manifest
 
 from service.system import updateLauncher as launcher
 
 MAX_BYTES = 256 * 1024 * 1024
-RELEASES = 'https://github.com/dr34m-cn/taosync/releases'
+TRUST_URLS = ('https://taoapi.dr34m.cn/auth.json', 'https://dr34m-cn.github.io/taosync/auth.json')
 
 
 def platform_target():
@@ -30,40 +30,56 @@ def supported():
 
 def info():
     enabled = supported()
-    return {'architecture': platform.machine() or '未知', 'target': platform_target(),
+    return {'architecture': platform.machine(), 'target': platform_target(),
             'supported': enabled, 'maxBytes': MAX_BYTES, 'pinned': bool(os.getenv('TAO_UPDATE_SHA256')),
             'container': Path('/.dockerenv').exists(),
             'result': launcher.read_json(Path(os.environ['TAO_UPDATE_CHANNEL']) / 'result') if enabled else {}}
 
 
-def trusted_digest():
-    pinned = os.getenv('TAO_UPDATE_SHA256')
-    if pinned:
-        if not re.fullmatch('[a-fA-F0-9]{64}', pinned):
-            raise ValueError('部署时配置的 TAO_UPDATE_SHA256 无效')
-        return pinned.lower()
+async def fetch_manifest(url):
+    # Source/Android deployments do not use or need the executable update transport.
+    import httpx
+
     try:
-        with requests.get(f'{RELEASES}/latest/download/taoSync-checksums.txt', timeout=(5, 15), stream=True) as res:
-            res.raise_for_status()
-            # The upload never supplies a URL or a trusted digest.
-            manifest = res.raw.read(16385, decode_content=True)
-            if len(manifest) > 16384:
-                raise ValueError('发布校验清单过大')
-    except (requests.RequestException, OSError) as exc:
-        raise ValueError('无法获取最新正式版的校验清单，请检查网络；离线部署可预设 TAO_UPDATE_SHA256') from exc
-    for line in manifest.decode('ascii').splitlines():
-        fields = line.split()
-        if len(fields) == 2 and fields[1] == platform_target() and re.fullmatch('[0-9a-f]{64}', fields[0]):
-            return fields[0]
-    raise ValueError('该版本没有适用于当前平台的可执行文件')
+        async with asyncio.timeout(20), httpx.AsyncClient(follow_redirects=False) as client:
+            async with client.stream('GET', url, headers={'Accept-Encoding': 'identity'}) as res:
+                res.raise_for_status()
+                raw = bytearray()
+                async for chunk in res.aiter_bytes(chunk_size=65536):
+                    if len(raw) + len(chunk) > MAX_MANIFEST_BYTES:
+                        raise ValueError('manifest too large')
+                    raw.extend(chunk)
+                return parse_manifest(raw)
+    except (httpx.HTTPError, OSError) as exc:
+        raise ValueError('manifest unavailable') from exc
 
 
-def install_verified(upload, digest, expected, request_id):
-    if digest != expected:
-        raise ValueError('校验未通过，请选择对应平台发布包内解压出的 TaoSync 可执行文件')
+async def verify_digest(digest):
+    pinned = os.getenv('TAO_UPDATE_SHA256', '').lower()
+    if SHA256.fullmatch(pinned) and digest == pinned:
+        return
+    tasks = [asyncio.create_task(fetch_manifest(url)) for url in TRUST_URLS]
+    try:
+        for completed in asyncio.as_completed(tasks):
+            try:
+                rows = await completed
+            except ValueError:
+                continue
+            target = platform_target()
+            if any(arch == target and sha == digest for _, arch, sha in rows):
+                return
+            raise ValueError('update_not_trusted')
+        raise ValueError('update_trust_unavailable')
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def install_verified(upload, digest, request_id):
     dest = launcher.slot(upload.parent, digest)
     if dest == launcher.executable():
-        raise ValueError('当前已在运行这个程序')
+        raise ValueError('update_already_running')
     upload.chmod(0o700)
     os.replace(upload, dest)
     try:

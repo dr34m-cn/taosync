@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import io
 import json
@@ -14,6 +15,7 @@ from unittest.mock import Mock, patch
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
+from apiServer.trust_manifest import encode_manifest, parse_manifest
 from controller.updateController import ProgramUpload
 from service.syncJob import jobClient
 from service.system import programUpdate as update, updateLauncher as launcher
@@ -31,6 +33,7 @@ class UploadTest(AsyncHTTPTestCase):
         self.enterContext(patch.dict(os.environ, TAO_UPDATE_CHANNEL=str(root),
                                      TAO_UPDATE_DIR=str(self.directory), TAO_UPDATE_SHA256=DIGEST))
         self.enterContext(patch.object(update.sys, 'frozen', True, create=True))
+        self.mirrors = self.enterContext(patch.object(update, 'fetch_manifest', side_effect=ValueError('offline')))
         self.auth = self.enterContext(patch.object(ProgramUpload, 'authenticated', return_value=True))
         self.restart = Mock()
         self.addCleanup(jobClient.cancelProgramUpdate)
@@ -50,6 +53,22 @@ class UploadTest(AsyncHTTPTestCase):
                          {'id': json.loads(res.body)['data']['id'], 'digest': DIGEST})
         self.restart.assert_called_once()
         self.assertFalse(jobClient.acquireRun(threading.Lock()))
+        self.mirrors.assert_not_called()
+
+    def test_online_file_is_accepted_with_a_different_pin(self):
+        self.mirrors.side_effect = None
+        self.mirrors.return_value = [('v1-dev', update.platform_target(), DIGEST)]
+        with patch.dict(os.environ, TAO_UPDATE_SHA256='a' * 64):
+            self.assertEqual(self.upload().code, 200)
+        self.restart.assert_called_once()
+
+    def test_offline_pin_miss_never_stages_or_restarts(self):
+        res = self.upload(headers={**HEADERS, 'Accept-Language': 'en'}, body=b'untrusted')
+        self.assertEqual(res.code, 400)
+        self.assertIn('Neither trust source', json.loads(res.body)['msg'])
+        self.assertEqual(self.mirrors.await_count, 2)
+        self.assertEqual(list(self.directory.iterdir()), [])
+        self.restart.assert_not_called()
 
     def test_authentication_and_non_simple_request_required_before_staging(self):
         self.auth.return_value = False
@@ -92,16 +111,54 @@ class ReleaseTest(unittest.TestCase):
             self.assertCountEqual(list(manifest(root, 'v1')), [(DIGEST, target) for target in
                              ('darwin-arm64', 'linux-StaticX-arm32', 'linux-arm-v7', 'windows-amd64')])
 
-    def test_only_trusts_matching_target_in_latest_official_manifest(self):
-        with patch.dict(os.environ, {'TAO_UPDATE_SHA256': ''}), patch.object(update.requests, 'get') as get, \
-                patch.object(update, 'platform_target', return_value='linux-arm-v7'):
-            response = get.return_value.__enter__.return_value
-            response.raw.read.return_value = f'{DIGEST} linux-arm-v7\n'.encode()
-            self.assertEqual(update.trusted_digest(), DIGEST)
-            self.assertEqual(get.call_args.args, (update.RELEASES + '/latest/download/taoSync-checksums.txt',))
-            response.raw.read.return_value = f'{DIGEST} linux-amd64\n'.encode()
-            with self.assertRaises(ValueError):
-                update.trusted_digest()
+            (root / 'taoSync-v1-android-debug.apk').write_bytes(PAYLOAD)
+            self.assertIn((DIGEST, 'android-arm64-v8a+armeabi-v7a'), list(manifest(root, 'v1', True)))
+
+
+class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
+    async def test_first_valid_list_wins_even_on_miss_and_closes_other_request(self):
+        started, cancelled = asyncio.Event(), asyncio.Event()
+        async def fetch(url):
+            if url == 'https://taoapi.dr34m.cn/auth.json':
+                started.set()
+                try:
+                    await asyncio.Future()
+                finally:
+                    cancelled.set()
+            self.assertEqual(url, 'https://dr34m-cn.github.io/taosync/auth.json')
+            await started.wait()
+            return [('v1', 'other', DIGEST)]
+        with patch.dict(os.environ, TAO_UPDATE_SHA256=''), patch.object(update, 'fetch_manifest', fetch):
+            with self.assertRaisesRegex(ValueError, 'update_not_trusted'):
+                await asyncio.wait_for(update.verify_digest(DIGEST), 1)
+        self.assertTrue(cancelled.is_set())
+
+    async def test_bad_first_json_then_history_across_versions_with_optional_pin(self):
+        sha2, pin = 'b' * 64, 'c' * 64
+        async def fetch(url):
+            if url == update.TRUST_URLS[0]:
+                return parse_manifest(b'{"entries":[]}')
+            await asyncio.sleep(0)
+            return parse_manifest(encode_manifest([('v1-dev', 'target', DIGEST), ('v2-pre', 'target', sha2),
+                                                    ('v2', 'wrong', 'd' * 64)]))
+        with patch.object(update, 'fetch_manifest', fetch), patch.object(update, 'platform_target', return_value='target'):
+            for configured in ('', 'typo', pin.upper()):
+                with patch.dict(os.environ, TAO_UPDATE_SHA256=configured):
+                    for digest in (DIGEST, sha2):
+                        await update.verify_digest(digest)
+                    with self.assertRaisesRegex(ValueError, 'update_not_trusted'):
+                        await update.verify_digest('d' * 64)
+
+    async def test_offline_only_valid_pin_can_allow_a_file(self):
+        for pin in ('', 'invalid', DIGEST.upper()):
+            with patch.dict(os.environ, TAO_UPDATE_SHA256=pin), patch.object(update, 'fetch_manifest', side_effect=ValueError) as get:
+                if pin == DIGEST.upper():
+                    await update.verify_digest(DIGEST)
+                    get.assert_not_called()
+                else:
+                    with self.assertRaises(ValueError):
+                        await update.verify_digest(DIGEST)
+                    self.assertEqual(get.await_count, 2)
 
 
 class LauncherTest(unittest.TestCase):

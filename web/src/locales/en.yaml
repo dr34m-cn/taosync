@@ -598,3 +598,32 @@ time:
   hour: h
   minute: m
   second: s
+programUpdate:
+  title: Program update
+  loading: Checking deployment…
+  target: Build target
+  arch: Processor architecture
+  online: Registered development, prerelease and stable builds for this platform are accepted.
+  registry: View trusted builds
+  pin: A match with the SHA-256 configured for this deployment is accepted without a network request. Other files are checked against the online registry.
+  container: Updates survive container restarts. Recreating the container uses the selected image.
+  unsupported: For source and mobile deployments, use the original installation method to update.
+  source: 'Never upload an executable from an unknown source. Official downloads:'
+  drop: Drop an executable here or
+  select: choose a file
+  hint: Extract the executable first. Maximum size is 256 MiB.
+  install: Update and restart
+  confirmTitle: Confirm program update
+  confirm: Installing {name} will restart TaoSync and reload the page. Save any unsaved settings first.
+  readError: Could not read program status
+  noReceipt: No update receipt was received
+  fileSize: Select a non-empty executable no larger than 256 MiB.
+  uploading: Uploading…
+  verifying: Verifying executable…
+  restarting: File verified. Waiting for the service to restart…
+  started: The new program has started. Reloading the page…
+  rollback: The new program failed to start. The previous version was restored.
+  unknown: Startup has not been confirmed. Check the service logs or try again.
+  complete: Update complete. The new page has loaded.
+  stopWait: Stop waiting
+  reload: Reload now

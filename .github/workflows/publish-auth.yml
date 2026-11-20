@@ -1,0 +1,78 @@
+name: 登记构建授信
+
+on:
+  workflow_run:
+    workflows: ['构建']
+    types: [completed]
+
+jobs:
+  publish-auth:
+    name: 汇总并登记实际构建的程序
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    outputs:
+      revision: ${{ steps.publish.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+      # Read the built revision's version file; run scripts only from the default branch.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          path: build-metadata
+          sparse-checkout: version.txt
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - id: publish
+        run: |
+          VERSION=$(head -n 1 build-metadata/version.txt | cut -d, -f1 | tr -d '\r')
+          python3 scripts/release-checksums.py collect dist "$VERSION" "$RUNNER_TEMP/delta.json"
+          if [[ -f "$RUNNER_TEMP/delta.json" ]]; then
+            bash scripts/publish-trust.sh "$RUNNER_TEMP/delta.json"
+          fi
+
+  mirror-auth:
+    name: 推送已提交的完整授信清单
+    needs: publish-auth
+    if: ${{ !cancelled() && needs.publish-auth.outputs.revision != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.publish-auth.outputs.revision }}
+          persist-credentials: false
+      - name: 同步至 apiServer
+        env:
+          PUSH_KEY: ${{ secrets.TAOSYNC_TRUST_API_KEY }}
+        run: |
+          : "${PUSH_KEY:?Missing TAOSYNC_TRUST_API_KEY}"
+          status=$(curl --disable --silent --show-error --fail --retry 4 --max-time 60 \
+            --output /dev/null --write-out '%{http_code}' --header "Authorization: Bearer $PUSH_KEY" \
+            --header 'Content-Type: application/json' --data-binary @auth.json \
+            https://taoapi.dr34m.cn/v1/trust/manifest)
+          test "$status" = 204
+
+  deploy-auth:
+    needs: publish-auth
+    if: ${{ !cancelled() && needs.publish-auth.outputs.revision != '' }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/auth-pages.yml

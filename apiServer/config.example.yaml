@@ -7,6 +7,11 @@ server:
   max_sessions_per_ip: 10
   trust_proxy_headers: true
 
+trust:
+  # Generate a separate random key (32-256 ASCII characters); leave empty to disable writes.
+  # Set the same value in the GitHub Actions secret TAOSYNC_TRUST_API_KEY.
+  api_key: ''
+
 aliyun:
   client_id: replace-with-app-id
   client_secret: replace-with-app-secret

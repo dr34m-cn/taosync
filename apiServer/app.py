@@ -18,6 +18,11 @@ import tornado.ioloop
 import tornado.web
 import yaml
 
+if __package__:
+    from .trust import PublicManifest, TrustIndex, TrustPush
+else:
+    from trust import PublicManifest, TrustIndex, TrustPush
+
 try:
     import qrcode
 except ImportError:  # pragma: no cover - only the standalone service needs it
@@ -52,6 +57,10 @@ def load_config(path):
         raw = yaml.safe_load(stream) or {}
     server = dict(raw.get("server") or {})
     aliyun = dict(raw.get("aliyun") or {})
+    push_key = (raw.get('trust') or {}).get('api_key') or ''
+    if push_key and (not isinstance(push_key, str) or not 32 <= len(push_key) <= 256
+                     or not push_key.isascii() or not push_key.isprintable() or ' ' in push_key):
+        raise ValueError('trust.api_key must be 32 to 256 printable ASCII characters without spaces')
     public_base_url = _validated_url(
         "server.public_base_url", server.get("public_base_url"), allow_loopback_http=True
     )
@@ -67,6 +76,7 @@ def load_config(path):
         callback_url = public_base_url + "/v1/aliyun/callback"
     callback_url = _validated_url("aliyun.callback_url", callback_url, allow_loopback_http=True)
     return {
+        'trust': {'api_key': push_key, 'database': config_path.resolve().with_name('trust.db')},
         "server": {
             "host": str(server.get("host") or "0.0.0.0"),
             "port": int(server.get("port") or 8030),
@@ -569,8 +579,12 @@ def make_app(config, oauth=None, store=None):
         ttl=server["session_ttl"], max_sessions_per_ip=server["max_sessions_per_ip"]
     )
     args = {"oauth": oauth, "store": store}
+    trust = config.get('trust', {})
     return tornado.web.Application(
         [
+            (r"/(?:index\.html)?", TrustIndex),
+            (r"/auth\.json", PublicManifest),
+            (r"/v1/trust/manifest", TrustPush),
             (r"/health", HealthHandler, args),
             (r"/v1/aliyun/sessions", SessionCreateHandler, args),
             (r"/v1/aliyun/sessions/([^/]+)", SessionStatusHandler, args),
@@ -579,6 +593,8 @@ def make_app(config, oauth=None, store=None):
             (r"/v1/aliyun/token/refresh", RefreshHandler, args),
         ],
         debug=False,
+        trust_database=trust.get('database', 'data/trust.db'),
+        trust_api_key=trust.get('api_key', ''),
     )
 
 

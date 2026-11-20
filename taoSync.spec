@@ -15,7 +15,7 @@ a = Analysis(
         ('web/dist/', 'front'),
         ('locales/', 'locales'),
     ] + ([('build-target.txt', '.')] if Path('build-target.txt').is_file() else []) + charset_datas,
-    hiddenimports=charset_hiddenimports,
+    hiddenimports=charset_hiddenimports + ['anyio._backends._asyncio'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

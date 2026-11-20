@@ -1,0 +1,34 @@
+name: 部署授信列表到 GitHub Pages
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: auth-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Read the latest branch after acquiring the deployment slot, not an older run's SHA.
+      - uses: actions/checkout@v4
+        with:
+          ref: auth
+          persist-credentials: false
+      - name: 仅部署静态清单和页面
+        run: |
+          mkdir "$RUNNER_TEMP/site"
+          cp auth.json index.html "$RUNNER_TEMP/site/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+      - id: deployment
+        uses: actions/deploy-pages@v4

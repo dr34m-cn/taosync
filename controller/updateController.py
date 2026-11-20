@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import os
 import tempfile
@@ -8,6 +7,7 @@ from pathlib import Path
 
 from tornado.web import stream_request_body
 
+from common.locales import t
 from controller.baseController import BaseHandler, handle_request
 from service.syncJob import jobClient
 from service.system import programUpdate as update
@@ -31,7 +31,7 @@ class ProgramUpload(BaseHandler):
 
     def reject(self, message, code=400):
         self.set_status(code)
-        self.finish({'code': code, 'data': None, 'msg': message})
+        self.finish({'code': code, 'data': None, 'msg': t(message, self.request.headers.get('Accept-Language', 'zh_CN'))})
 
     def authenticated(self):
         return self.authenticated_user() is not None
@@ -39,19 +39,19 @@ class ProgramUpload(BaseHandler):
     def prepare(self):
         headers = self.request.headers
         if self.request.method != 'POST':
-            return self.reject('不支持的请求方式', 405)
+            return self.reject('update_method', 405)
         if not self.authenticated():
-            return self.reject('请先登录', 401)
+            return self.reject('sign_in', 401)
         # Browsers cannot send this custom header cross-origin without an approved preflight.
         if headers.get('X-TaoSync-Update') != '1' or headers.get('Content-Type') != 'application/octet-stream':
-            return self.reject('请从系统设置上传可执行文件', 403)
+            return self.reject('update_headers', 403)
         if not update.supported() or 'restart_for_update' not in self.settings:
-            return self.reject('当前部署不支持可执行文件更新', 409)
+            return self.reject('update_unsupported', 409)
         length = headers.get('Content-Length', '')
         if not length.isdigit() or not 0 < int(length) <= update.MAX_BYTES:
-            return self.reject('文件为空或超过大小限制', 413)
+            return self.reject('update_size', 413)
         if not self.lock.acquire(blocking=False):
-            return self.reject('已有更新正在进行', 409)
+            return self.reject('update_busy', 409)
         self.owns_lock = True
         self.request.connection.set_max_body_size(update.MAX_BYTES)
         self.request.connection.set_body_timeout(600)
@@ -62,7 +62,7 @@ class ProgramUpload(BaseHandler):
             self.temporary = Path(self.stream.name)
             self.digest = hashlib.sha256()
         except OSError:
-            self.reject('无法暂存文件，请检查安装目录的写权限和可用空间', 507)
+            self.reject('update_stage_failed', 507)
 
     def data_received(self, chunk):
         if self._finished:
@@ -71,7 +71,7 @@ class ProgramUpload(BaseHandler):
             self.stream.write(chunk)
             self.digest.update(chunk)
         except OSError:
-            self.reject('写入更新文件失败，请检查可用空间', 507)
+            self.reject('update_write_failed', 507)
 
     async def post(self):
         if self._finished:
@@ -82,19 +82,17 @@ class ProgramUpload(BaseHandler):
             self.stream.flush()
             os.fsync(self.stream.fileno())
             self.stream.close()
-            expected = await asyncio.to_thread(update.trusted_digest)
+            digest = self.digest.hexdigest()
+            await update.verify_digest(digest)
             if self.request.connection.stream.closed():
                 return
             if not self.authenticated():
-                return self.reject('登录已失效，请重新登录', 401)
-            digest = self.digest.hexdigest()
-            if digest != expected:
-                return self.reject('校验未通过，请选择对应平台发布包内解压出的 TaoSync 可执行文件')
+                return self.reject('login_expired', 401)
             attempt = uuid.uuid4().hex
             # Check and freeze manual/scheduled starts as a single operation.
             jobClient.beginProgramUpdate()
             try:
-                update.install_verified(self.temporary, digest, expected, attempt)
+                update.install_verified(self.temporary, digest, attempt)
                 committed = True
             finally:
                 if not committed:

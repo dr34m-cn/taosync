@@ -116,3 +116,13 @@ invalid_username: "用户名不能为空，最多64个字符，不能包含控�
 invalid_directory_name: "请输入有效的目录名"
 root_directory_creation_forbidden: "不能在根目录下新建目录"
 directory_name_exists: "该位置已存在同名文件或目录"
+update_method: 不支持的请求方式
+update_headers: 请从系统设置上传可执行文件
+update_unsupported: 当前部署不支持可执行文件更新
+update_size: 文件为空或超过大小限制
+update_busy: 有同步任务或更新正在进行，请稍后重试
+update_stage_failed: 无法暂存文件，请检查安装目录的写权限和可用空间
+update_write_failed: 写入更新文件失败，请检查可用空间
+update_trust_unavailable: 无法从两个授信来源取得有效清单，未安装更新。请检查网络后重试。
+update_not_trusted: 文件的 SHA-256 未列入当前平台的授信记录，请选择对应平台已解压的可执行文件。
+update_already_running: 当前已在运行这个程序

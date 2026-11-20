@@ -116,3 +116,13 @@ invalid_username: "Username must contain 1 to 64 characters without control char
 invalid_directory_name: "Enter a valid folder name"
 root_directory_creation_forbidden: "Cannot create a folder in the root directory"
 directory_name_exists: "A file or folder with this name already exists"
+update_method: Unsupported request method
+update_headers: Upload the executable from System Settings
+update_unsupported: This deployment does not support executable updates
+update_size: The file is empty or exceeds the size limit
+update_busy: A sync job or update is in progress. Try again later.
+update_stage_failed: Cannot stage the file. Check the installation directory permissions and free space.
+update_write_failed: Cannot write the update. Check the available disk space.
+update_trust_unavailable: Neither trust source returned a valid registry. No update was installed. Check your connection and try again.
+update_not_trusted: This SHA-256 is not registered for the current platform. Select the extracted executable for this platform.
+update_already_running: This executable is already running

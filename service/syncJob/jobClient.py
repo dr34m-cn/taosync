@@ -56,7 +56,7 @@ def beginProgramUpdate():
     global _updating
     with _runGate:
         if _updating or any(lock.locked() for lock in _runLocks):
-            raise ValueError('有同步任务或更新正在进行，请稍后重试')
+            raise ValueError('update_busy')
         _updating = True
 
 

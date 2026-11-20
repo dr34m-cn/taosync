@@ -598,3 +598,32 @@ time:
   hour: 小时
   minute: 分钟
   second: 秒
+programUpdate:
+  title: 程序更新
+  loading: 正在读取运行环境…
+  target: 发布平台
+  arch: 处理器架构
+  online: 允许安装授信清单中与当前平台匹配的开发版、预发布版和正式版。
+  registry: 查看授信列表
+  pin: 优先校验部署时指定的 SHA-256，匹配时无需联网；不匹配时查询在线授信清单。
+  container: 更新在当前容器重启后保留；重建容器会使用所选镜像的版本。
+  unsupported: 当前为源码或移动端部署，请通过原安装方式更新。
+  source: 切勿上传来历不明的程序。官方下载：
+  drop: 将可执行文件拖到此处，或
+  select: 点击选择
+  hint: 请先解压发布包，文件最大 256 MiB
+  install: 更新并重启
+  confirmTitle: 确认更新程序
+  confirm: 安装 {name} 后将重启 TaoSync 并刷新页面。请先保存尚未提交的设置。
+  readError: 无法读取程序状态
+  noReceipt: 未收到更新确认
+  fileSize: 请选择非空且不超过 256 MiB 的可执行文件。
+  uploading: 正在上传…
+  verifying: 正在校验可执行文件…
+  restarting: 文件已校验，正在等待服务重新启动…
+  started: 新程序已启动，正在载入新版页面…
+  rollback: 新程序启动失败，已恢复到可用版本。
+  unknown: 尚未确认启动结果，请检查服务日志或重新查询。
+  complete: 更新完成，新版页面已载入。
+  stopWait: 结束等待
+  reload: 立即载入新版页面

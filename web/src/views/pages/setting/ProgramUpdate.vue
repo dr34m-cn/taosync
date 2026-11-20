@@ -3,7 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import { Refresh, Upload, UploadFilled, Warning } from '@element-plus/icons-vue';
 import axios from 'axios';
+import { useI18n } from 'vue-i18n';
 
+const { t, locale } = useI18n();
 const endpoint = '/svr/settings/update';
 const info = ref(null);
 const files = ref([]);
@@ -27,13 +29,13 @@ function reloadFrontend(id) {
 async function status() {
   // Restart polling is deliberately quiet: a closed socket is expected here.
   const { data } = await axios.get(endpoint, { signal, timeout: 3500 });
-  if (data.code !== 200) throw new Error(data.msg || '无法读取程序状态');
+  if (data.code !== 200) throw new Error(data.msg || t('programUpdate.readError'));
   return data.data;
 }
 
 async function waitForStart(id) {
   phase.value = 'restart';
-  message.value = '文件已校验，正在等待服务重新启动…';
+  message.value = t('programUpdate.restarting');
   const deadline = Date.now() + 180000;
   while (!signal.aborted && Date.now() < deadline) {
     try {
@@ -42,7 +44,7 @@ async function waitForStart(id) {
       if (result?.id === id && ['started', 'rollback'].includes(result.status)) {
         sessionStorage.removeItem(receiptKey);
         phase.value = result.status;
-        message.value = result.status === 'started' ? '新程序已启动，正在载入新版页面…' : '新程序启动失败，已恢复到可用版本。';
+        message.value = t(result.status === 'started' ? 'programUpdate.started' : 'programUpdate.rollback');
         files.value = [];
         if (result.status === 'started') refreshTimer = setTimeout(() => reloadFrontend(id), 1000);
         return;
@@ -52,7 +54,7 @@ async function waitForStart(id) {
   }
   if (!signal.aborted) {
     phase.value = 'unknown';
-    message.value = '尚未确认启动结果，请检查服务日志或重新查询。';
+    message.value = t('programUpdate.unknown');
   }
 }
 
@@ -66,7 +68,7 @@ async function load() {
     const url = new URL(window.location.href);
     const refreshed = url.searchParams.get('tao-update');
     message.value = refreshed && refreshed === info.value.result?.id && info.value.result.status === 'started'
-      ? '更新完成，新版页面已载入。' : '';
+      ? t('programUpdate.complete') : '';
     if (refreshed) {
       url.searchParams.delete('tao-update');
       window.history.replaceState(window.history.state, '', url.href);
@@ -86,7 +88,7 @@ function select(uploadFile) {
   message.value = '';
   if (!uploadFile.size || uploadFile.size > info.value.maxBytes) {
     files.value = [];
-    message.value = '请选择非空且不超过 256 MiB 的可执行文件。';
+    message.value = t('programUpdate.fileSize');
   } else {
     files.value = [uploadFile];
   }
@@ -96,8 +98,8 @@ async function install() {
   if (busy.value || !file.value) return;
   phase.value = 'confirm';
   try {
-    await ElMessageBox.confirm(`安装 ${file.value.name} 后将重启 TaoSync 并刷新页面。请先保存尚未提交的设置。`, '确认更新程序',
-      { type: 'warning', confirmButtonText: '更新并重启', cancelButtonText: '取消' });
+    await ElMessageBox.confirm(t('programUpdate.confirm', { name: file.value.name }), t('programUpdate.confirmTitle'),
+      { type: 'warning', confirmButtonText: t('programUpdate.install'), cancelButtonText: t('common.cancel') });
   } catch { phase.value = 'idle'; return; }
   progress.value = 0;
   phase.value = 'upload';
@@ -105,10 +107,10 @@ async function install() {
   try {
     const { data } = await axios.post(endpoint + '/upload', file.value, {
       signal, timeout: 600000,
-      headers: { 'Content-Type': 'application/octet-stream', 'X-TaoSync-Update': '1' },
+      headers: { 'Content-Type': 'application/octet-stream', 'X-TaoSync-Update': '1', 'Accept-Language': locale.value },
       onUploadProgress: event => { progress.value = Math.round(100 * event.loaded / file.value.size); },
     });
-    if (!data.data?.id) throw new Error(data.msg || '未收到更新确认');
+    if (!data.data?.id) throw new Error(data.msg || t('programUpdate.noReceipt'));
     sessionStorage.setItem(receiptKey, data.data.id);
     await waitForStart(data.data.id);
   } catch (error) {
@@ -123,40 +125,40 @@ onBeforeUnmount(() => { clearTimeout(refreshTimer); controller.abort(); });
 
 <template>
   <section class="program-update" aria-labelledby="program-update-title" :aria-busy="busy">
-    <h2 id="program-update-title" class="section-heading"><el-icon aria-hidden="true"><Upload /></el-icon>程序更新</h2>
-    <p v-if="phase === 'loading'">正在读取运行环境…</p>
+    <h2 id="program-update-title" class="section-heading"><el-icon aria-hidden="true"><Upload /></el-icon>{{ t('programUpdate.title') }}</h2>
+    <p v-if="phase === 'loading'">{{ t('programUpdate.loading') }}</p>
     <div v-if="info" class="update-layout" :class="{ 'supports-upload': info.supported }">
       <div class="deployment">
         <dl class="platform-info">
-          <dt>发布平台</dt><dd><code>{{ info.target }}</code></dd>
-          <dt>处理器架构</dt><dd><code>{{ info.architecture }}</code></dd>
+          <dt>{{ t('programUpdate.target') }}</dt><dd><code>{{ info.target }}</code></dd>
+          <dt>{{ t('programUpdate.arch') }}</dt><dd><code>{{ info.architecture || '—' }}</code></dd>
         </dl>
         <template v-if="info.supported">
-          <p v-if="info.pinned">离线校验：仅接受部署时指定 SHA-256 的程序。</p>
-          <p v-else>仅接受最新正式版中与当前平台匹配的可执行文件。</p>
-          <p v-if="info.container">更新在当前容器重启后保留；重建容器会使用所选镜像的版本。</p>
+          <p>{{ t('programUpdate.online') }} <a href="https://taoapi.dr34m.cn/" target="_blank" rel="noopener noreferrer">{{ t('programUpdate.registry') }}</a></p>
+          <p v-if="info.pinned">{{ t('programUpdate.pin') }}</p>
+          <p v-if="info.container">{{ t('programUpdate.container') }}</p>
         </template>
-        <p v-else>当前为源码或移动端部署，请通过原安装方式更新。</p>
-        <p class="source-warning"><el-icon aria-hidden="true"><Warning /></el-icon><span>切勿上传来历不明的可执行文件，建议从 <a href="https://github.com/dr34m-cn/taosync/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> 下载。</span></p>
+        <p v-else>{{ t('programUpdate.unsupported') }}</p>
+        <p class="source-warning"><el-icon aria-hidden="true"><Warning /></el-icon><span>{{ t('programUpdate.source') }} <a href="https://github.com/dr34m-cn/taosync/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a></span></p>
       </div>
       <div v-if="info.supported" class="update-controls">
         <el-upload :file-list="files" drag :auto-upload="false" :disabled="busy" :on-change="select" :on-remove="() => files = []">
           <el-icon :size="28" class="upload-icon" aria-hidden="true"><UploadFilled /></el-icon>
-          <div class="el-upload__text">将可执行文件拖到此处，或<em>点击选择</em></div>
-          <div class="upload-hint">请先解压发布包，文件最大 256 MiB</div>
+          <div class="el-upload__text">{{ t('programUpdate.drop') }} <em>{{ t('programUpdate.select') }}</em></div>
+          <div class="upload-hint">{{ t('programUpdate.hint') }}</div>
         </el-upload>
-        <el-button plain :icon="Refresh" :loading="busy" :disabled="!file || busy || phase === 'unknown'" @click="install">更新并重启</el-button>
+        <el-button plain :icon="Refresh" :loading="busy" :disabled="!file || busy || phase === 'unknown'" @click="install">{{ t('programUpdate.install') }}</el-button>
       </div>
     </div>
     <div role="status" aria-live="polite" class="update-status" :class="{ 'is-error': phase === 'error' || phase === 'rollback' }">
       <el-progress v-if="phase === 'upload'" :percentage="progress" />
-      <p v-if="phase === 'upload'">{{ progress < 100 ? '正在上传…' : '正在校验可执行文件…' }}</p>
+      <p v-if="phase === 'upload'">{{ t(progress < 100 ? 'programUpdate.uploading' : 'programUpdate.verifying') }}</p>
       <p v-if="message">{{ message }}</p>
     </div>
     <div v-if="phase === 'unknown' || phase === 'started' || (!info && phase === 'error')" class="recovery-actions">
-      <el-button v-if="phase === 'unknown' || (!info && phase === 'error')" :icon="Refresh" @click="load">重新查询</el-button>
-      <el-button v-if="phase === 'unknown'" @click="stopWaiting">结束等待</el-button>
-      <el-button v-if="phase === 'started'" :icon="Refresh" @click="reloadFrontend(info.result.id)">立即载入新版页面</el-button>
+      <el-button v-if="phase === 'unknown' || (!info && phase === 'error')" :icon="Refresh" @click="load">{{ t('retry') }}</el-button>
+      <el-button v-if="phase === 'unknown'" @click="stopWaiting">{{ t('programUpdate.stopWait') }}</el-button>
+      <el-button v-if="phase === 'started'" :icon="Refresh" @click="reloadFrontend(info.result.id)">{{ t('programUpdate.reload') }}</el-button>
     </div>
   </section>
 </template>

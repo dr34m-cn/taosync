@@ -1,4 +1,5 @@
 tornado==6.5.5
+httpx==0.28.1
 requests==2.33.0
 charset-normalizer>=3,<4
 APScheduler==3.11.0

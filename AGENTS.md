@@ -47,7 +47,7 @@ python scripts/run-backend-tests.py --shuffle-seed 42
 - Summarize only completed code changes since the most recent valid summary checkpoint in this conversation. If no valid checkpoint exists, summarize completed code changes from the beginning of the conversation. Do not repeat changes covered by an earlier checkpoint.
 - Describe implemented features and behavioral changes: what users can now do or what behavior changed. Omit file paths, function/class names, variables, code snippets, CSS properties, SQL, API parameters, and other implementation details unless they are the point of the change.
 - Use exactly these category prefixes: `add 增加了`, `update 更新了`, `fix 修复了`, and `remove 移除了`.
-- Return only a Markdown fenced code block containing one changelog line. Join every item with ` && `; do not insert line breaks within the changelog.
+- Return only one Markdown fenced code block with exactly two content lines and no blank line. Line 1 is one short Chinese sentence summarizing the changes, without a category prefix. Line 2 is the categorized changelog: join every item with ` && ` and do not insert line breaks within it.
 - Exclude acknowledgements, explanations, verification, tests, runtime status, memory or preference updates, environment details, and other non-code-change work. Do not include any text outside the code block.
-- Treat each valid single-line changelog response as the new summary checkpoint for subsequent summaries.
+- Treat each valid two-line summary as the new checkpoint for subsequent summaries; keep earlier valid checkpoints.
 
