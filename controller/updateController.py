@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import os
 import tempfile
@@ -11,6 +12,7 @@ from common.locales import t
 from controller.baseController import BaseHandler, handle_request
 from service.syncJob import jobClient
 from service.system import programUpdate as update
+from service.system.updatePackage import prepare_payload
 
 
 class UpdateInfo(BaseHandler):
@@ -82,7 +84,7 @@ class ProgramUpload(BaseHandler):
             self.stream.flush()
             os.fsync(self.stream.fileno())
             self.stream.close()
-            digest = self.digest.hexdigest()
+            digest = await asyncio.to_thread(prepare_payload, self.temporary, self.digest.hexdigest(), update.MAX_BYTES)
             await update.verify_digest(digest)
             if self.request.connection.stream.closed():
                 return
@@ -98,9 +100,13 @@ class ProgramUpload(BaseHandler):
                 if not committed:
                     jobClient.cancelProgramUpdate()
             await self.finish({'code': 200, 'data': {'id': attempt}, 'msg': ''})
-        except (ValueError, OSError) as exc:
+        except ValueError as exc:
             if not self._finished:
-                self.reject(str(exc))
+                message = str(exc)
+                self.reject(message, 413 if message in ('update_size', 'update_archive_limit') else 400)
+        except OSError:
+            if not self._finished:
+                self.reject('update_write_failed', 507)
         finally:
             self.cleanup()
             if committed:

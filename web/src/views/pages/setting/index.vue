@@ -138,7 +138,9 @@ h1 { margin: 0; font-size: 26px; font-weight: 650; line-height: 1.4; }
   border-radius: 12px;
   background: var(--home-item-background-color);
 }
-.setting :deep(.section-heading) { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; font-size: 17px; font-weight: 600; line-height: 1.5; }
+.setting :deep(.section-heading) { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 17px; font-weight: 600; line-height: 1.5; }
+.setting :deep(.settings-section > .section-heading) { margin-bottom: 16px; }
+.setting :deep(.section-toolbar) { display: flex; align-items: center; gap: var(--toolbar-gap, 12px); }
 .setting :deep(.section-heading > .el-icon) { width: 32px; height: 32px; border-radius: 9px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
 .setting-row {
   display: grid;

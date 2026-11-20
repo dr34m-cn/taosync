@@ -22,6 +22,8 @@ Write `doc/changelog/` entries from the perspective of a user upgrading from the
 
 # Frontend Preferences
 
+Prefer Element Plus components and theme styles for new or updated controls. For file uploads, use the Element Plus drag-and-drop picker with click-to-select support instead of a visible native file input.
+
 Every new or changed feature must support all project locales (currently Simplified Chinese and English). Localize user-facing UI, accessibility labels, validation, notifications and backend messages in the same change. Keep locale keys and placeholders in sync. Store stable codes for new built-in log messages and translate them for the viewer; preserve user content and external diagnostics verbatim.
 
 Numeric inputs must not show increment/decrement arrow controls. Use `:controls="false"` for Element Plus `el-input-number` components and hide native number input spinners when applicable.

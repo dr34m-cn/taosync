@@ -25,6 +25,21 @@ DIGEST = hashlib.sha256(PAYLOAD).hexdigest()
 HEADERS = {'Content-Type': 'application/octet-stream', 'X-TaoSync-Update': '1'}
 
 
+def release_archive(kind, *files):
+    output = io.BytesIO()
+    if kind == 'zip':
+        with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for name, content in files:
+                archive.writestr(name, content)
+    else:
+        with tarfile.open(fileobj=output, mode='w:gz') as archive:
+            for name, content in files:
+                entry = tarfile.TarInfo(name)
+                entry.size = len(content)
+                archive.addfile(entry, io.BytesIO(content))
+    return output.getvalue()
+
+
 class UploadTest(AsyncHTTPTestCase):
     def setUp(self):
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
@@ -45,15 +60,66 @@ class UploadTest(AsyncHTTPTestCase):
     def upload(self, headers=HEADERS, body=PAYLOAD):
         return self.fetch('/update', method='POST', headers=headers, body=body)
 
-    def test_stages_only_the_verified_bytes_and_requests_restart(self):
-        res = self.upload()
+    def assert_installed(self, res):
         self.assertEqual(res.code, 200, res.body)
-        self.assertEqual(launcher.slot(self.directory, DIGEST).read_bytes(), PAYLOAD)
+        slot = launcher.slot(self.directory, DIGEST)
+        self.assertEqual(list(self.directory.iterdir()), [slot])
+        self.assertEqual(slot.read_bytes(), PAYLOAD)
         self.assertEqual(launcher.read_json(self.channel / 'request'),
                          {'id': json.loads(res.body)['data']['id'], 'digest': DIGEST})
         self.restart.assert_called_once()
         self.assertFalse(jobClient.acquireRun(threading.Lock()))
+
+    def test_stages_only_the_verified_bytes_and_requests_restart(self):
+        self.assert_installed(self.upload())
         self.mirrors.assert_not_called()
+
+    def test_zip_installs_nested_executable_with_offline_pin(self):
+        body = release_archive('zip', ('release/taoSync.exe', PAYLOAD), ('release/notes.txt', b'notes'))
+        self.assert_installed(self.upload(body=body))
+        self.mirrors.assert_not_called()
+
+    def test_tar_gz_installs_program_registered_for_current_platform(self):
+        body = release_archive('tar.gz', ('notes.txt', b'notes'), ('./taoSync', PAYLOAD))
+        self.mirrors.side_effect = None
+        self.mirrors.return_value = [('v1', update.platform_target(), DIGEST)]
+        with patch.dict(os.environ, TAO_UPDATE_SHA256=''):
+            self.assert_installed(self.upload(body=body))
+        self.mirrors.assert_awaited()
+
+    def test_archive_hash_and_other_platform_executable_do_not_authorize_update(self):
+        self.mirrors.side_effect = None
+        for kind in ('tar.gz', 'zip'):
+            with self.subTest(kind=kind):
+                body = release_archive(kind, ('taoSync', PAYLOAD))
+                outer = hashlib.sha256(body).hexdigest()
+                self.mirrors.return_value = [('v1', 'other', DIGEST), ('v1', update.platform_target(), outer)]
+                with patch.dict(os.environ, TAO_UPDATE_SHA256=outer):
+                    res = self.upload(headers={**HEADERS, 'Accept-Language': 'en'}, body=body)
+                self.assertEqual(res.code, 400)
+                self.assertIn('not registered for this platform', json.loads(res.body)['msg'])
+                self.assertEqual(list(self.directory.iterdir()), [])
+        self.assertFalse((self.channel / 'request').exists())
+        self.restart.assert_not_called()
+
+    def test_rejects_missing_ambiguous_corrupt_and_oversized_archive_contents(self):
+        for kind in ('tar.gz', 'zip'):
+            valid = release_archive(kind, ('taoSync', PAYLOAD))
+            for reason, body, code, message in (
+                ('missing', release_archive(kind, ('notes', PAYLOAD)), 400, 'exactly one'),
+                ('ambiguous', release_archive(kind, ('taoSync', PAYLOAD), ('bin/taoSync.exe', PAYLOAD)), 400, 'exactly one'),
+                ('truncated', valid[:-16], 400, 'complete .tar.gz or .zip'),
+                ('oversize', release_archive(kind, ('taoSync', bytes(2048))), 413, 'size limit'),
+            ):
+                with self.subTest(kind=kind, reason=reason), patch.object(update, 'MAX_BYTES', 1024):
+                    self.assertLess(len(body), update.MAX_BYTES)
+                    res = self.upload(headers={**HEADERS, 'Accept-Language': 'en'}, body=body)
+                    self.assertEqual(res.code, code, res.body)
+                    self.assertIn(message, json.loads(res.body)['msg'])
+                    self.assertEqual(list(self.directory.iterdir()), [])
+        self.mirrors.assert_not_called()
+        self.assertFalse((self.channel / 'request').exists())
+        self.restart.assert_not_called()
 
     def test_online_file_is_accepted_with_a_different_pin(self):
         self.mirrors.side_effect = None
@@ -88,7 +154,7 @@ class UploadTest(AsyncHTTPTestCase):
         self.assertEqual(self.upload().code, 400)
         run.release()
         with patch.object(launcher, 'write_json', side_effect=OSError('disk full')):
-            self.assertEqual(self.upload().code, 400)
+            self.assertEqual(self.upload().code, 507)
         self.assertEqual(list(self.directory.iterdir()), [])
         self.assertTrue(jobClient.acquireRun(run))
         run.release()

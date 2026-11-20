@@ -134,7 +134,9 @@ onBeforeUnmount(() => { clearTimeout(refreshTimer); controller.abort(); });
           <dt>{{ t('programUpdate.arch') }}</dt><dd><code>{{ info.architecture || '—' }}</code></dd>
         </dl>
         <template v-if="info.supported">
-          <p>{{ t('programUpdate.online') }} <a href="https://taoapi.dr34m.cn/" target="_blank" rel="noopener noreferrer">{{ t('programUpdate.registry') }}</a></p>
+          <i18n-t keypath="programUpdate.online" tag="p">
+            <template #registry><a href="https://taoapi.dr34m.cn/" target="_blank" rel="noopener noreferrer">{{ t('programUpdate.registry') }}</a></template>
+          </i18n-t>
           <p v-if="info.pinned">{{ t('programUpdate.pin') }}</p>
           <p v-if="info.container">{{ t('programUpdate.container') }}</p>
         </template>
@@ -172,7 +174,8 @@ onBeforeUnmount(() => { clearTimeout(refreshTimer); controller.abort(); });
 .program-update p { margin: 10px 0 0; overflow-wrap: anywhere; }
 .program-update .source-warning { display: flex; align-items: baseline; gap: 7px; margin-top: 14px; }
 .source-warning .el-icon { align-self: flex-start; margin-top: 3px; color: var(--el-color-warning); }
-.source-warning a { color: var(--text-primary); text-underline-offset: 3px; }
+.deployment a { color: var(--el-color-primary); text-underline-offset: 3px; }
+.source-warning a { color: var(--text-primary); }
 .update-controls { min-width: 0; display: grid; align-content: start; gap: 10px; }
 .update-controls > .el-button { justify-self: end; }
 .update-controls :deep(.el-upload-dragger) { padding: 24px 16px; border-radius: 8px; background: var(--background-color); }

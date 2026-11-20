@@ -76,10 +76,54 @@ class HttpsTest(unittest.IsolatedAsyncioTestCase):
         self.listener = HttpsListener(self.app, self.path, port=0, address='127.0.0.1')
         self.listener.restore()
         await self.check_peer(second[0])
-        self.assertFalse(self.listener.apply(False)['enabled'])
+        active = self.path.read_bytes()
+        self.listener.apply(False)
+        self.listener = HttpsListener(self.app, self.path, port=0, address='127.0.0.1')
+        self.listener.restore()
+        self.assertEqual(self.listener.status(), {'enabled': False, 'configured': True, 'autoStart': False, 'port': 0})
+        self.listener.apply(True)
+        self.assertEqual(self.path.read_bytes(), active)
+        await self.check_peer(second[0])
+        self.assertFalse(self.listener.clear()['enabled'])
         self.assertEqual(list(self.folder.iterdir()), [])
         self.listener.restore()
         self.assertFalse(self.listener.status()['configured'])
+
+    async def test_legacy_pem_restores_and_retained_pair_can_be_replaced_or_cleared(self):
+        cert, key = pair()
+        self.path.write_bytes((cert + key).encode('ascii'))
+        self.listener.restore()
+        await self.check_peer(cert)
+        self.listener.apply(False)
+        replacement = pair()
+        self.listener.apply(True, *replacement)
+        await self.check_peer(replacement[0])
+        self.listener.apply(False)
+        self.listener.clear()
+        self.listener.restore()
+        self.assertFalse(self.listener.status()['configured'])
+        with self.assertRaisesRegex(HttpsError, 'https_invalid_pair'):
+            self.listener.apply(True)
+        self.assertEqual(list(self.folder.iterdir()), [])
+
+    async def test_failed_disable_clear_or_reenable_preserves_committed_state(self):
+        cert, key = pair()
+        self.listener.apply(True, cert, key)
+        with mock.patch('service.system.httpsListener.os.replace', side_effect=OSError), self.assertRaisesRegex(HttpsError, 'storage_error'):
+            self.listener.apply(False)
+        with mock.patch.object(Path, 'unlink', side_effect=OSError), self.assertRaisesRegex(HttpsError, 'storage_error'):
+            self.listener.clear()
+        self.assertTrue(self.listener.status()['autoStart'])
+        await self.check_peer(cert)
+        self.listener.apply(False)
+        retained = self.path.read_bytes()
+        with mock.patch.object(self.app, 'listen', side_effect=OSError), self.assertRaisesRegex(HttpsError, 'port_unavailable'):
+            self.listener.apply(True)
+        self.assertEqual(self.path.read_bytes(), retained)
+        self.assertFalse(self.listener.status()['enabled'])
+        self.assertFalse(self.listener.status()['autoStart'])
+        self.listener.apply(True)
+        await self.check_peer(cert)
 
     async def test_bind_and_commit_failures_leave_no_config(self):
         cert, key = pair()

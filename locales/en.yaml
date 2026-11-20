@@ -20,7 +20,7 @@ notify_invalid_only_failed: Notify only on failure must be either on or off
 notify_invalid_remark: Notification note must be text
 api_key_unknown_action: Unknown API key action
 api_key_enable_first: Enable the API key first
-https_invalid_pair: Upload a PEM certificate chain and its matching unencrypted private key (up to 256 KiB each).
+https_invalid_pair: Provide a PEM certificate chain and its matching unencrypted private key (up to 256 KiB each).
 https_port_unavailable: Cannot listen on HTTPS port 8025. Check whether the port is already in use.
 https_storage_error: Cannot read or save the HTTPS configuration. Check the data directory permissions.
 init_sql: Database initialization completed
@@ -117,12 +117,16 @@ invalid_directory_name: "Enter a valid folder name"
 root_directory_creation_forbidden: "Cannot create a folder in the root directory"
 directory_name_exists: "A file or folder with this name already exists"
 update_method: Unsupported request method
-update_headers: Upload the executable from System Settings
+update_headers: Upload the update file from System Settings
 update_unsupported: This deployment does not support executable updates
 update_size: The file is empty or exceeds the size limit
+update_archive_invalid: Could not read the release archive. Download the complete .tar.gz or .zip file and try again.
+update_archive_limit: The expanded archive or its directory is too large. Upload the executable directly.
+update_archive_program: The archive must contain exactly one regular file named taoSync or taoSync.exe.
+update_zip_unsupported: Use an unencrypted ZIP with stored or Deflate compression, or upload the executable directly.
 update_busy: A sync job or update is in progress. Try again later.
 update_stage_failed: Cannot stage the file. Check the installation directory permissions and free space.
 update_write_failed: Cannot write the update. Check the available disk space.
 update_trust_unavailable: Neither trust source returned a valid registry. No update was installed. Check your connection and try again.
-update_not_trusted: This SHA-256 is not registered for the current platform. Select the extracted executable for this platform.
+update_not_trusted: The executable's SHA-256 is not registered for this platform. Select an executable or release archive for this platform.
 update_already_running: This executable is already running

@@ -90,7 +90,19 @@ try {
       assert.ok(rows.every(top => top !== null));
       assert.equal(new Set(rows).size, 4);
 
+      for (const title of ['https-heading', 'api-key-title']) {
+        const header = page.locator(`section[aria-labelledby="${title}"] header`);
+        await header.locator('.el-switch').waitFor();
+        const centers = await header.locator('h2, button, .el-switch, .controls > span').evaluateAll(items => items.map(item => {
+          const box = item.getBoundingClientRect();
+          return box.top + box.height / 2;
+        }));
+        assert.ok(Math.max(...centers) - Math.min(...centers) <= 1, `${title} controls must align with the heading`);
+      }
       const update = page.getByRole('region', { name: '程序更新' });
+      const registry = update.getByRole('link', { name: '授信清单', exact: true });
+      assert.equal(await registry.getAttribute('href'), 'https://taoapi.dr34m.cn/');
+      assert.match(await registry.locator('..').innerText(), /允许安装授信清单中/);
       assert.equal(await update.getByRole('link', { name: 'GitHub Releases' }).getAttribute('href'), 'https://github.com/dr34m-cn/taosync/releases');
       const install = update.getByRole('button', { name: '更新并重启' });
       const drop = name => update.locator('.el-upload-dragger').evaluate((el, name) => {
@@ -100,17 +112,17 @@ try {
       }, name);
       const chooser = page.waitForEvent('filechooser');
       await update.getByText('点击选择').click();
-      await (await chooser).setFiles({ name: 'first.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('pick') });
-      await update.getByText('first.exe', { exact: true }).waitFor();
-      await drop('second.exe');
-      await update.getByText('second.exe', { exact: true }).waitFor();
-      await update.getByText('first.exe', { exact: true }).waitFor({ state: 'detached' });
+      await (await chooser).setFiles({ name: 'release.zip', mimeType: 'application/zip', buffer: Buffer.from('pick') });
+      await update.getByText('release.zip', { exact: true }).waitFor();
+      await drop('release.tar.gz');
+      await update.getByText('release.tar.gz', { exact: true }).waitFor();
+      await update.getByText('release.zip', { exact: true }).waitFor({ state: 'detached' });
       for (const size of [0, 33]) {
         await update.locator('input[type=file]').setInputFiles({ name: 'invalid.exe', mimeType: 'application/octet-stream', buffer: Buffer.alloc(size) });
         await update.getByText(/请选择非空/).waitFor();
         assert.equal(await install.isDisabled(), true);
       }
-      await drop('update.exe');
+      await drop('taoSync');
       await install.click();
       const confirm = page.getByRole('dialog', { name: '确认更新程序' });
       await confirm.getByRole('button', { name: '取消' }).click();

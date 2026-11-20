@@ -55,13 +55,13 @@ onMounted(load);
 
 <template>
   <section aria-labelledby="api-key-title" :aria-busy="busy">
-    <header class="key-heading">
-      <h2 id="api-key-title" class="section-heading"><el-icon><Key /></el-icon>{{ t('apiKey.title') }}</h2>
-      <el-button link type="primary" :icon="QuestionFilled" @click="help = true">{{ t('apiKey.help') }}</el-button>
+    <header class="section-toolbar key-heading">
+      <h2 id="api-key-title" class="section-heading"><el-icon aria-hidden="true"><Key /></el-icon>{{ t('apiKey.title') }}</h2>
+      <el-button class="guide-action" link type="primary" :icon="QuestionFilled" :aria-label="t('apiKey.help')" :title="t('apiKey.help')" @click="help = true">{{ t('apiKey.help') }}</el-button>
       <div v-if="enabled !== null" class="controls">
         <el-switch :model-value="enabled" :disabled="busy" :aria-label="t('apiKey.enable')" @change="change($event ? 'enable' : 'disable')" />
         <span>{{ t(enabled ? 'notify.enabled' : 'notify.disabled') }}</span>
-        <el-button v-if="enabled" size="small" :icon="Refresh" :disabled="busy" @click="change('reset')">{{ t('apiKey.reset') }}</el-button>
+        <el-button v-if="enabled" class="reset-action" size="small" :icon="Refresh" :disabled="busy" :aria-label="t('apiKey.reset')" :title="t('apiKey.reset')" @click="change('reset')">{{ t('apiKey.reset') }}</el-button>
       </div>
       <el-button v-else-if="!busy" size="small" :icon="Refresh" @click="load">{{ t('apiKey.reload') }}</el-button>
     </header>
@@ -81,16 +81,22 @@ onMounted(load);
 </template>
 
 <style scoped>
-.key-heading, .controls { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
-.key-heading { overflow-x: auto; }
-.key-heading .section-heading { margin-bottom: 0; }
-.controls { margin-inline-start: auto; font-size: 14px; }
+.key-heading { white-space: nowrap; }
+.controls { display: flex; align-items: center; gap: var(--toolbar-gap, 12px); margin-inline-start: auto; font-size: 14px; }
 .key-notice { margin: 0 0 12px; line-height: 1.6; }
 .issued-key { display: block; overflow-wrap: anywhere; user-select: all; }
 @container (max-width: 440px) {
-  .key-heading, .controls { gap: 6px; }
+  .key-heading { --toolbar-gap: 6px; }
   .key-heading .section-heading { gap: 4px; }
   .key-heading .section-heading > .el-icon { display: none; }
+}
+@container (max-width: 400px) {
+  .reset-action { width: 28px; height: 28px; padding: 0; }
+  .reset-action > :deep(span) { display: none; }
+}
+@container (max-width: 340px) {
+  .guide-action { width: 28px; height: 28px; }
+  .guide-action > :deep(span) { display: none; }
 }
 .key-guide { line-height: 1.65; }
 .key-guide :deep(h3:first-child) { margin-top: 0; }

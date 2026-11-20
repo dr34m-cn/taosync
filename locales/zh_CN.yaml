@@ -20,7 +20,7 @@ notify_invalid_only_failed: 仅失败通知必须是开关值
 notify_invalid_remark: 通知备注必须是文本
 api_key_unknown_action: 未知的 API 密钥操作
 api_key_enable_first: 请先开启 API 密钥
-https_invalid_pair: 请上传 PEM 格式的证书链和匹配的无密码私钥，每个文件不超过 256 KiB。
+https_invalid_pair: 请提供 PEM 格式的证书链和匹配的无密码私钥，每项不超过 256 KiB。
 https_port_unavailable: 无法监听 HTTPS 端口 8025，请检查端口是否被占用。
 https_storage_error: 无法读写 HTTPS 配置，请检查数据目录权限。
 init_sql: 初始化数据库完成
@@ -117,12 +117,16 @@ invalid_directory_name: "请输入有效的目录名"
 root_directory_creation_forbidden: "不能在根目录下新建目录"
 directory_name_exists: "该位置已存在同名文件或目录"
 update_method: 不支持的请求方式
-update_headers: 请从系统设置上传可执行文件
+update_headers: 请从系统设置上传更新文件
 update_unsupported: 当前部署不支持可执行文件更新
 update_size: 文件为空或超过大小限制
+update_archive_invalid: 无法读取发布包，请重新下载完整的 .tar.gz 或 .zip 文件。
+update_archive_limit: 发布包的解压数据或目录过大，请直接上传包内的可执行文件。
+update_archive_program: 发布包中必须有且仅有一个名为 taoSync 或 taoSync.exe 的普通文件。
+update_zip_unsupported: 请使用未加密且采用存储或 Deflate 压缩方式的 ZIP，或直接上传可执行文件。
 update_busy: 有同步任务或更新正在进行，请稍后重试
 update_stage_failed: 无法暂存文件，请检查安装目录的写权限和可用空间
 update_write_failed: 写入更新文件失败，请检查可用空间
 update_trust_unavailable: 无法从两个授信来源取得有效清单，未安装更新。请检查网络后重试。
-update_not_trusted: 文件的 SHA-256 未列入当前平台的授信记录，请选择对应平台已解压的可执行文件。
+update_not_trusted: 可执行文件的 SHA-256 未列入当前平台的授信记录，请选择当前平台的可执行文件或发布包。
 update_already_running: 当前已在运行这个程序

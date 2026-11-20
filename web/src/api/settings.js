@@ -16,6 +16,10 @@ export function applyHttps(data) {
   return request({ url: '/settings/https', method: 'put', headers: { isMask: false }, data });
 }
 
+export function clearHttpsCertificate() {
+  return request({ url: '/settings/https', method: 'delete', headers: { isMask: false } });
+}
+
 export function changeApiKey(action) {
   return request({ url: '/settings/api-key', method: 'put', headers: { isMask: false }, data: { action } });
 }

@@ -85,7 +85,10 @@ class Https(BaseHandler):
 
     @handle_request
     def get(self, req):
-        return self.settings['https_listener'].status()
+        try:
+            return self.settings['https_listener'].status()
+        except HttpsError as exc:
+            raise ValueError(G(str(exc))) from None
 
     @handle_request
     def put(self, req):
@@ -93,6 +96,13 @@ class Https(BaseHandler):
             raise ValueError(G('https_invalid_pair'))
         try:
             return self.settings['https_listener'].apply(req.get('enabled'), req.get('certificate'), req.get('privateKey'))
+        except HttpsError as exc:
+            raise ValueError(G(str(exc))) from None
+
+    @handle_request
+    def delete(self, req):
+        try:
+            return self.settings['https_listener'].clear()
         except HttpsError as exc:
             raise ValueError(G(str(exc))) from None
 

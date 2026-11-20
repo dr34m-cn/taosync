@@ -87,7 +87,7 @@ function mockData(url, body, tick) {
   const params = url.searchParams;
   if (url.pathname === '/svr/user') return user;
   if (url.pathname === '/svr/settings/api-key') return { enabled: false };
-  if (url.pathname === '/svr/settings/https') return { enabled: false, configured: false, port: 8025 };
+  if (url.pathname === '/svr/settings/https') return { enabled: false, configured: false, autoStart: false, port: 8025 };
   if (url.pathname === '/svr/alist') {
     if (params.has('path')) {
       const names = params.get('path') === '/' ? mounts.map(x => x.name) : ['桃桃成长', '家庭旅行', '周末时光', '精选照片', '成长记录'];
@@ -155,17 +155,17 @@ export async function createDemoServer() {
   return { url: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(resolve => server.close(resolve)) };
 }
 
-export async function preparePage(browser, url, mobile) {
+export async function preparePage(browser, url, mobile, language = 'zh-CN') {
   const context = await browser.newContext({
     viewport: mobile ? { width: 440, height: 956 } : { width: 1920, height: 1080 },
     deviceScaleFactor: mobile ? 3 : 1, isMobile: mobile, hasTouch: mobile,
-    locale: 'zh-CN', timezoneId: 'Asia/Shanghai', colorScheme: 'light', reducedMotion: 'reduce',
+    locale: language, timezoneId: 'Asia/Shanghai', colorScheme: 'light', reducedMotion: 'reduce',
   });
-  await context.addInitScript(({ user }) => {
-    localStorage.setItem('lang', 'zh-CN');
+  await context.addInitScript(({ user, language }) => {
+    localStorage.setItem('lang', language);
     localStorage.setItem('vueuse-color-scheme', 'light');
     localStorage.setItem('app', JSON.stringify({ user, login: null }));
-  }, { user });
+  }, { user, language });
   const errors = [];
   let tick = 0;
   await context.route('**/*', async route => {

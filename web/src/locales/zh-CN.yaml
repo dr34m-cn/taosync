@@ -550,11 +550,23 @@ https:
   enable: 启用 HTTPS（8025 端口）
   certificate: 证书链（PEM）
   privateKey: 无密码私钥（PEM）
+  inputMode: '{field}的输入方式'
+  uploadFile: 上传文件
+  enterText: 手动填写
+  dropFile: '将文件拖到此处，或{choose}'
+  chooseFile: 点击选择
+  fileHint: '{formats} · 最大 256 KiB'
+  pemPlaceholder: 输入或粘贴 PEM 内容，保留 BEGIN 和 END 行。
   files: 证书链请将服务器证书放在首位，后接中间证书。HTTPS 使用 8025 端口，原 HTTP 地址仍可访问。
-  plainHttp: 当前连接未加密。请仅在本机或通过安全隧道上传私钥。
-  inactive: 已保存证书，但 HTTPS 未在监听。可保存并重试，或选择新的证书和私钥。
-  disableHint: 保存后将停止 HTTPS 并删除已保存的证书和私钥。之后可通过原 HTTP 地址访问。
-  fileSize: 文件不能为空，且每个文件不能超过 256 KiB。
+  plainHttp: 当前连接未加密。请仅在本机或通过安全隧道提交私钥。
+  inactive: 已保存证书，但 HTTPS 未在监听。可保存并重试，或提供新的证书和私钥。
+  retained: 已保留证书和私钥。再次启用 HTTPS 时，两项留空即可沿用。
+  disableHint: 保存后将停止 HTTPS，并保留证书和私钥。之后可通过原 HTTP 地址访问。
+  clear: 清空证书
+  clearConfirm: 确认永久删除已保存的证书和私钥？再次启用 HTTPS 时需要重新提供。
+  clearActiveConfirm: 确认永久删除已保存的证书和私钥，并停止 HTTPS？之后请通过原 HTTP 地址访问。
+  cleared: 证书和私钥已清空。
+  contentSize: PEM 内容不能为空，且不能超过 256 KiB。
   readError: 无法读取所选文件，请重新选择。
 setting:
   title: 系统设置
@@ -603,21 +615,21 @@ programUpdate:
   loading: 正在读取运行环境…
   target: 发布平台
   arch: 处理器架构
-  online: 允许安装授信清单中与当前平台匹配的开发版、预发布版和正式版。
-  registry: 查看授信列表
-  pin: 优先校验部署时指定的 SHA-256，匹配时无需联网；不匹配时查询在线授信清单。
+  online: 允许安装{registry}中与当前平台匹配的开发版、预发布版和正式版。
+  registry: 授信清单
+  pin: 优先校验部署时指定的 SHA-256，匹配时无需联网；不匹配时再查询在线清单。
   container: 更新在当前容器重启后保留；重建容器会使用所选镜像的版本。
   unsupported: 当前为源码或移动端部署，请通过原安装方式更新。
-  source: 切勿上传来历不明的程序。官方下载：
-  drop: 将可执行文件拖到此处，或
+  source: 切勿上传来历不明的更新文件。官方下载：
+  drop: 将可执行文件或发布包拖到此处，或
   select: 点击选择
-  hint: 请先解压发布包，文件最大 256 MiB
+  hint: 支持 .tar.gz 和 .zip，包内应包含 taoSync 或 taoSync.exe。上传文件及包内程序均不能超过 256 MiB。
   install: 更新并重启
   confirmTitle: 确认更新程序
   confirm: 安装 {name} 后将重启 TaoSync 并刷新页面。请先保存尚未提交的设置。
   readError: 无法读取程序状态
   noReceipt: 未收到更新确认
-  fileSize: 请选择非空且不超过 256 MiB 的可执行文件。
+  fileSize: 请选择非空且不超过 256 MiB 的可执行文件或发布包。
   uploading: 正在上传…
   verifying: 正在校验可执行文件…
   restarting: 文件已校验，正在等待服务重新启动…

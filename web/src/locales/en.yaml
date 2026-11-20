@@ -550,11 +550,23 @@ https:
   enable: Enable HTTPS on port 8025
   certificate: Certificate chain (PEM)
   privateKey: Unencrypted private key (PEM)
+  inputMode: 'Input method for {field}'
+  uploadFile: Upload file
+  enterText: Enter text
+  dropFile: 'Drop a file here or {choose}'
+  chooseFile: choose a file
+  fileHint: '{formats} · Up to 256 KiB'
+  pemPlaceholder: Enter or paste the PEM text, including the BEGIN and END lines.
   files: Use the server certificate followed by any intermediate certificates. Port 8025 serves HTTPS; the HTTP address stays available.
-  plainHttp: This connection is not encrypted. Upload the private key only from localhost or through a secure tunnel.
-  inactive: HTTPS is configured but not listening. Apply to retry, or select a replacement certificate and key.
-  disableHint: Applying this change stops HTTPS and removes the saved certificate and private key. Use the HTTP address to reconnect.
-  fileSize: Each file must be nonempty and no larger than 256 KiB.
+  plainHttp: This connection is not encrypted. Submit the private key only from localhost or through a secure tunnel.
+  inactive: HTTPS is configured but not listening. Apply to retry, or provide a replacement certificate and key.
+  retained: The certificate and private key are saved. Leave both fields empty to use them when re-enabling HTTPS.
+  disableHint: Applying this change stops HTTPS and keeps the certificate and private key. Use the HTTP address to reconnect.
+  clear: Clear certificate
+  clearConfirm: Permanently delete the saved certificate and private key? You will need to provide a new pair to enable HTTPS again.
+  clearActiveConfirm: Permanently delete the saved certificate and private key and stop HTTPS? Use the HTTP address to reconnect.
+  cleared: Certificate and private key deleted.
+  contentSize: The PEM content must be nonempty and no larger than 256 KiB.
   readError: Could not read the selected files. Select them again.
 setting:
   title: Settings
@@ -603,21 +615,21 @@ programUpdate:
   loading: Checking deployment…
   target: Build target
   arch: Processor architecture
-  online: Registered development, prerelease and stable builds for this platform are accepted.
-  registry: View trusted builds
+  online: You can install development, prerelease and stable builds listed for this platform in the {registry}.
+  registry: trusted build registry
   pin: A match with the SHA-256 configured for this deployment is accepted without a network request. Other files are checked against the online registry.
   container: Updates survive container restarts. Recreating the container uses the selected image.
   unsupported: For source and mobile deployments, use the original installation method to update.
-  source: 'Never upload an executable from an unknown source. Official downloads:'
-  drop: Drop an executable here or
+  source: 'Never upload an update file from an unknown source. Official downloads:'
+  drop: Drop an executable or release archive here or
   select: choose a file
-  hint: Extract the executable first. Maximum size is 256 MiB.
+  hint: .tar.gz and .zip archives must contain taoSync or taoSync.exe. The upload and the executable inside must each be 256 MiB or smaller.
   install: Update and restart
   confirmTitle: Confirm program update
   confirm: Installing {name} will restart TaoSync and reload the page. Save any unsaved settings first.
   readError: Could not read program status
   noReceipt: No update receipt was received
-  fileSize: Select a non-empty executable no larger than 256 MiB.
+  fileSize: Select a non-empty executable or release archive no larger than 256 MiB.
   uploading: Uploading…
   verifying: Verifying executable…
   restarting: File verified. Waiting for the service to restart…
