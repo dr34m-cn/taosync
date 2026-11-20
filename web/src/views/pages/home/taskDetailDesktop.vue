@@ -9,7 +9,7 @@ import { useI18n } from "vue-i18n";
 
 const router = useRouter();
 const { t } = useI18n();
-const { params, taskItemData, loading, getTaskItemList, filterChange } = useTaskDetail();
+const { params, taskItemData, loading, getTaskItemList, filterChange, submitting, retryFile } = useTaskDetail();
 
 const goback = () => {
   router.go(-1);
@@ -43,7 +43,7 @@ const pageChange = (val) => {
       <div class="top-box-title">{{ t("taskDetail.title") }}</div>
       <menuRefresh :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1" @getData="getTaskItemList" />
     </div>
-    <taskDetailTable v-model:page-num="params.pageNum" class="table-page-box" :loading="loading" :taskItemData="taskItemData" @pageChange="pageChange" />
+    <taskDetailTable v-model:page-num="params.pageNum" class="table-page-box" :loading="loading" :taskItemData="taskItemData" :submitting="submitting" @retry="retryFile" @pageChange="pageChange" />
   </div>
 </template>
 

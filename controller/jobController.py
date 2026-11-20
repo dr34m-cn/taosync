@@ -105,7 +105,7 @@ class Job(BaseHandler):
                 return jobService.getJobCurrent(req['id'], req.get('status', None))
             return taskService.getTaskList(req)
         elif 'taskId' in req:
-            return taskService.getTaskItemList(req)
+            return jobService.getTaskDetails(req)
         return jobService.getJobList(req)
 
     @run_on_executor
@@ -119,6 +119,8 @@ class Job(BaseHandler):
     @run_on_executor
     @handle_request
     def put(self, req):
+        if req.get('action') == 'retryFile':
+            return jobService.retryFile(req['taskId'], req['itemId'])
         if req['pause'] is None:
             if 'id' in req:
                 # 手动执行作业

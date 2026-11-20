@@ -331,6 +331,8 @@ def init_sql(conn):
     itemColumns = {row[1] for row in cursor.fetchall()}
     if itemColumns and 'rapidUpload' not in itemColumns:
         cursor.execute("alter table job_task_item add column rapidUpload integer not null default 0")
+    if itemColumns and 'retryTaskId' not in itemColumns:
+        cursor.execute("alter table job_task_item add column retryTaskId integer")
     cursor.execute("pragma table_info(job_source_snapshot)")
     snapshotColumns = {row[1] for row in cursor.fetchall()}
     if 'fingerprint' not in snapshotColumns:

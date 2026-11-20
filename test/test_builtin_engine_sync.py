@@ -143,6 +143,73 @@ class EngineTestBase(unittest.TestCase):
 
 
 
+class FileRetryTest(EngineTestBase):
+    def _failed(self, jobId, operation=0):
+        taskId = jobMapper.addJobTask({'jobId': jobId, 'runTime': 1})
+        jobMapper.updateJobTaskStatus(taskId, 3)
+        jobMapper.addJobTaskItemMany([dict(taskId=taskId, srcPath='/S/' if operation != 1 else None,
+                                           dstPath='/D/', fileName='one', fileSize=1, isPath=0,
+                                           type=operation, alistTaskId=None, status=7, errMsg='original')])
+        return taskId, jobMapper.getJobTaskItemList({'taskId': taskId})[0]['id']
+
+    def test_retry_only_selected_file_and_persist_result(self):
+        jobId = self._job(method=0, sourceMode=1)
+        taskId, itemId = self._failed(jobId)
+        write(self.src, 'one', '1')
+        write(self.src, 'untouched', '2')
+        original = jobService.FileRetryTask.retryFile
+        with mock.patch.object(jobService.FileRetryTask, 'retryFile', autospec=True) as produce:
+            # Hold the producer while checking live status and double-submit protection.
+            entered, resume = threading.Event(), threading.Event()
+            def blocked(task):
+                entered.set()
+                if resume.wait(10):
+                    original(task)
+            produce.side_effect = blocked
+            retry = jobService.retryFile(taskId, itemId)
+            try:
+                self.assertTrue(entered.wait(5))
+                live = jobService.getTaskDetails({'taskId': taskId})[0]['retry']
+                self.assertEqual((live['id'], live['status'], live['progress']), (retry['id'], 1, 0))
+                with self.assertRaises(ValueError):
+                    jobService.retryFile(taskId, itemId)
+            finally:
+                resume.set()
+            self._wait(jobService.getJobClientById(jobId))
+        self.assertEqual(tree(self.dst), {'one': b'1'})
+        row = jobService.getTaskDetails({'taskId': taskId})[0]
+        self.assertEqual((row['status'], row['errMsg'], row['retry']['status']), (7, 'original', 2))
+        with self.assertRaises(ValueError):
+            jobService.retryFile(taskId, itemId)
+        self.assertEqual(jobMapper.getSourceSnapshot(jobId)['meta']['initialized'], 0)
+
+    def test_retry_delete_rechecks_source_and_can_retry_again(self):
+        jobId = self._job()
+        taskId, itemId = self._failed(jobId, 1)
+        write(self.dst, 'one', '1')
+        write(self.src, 'one', '1')
+        jobService.retryFile(taskId, itemId)
+        self._wait(jobService.getJobClientById(jobId))
+        row = jobService.getTaskDetails({'taskId': taskId})[0]
+        self.assertEqual(row['retry']['status'], 6)
+        self.assertTrue(row['retry']['errMsg'])
+        self.assertEqual(tree(self.dst), {'one': b'1'})
+        Path(self.src, 'one').rename(Path(self.src, 'other'))
+        jobService.retryFile(taskId, itemId)
+        self._wait(jobService.getJobClientById(jobId))
+        self.assertEqual(tree(self.dst), {})
+
+    def test_move_retry_keeps_source_when_second_destination_fails(self):
+        jobId = self._job(method=2, dst='/D/:/missing/')
+        taskId, itemId = self._failed(jobId, 2)
+        write(self.src, 'one', '1')
+        jobService.retryFile(taskId, itemId)
+        self._wait(jobService.getJobClientById(jobId))
+        row = jobService.getTaskDetails({'taskId': taskId})[0]
+        self.assertNotEqual(row['retry']['status'], 2)
+        self.assertEqual(tree(self.src), {'one': b'1'})
+
+
 class BuiltinEngineSyncTest(EngineTestBase):
     def test_encrypted_folder_backup_and_restore_through_sync_jobs(self):
         backing = self.base / 'dst' / 'vaults'

@@ -8,7 +8,8 @@ import logging
 from common.LNG import G
 from mapper import jobMapper
 from service.storage import storageService
-from service.syncJob import jobClient
+from service.syncJob import jobClient, taskService
+from service.syncJob.fileRetry import FileRetryTask
 
 # 作业客户端列表，key为jobId,value为jobClient
 jobClientList = {}
@@ -226,6 +227,46 @@ def doJobManual(jobId):
     if client.job['enable'] != 1:
         raise Exception(G('disabled_job_cannot_run'))
     client.doManual()
+
+
+def retryFile(taskId, itemId):
+    item = jobMapper.getRetryItem(taskId, itemId)
+    client = getJobClientById(item['jobId'])
+    if not jobClient.acquireRun(client.runLock):
+        raise ValueError(G('job_running'))
+    retryId = None
+    try:
+        if client.removed or client.job['enable'] != 1:
+            raise ValueError(G('disabled_job_cannot_run'))
+        retryId = jobMapper.createFileRetry(item)
+        task = FileRetryTask(retryId, client, item)
+        client.currentJobTask = task
+        client.jobDoing = True
+        task.start()
+        return {'id': retryId}
+    except Exception as exc:
+        try:
+            if retryId is not None:
+                jobMapper.updateJobTaskStatus(retryId, 6, str(exc))
+        finally:
+            client.finishRun()
+        raise
+
+
+def getTaskDetails(req):
+    result = taskService.getTaskItemList(req)
+    rows = result['dataList'] if isinstance(result, dict) else result
+    ids = {row['retryTaskId'] for row in rows if row.get('retryTaskId')}
+    if ids:
+        retries = {run['id']: run for run in jobMapper.getFileRetryResults(ids)}
+        for run in retries.values():
+            client = jobClientList.get(run['jobId'])
+            task = client.currentJobTask if client else None
+            if run['status'] < 2 and isinstance(task, FileRetryTask) and task.taskId == run['id']:
+                run.update(task.retryProgress())
+        for row in rows:
+            row['retry'] = retries.get(row.get('retryTaskId'))
+    return result
 
 
 def removeJobClient(jobId):

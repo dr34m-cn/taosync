@@ -4,8 +4,10 @@ import { parseSize, parseTime } from "@/utils/utils";
 import taskItemStatus from "@/utils/taskItemStatus";
 import { useMediaQuery } from "@vueuse/core";
 import taskProgress from "./taskProgress.vue";
+import fileRetry from "./fileRetry.vue";
 
 defineProps({
+  submitting: Set,
   taskItemData: {
     type: Object,
     default: () => ({
@@ -18,7 +20,7 @@ defineProps({
     default: false,
   },
 });
-const emit = defineEmits(["pageChange"]);
+const emit = defineEmits(["pageChange", "retry"]);
 const isMobile = useMediaQuery("(max-width: 768px)");
 const pageNum = defineModel("pageNum", { type: Number, default: 1 });
 const pageSize = ref(10);
@@ -93,6 +95,7 @@ const pageChange = () => emit("pageChange", { pageNum: pageNum.value, pageSize: 
             style="width: 96px"
             :percentage="Number(scope.row.progress || 0)"
           />
+          <fileRetry v-if="submitting" :row="scope.row" :submitting="submitting.has(scope.row.id)" @retry="emit('retry', $event)" />
         </template>
       </el-table-column>
     </el-table>

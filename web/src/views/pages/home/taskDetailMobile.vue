@@ -7,10 +7,11 @@ import taskItemStatus, { taskItemStatusKeys } from "@/utils/taskItemStatus";
 import { parseSize, parseTime } from "@/utils/utils";
 import menuRefresh from "./components/menuRefresh.vue";
 import taskProgress from "./components/taskProgress.vue";
+import fileRetry from "./components/fileRetry.vue";
 
 const router = useRouter();
 const { t } = useI18n();
-const { params, taskItemData, loading, getTaskItemList, filterChange } = useTaskDetail();
+const { params, taskItemData, loading, getTaskItemList, filterChange, submitting, retryFile } = useTaskDetail();
 
 const typeText = (row) => {
   if (row.type === 0) return row.isPath ? t("taskDetail.create") : t("taskDetail.copy");
@@ -96,6 +97,7 @@ const handleCurrentChange = (value) => {
           <span>{{ $t("common.reason") }}</span>
           {{ item.errMsg }}
         </div>
+        <fileRetry :row="item" :submitting="submitting.has(item.id)" @retry="retryFile" />
       </article>
     </div>
 

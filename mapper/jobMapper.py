@@ -456,6 +456,40 @@ def getJobTaskItemList(req):
                                     "order by createTime desc, id desc ", req)
 
 
+def getRetryItem(taskId, itemId):
+    rows = sqlBase.fetchall_to_table(
+        "select i.*, t.jobId from job_task_item i join job_task t on t.id=i.taskId "
+        "where i.taskId=? and i.id=? and t.status>1 and i.status=7 and i.isPath=0 "
+        "and i.type in (0,1,2) and i.fileName is not null", (taskId, itemId))
+    if not rows:
+        raise ValueError('只可重试已结束任务中的失败文件')
+    return rows[0]
+
+
+@sqlBase.connect_sql
+def createFileRetry(conn, item):
+    # Claim the original row and create its linked run in one transaction.
+    with conn:
+        taskId = conn.execute('insert into job_task (jobId,runTime) values (?,?)',
+                              (item['jobId'], int(time.time()))).lastrowid
+        changed = conn.execute(
+            'update job_task_item set retryTaskId=? where id=? and taskId=? and status=7 '
+            'and retryTaskId is ? and not exists '
+            '(select 1 from job_task where id=retryTaskId and status in (0,1,2))',
+            (taskId, item['id'], item['taskId'], item['retryTaskId']))
+        if changed.rowcount != 1:
+            raise ValueError('该文件已重试，请刷新查看结果')
+    return taskId
+
+
+def getFileRetryResults(taskIds):
+    placeholders = ','.join('?' for _ in taskIds)
+    return sqlBase.fetchall_to_table(
+        f'select t.id,t.jobId,t.status, coalesce(t.errMsg,(select i.errMsg from job_task_item i '
+        f'where i.taskId=t.id and i.status=7 order by i.id limit 1)) as errMsg '
+        f'from job_task t where t.id in ({placeholders})', tuple(taskIds))
+
+
 def getUndoneJobTaskItemList(taskId):
     return sqlBase.fetchall_to_table("select * from job_task_item where taskId=? "
                                      "and status not in (2,4,7)", (taskId,))
