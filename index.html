@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>TaoSync · 构建授信列表</title>
+  <style>
+    :root { color-scheme:light dark; --bg:#fbfcfb; --ink:#192822; --muted:#52645d; --line:#cbd8d1; --accent:#006749; --band:#eff4f0; }
+    @media(prefers-color-scheme:dark){ :root { --bg:#171c19; --ink:#edf3ed; --muted:#aec1b5; --line:#415049; --accent:#86ddaf; --band:#232c26; } }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,sans-serif}
+    main{max-width:1120px;margin:auto;padding:24px 20px 16px} header,nav,.heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    header{border-top:4px solid var(--accent);padding:16px 0;border-bottom:1px solid var(--line)} header strong{font:700 22px/1.2 Georgia,serif}
+    h1{font-size:26px;line-height:1.25;margin:0}.heading{padding:28px 0 16px} p{margin:0;color:var(--muted)}
+    table{border-collapse:collapse;width:100%;table-layout:fixed;text-align:start} col:nth-child(1){width:21%} col:nth-child(2){width:22%}
+    th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:start;overflow-wrap:anywhere} th{background:var(--band);font-size:14px}
+    td{font:14px/1.55 ui-monospace,Consolas,monospace} nav{justify-content:flex-end;margin:16px 0}
+    button,a{font:inherit;color:var(--accent)} button{border:1px solid var(--line);border-radius:4px;background:var(--bg);padding:6px 12px;cursor:pointer}
+    button:disabled{opacity:.48;cursor:default} :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    @media(max-width:580px){main{padding:12px 12px 16px} col:nth-child(1),col:nth-child(2){width:25%} th,td{padding:8px 5px} td{font-size:12px} nav{justify-content:space-between}}
+  </style>
+</head>
+<body><main>
+  <header><strong>TaoSync</strong><button id="language" type="button">English</button></header>
+  <div class="heading"><h1 id="title">构建授信列表</h1><a href="./auth.json">auth.json</a></div>
+  <table aria-labelledby="title"><colgroup><col><col><col></colgroup><thead><tr><th scope="col" id="version">版本号</th><th scope="col" id="arch">架构</th><th scope="col">SHA-256</th></tr></thead><tbody id="rows"></tbody></table>
+  <nav><button id="prev" type="button" disabled>上一页</button><p id="status" role="status" aria-live="polite"></p><button id="next" type="button" disabled>下一页</button></nav>
+</main><script>
+  'use strict';
+  const strings = {
+    'zh-CN': {title:'构建授信列表',version:'版本号',arch:'架构',prev:'上一页',next:'下一页',other:'English',loading:'正在读取清单…',empty:'尚无授信记录',error:'无法读取授信清单',page:(p,n,total)=>`第 ${p} / ${n} 页 · 共 ${total} 条`},
+    en: {title:'Trusted builds',version:'Version',arch:'Architecture',prev:'Previous',next:'Next',other:'中文',loading:'Loading registry…',empty:'No trusted builds yet',error:'Could not load the registry',page:(p,n,total)=>`Page ${p} of ${n} · ${total} builds`}
+  };
+  const byId = id => document.getElementById(id);
+  const size = 20;
+  let lang = navigator.language.startsWith('zh') ? 'zh-CN' : 'en', entries = [], page = 1, state = 'loading';
+  function render(){
+    const s = strings[lang], pages = Math.ceil(entries.length / size);
+    document.documentElement.lang = lang; document.title = 'TaoSync · ' + s.title;
+    for(const id of ['title','version','arch','prev','next']) byId(id).textContent = s[id];
+    byId('language').textContent = s.other; byId('prev').disabled = page <= 1; byId('next').disabled = page >= pages;
+    byId('status').textContent = state === 'ready' ? (pages ? s.page(page,pages,entries.length) : s.empty) : s[state];
+    const rows = byId('rows'); rows.replaceChildren();
+    for(const entry of entries.slice((page-1)*size,page*size)){
+      const row = rows.insertRow();
+      for(const key of ['version','arch','sha256']) row.insertCell().textContent = entry[key];
+    }
+  }
+  byId('prev').onclick = () => {page--; render()}; byId('next').onclick = () => {page++; render()};
+  byId('language').onclick = () => {lang = lang === 'en' ? 'zh-CN' : 'en'; render()};
+  render();
+  (async () => {
+    try {
+      const res = await fetch('./auth.json',{cache:'no-store'});
+      if (!res.ok) throw Error();
+      const doc = await res.json();
+      if (doc.schema !== 1 || !Array.isArray(doc.entries) || !doc.entries.every(e => e && typeof e.version==='string' && typeof e.arch==='string' && /^[a-f0-9]{64}$/.test(e.sha256))) throw Error();
+      entries = doc.entries.reverse(); state = 'ready';
+    } catch {state = 'error'}
+    render();
+  })();
+</script></body></html>
