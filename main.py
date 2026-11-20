@@ -17,6 +17,7 @@ from common.config import getConfig
 from common.LNG import G
 from controller import systemController, jobController, notifyController, updateController
 from service.system import onStart
+from service.system.httpsListener import HttpsListener
 
 
 class MainIndex(RequestHandler):
@@ -31,6 +32,7 @@ def make_app():
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
         (r"/svr/settings", systemController.Settings),
+        (r"/svr/settings/https", systemController.Https),
         (r"/svr/settings/api-key", systemController.ApiKey),
         (r"/svr/settings/update", updateController.UpdateInfo),
         (r"/svr/settings/update/upload", updateController.ProgramUpload),
@@ -38,6 +40,7 @@ def make_app():
         (r"/svr/alist", jobController.Alist),
         (r"/svr/storage", jobController.Storage),
         (r"/svr/job", jobController.Job),
+        (r"/svr/job/links", jobController.JobLinks),
         (r"/svr/notify", notifyController.Notify),
         (r"/(?:index\.html)?", MainIndex),
         (r"/(.*)", StaticFileHandler,
@@ -50,6 +53,8 @@ async def main():
     logger = logging.getLogger()
     restart = asyncio.Event()
     http = app.listen(server['port'])
+    https = app.settings['https_listener'] = HttpsListener(app)
+    https.restore()
     if getattr(sys, 'frozen', False) and os.getenv('TAO_UPDATE_CHANNEL'):
         app.settings['restart_for_update'] = restart.set
         (Path(os.environ['TAO_UPDATE_CHANNEL']) / 'ready').touch()
@@ -57,6 +62,9 @@ async def main():
     logger.critical(successMsg)
     await restart.wait()
     http.stop()
+    if https.server:
+        https.server.stop()
+        await https.server.close_all_connections()
     await http.close_all_connections()
     logging.shutdown()
     os._exit(updateLauncher.RESTART)  # Do not wait for idle scheduler/executor threads.

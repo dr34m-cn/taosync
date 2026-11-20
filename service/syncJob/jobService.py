@@ -8,9 +8,9 @@ import threading
 import time
 
 from common.LNG import G
-from mapper import jobMapper
+from mapper import jobLinkMapper, jobMapper
 from service.storage import storageService
-from service.syncJob import jobClient, taskService
+from service.syncJob import jobClient, jobLinks, taskService
 from service.syncJob.fileRetry import FileRetryTask
 
 # 作业客户端列表，key为jobId,value为jobClient
@@ -64,6 +64,7 @@ def initJob():
     except Exception as e:
         logger.exception(e)
     jobMapper.updateJobTaskStatusByStatus()
+    jobLinkMapper.recoverInterrupted()
     jobList = jobMapper.getJobList()
     for item in jobList:
         try:
@@ -72,6 +73,8 @@ def initJob():
         except Exception as e:
             logger.error(f"添加任务过程中报错")
             logger.exception(e)
+
+    jobLinks.startScheduler()
 
 
 def getJobClientById(jobId):
@@ -236,6 +239,21 @@ def doJobManual(jobId):
     if client.job['enable'] != 1:
         raise Exception(G('disabled_job_cannot_run'))
     client.doManual()
+
+
+def launchLinkedJob(jobId):
+    with _configLock:
+        client = getJobClientById(jobId)
+        if client.job['enable'] != 1 or client.removed:
+            raise ValueError('link_target_disabled')
+        reason = jobClient.tryAcquireRun(client.runLock)
+        if reason == 'busy':
+            return 'skipped'
+        if reason:
+            raise ValueError('link_updating')
+    if not client.doJob(lockAcquired=True):
+        raise ValueError('link_start_failed')
+    return 'executed'
 
 
 def retryFile(taskId, itemId):

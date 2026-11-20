@@ -8,6 +8,7 @@ import { Check, Link, Operation, Refresh, User } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import ProgramUpdate from './ProgramUpdate.vue';
 import ApiKey from './ApiKey.vue';
+import HttpsSettings from './HttpsSettings.vue';
 
 const appStore = useAppStore();
 const { t } = useI18n();
@@ -96,6 +97,7 @@ onMounted(load);
       <el-button v-else-if="!loading" @click="load" :icon="Refresh">{{ $t('retry') }}</el-button>
     </section>
 
+    <HttpsSettings class="settings-section" />
     <ApiKey class="settings-section" />
     <ProgramUpdate class="settings-section" />
     <footer class="setting-footer">

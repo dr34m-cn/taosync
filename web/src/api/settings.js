@@ -8,6 +8,14 @@ export function getApiKeyStatus() {
   return request({ url: '/settings/api-key', method: 'get', headers: { isMask: false } });
 }
 
+export function getHttpsStatus() {
+  return request({ url: '/settings/https', method: 'get', headers: { isMask: false } });
+}
+
+export function applyHttps(data) {
+  return request({ url: '/settings/https', method: 'put', headers: { isMask: false }, data });
+}
+
 export function changeApiKey(action) {
   return request({ url: '/settings/api-key', method: 'put', headers: { isMask: false }, data: { action } });
 }

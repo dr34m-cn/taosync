@@ -87,6 +87,7 @@ function mockData(url, body, tick) {
   const params = url.searchParams;
   if (url.pathname === '/svr/user') return user;
   if (url.pathname === '/svr/settings/api-key') return { enabled: false };
+  if (url.pathname === '/svr/settings/https') return { enabled: false, configured: false, port: 8025 };
   if (url.pathname === '/svr/alist') {
     if (params.has('path')) {
       const names = params.get('path') === '/' ? mounts.map(x => x.name) : ['桃桃成长', '家庭旅行', '周末时光', '精选照片', '成长记录'];

@@ -2,10 +2,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tornado.concurrent import run_on_executor
 
-from common.LNG import language
+from common.LNG import G, language
 from common.config import getSettings, updateSettings
-from controller.baseController import BaseHandler, handle_request, cookieName
+from controller.baseController import BaseHandler, handle_request
 from service.system import apiKey, userService
+from service.system.httpsListener import HttpsError
 
 
 class Login(BaseHandler):
@@ -30,7 +31,7 @@ class Login(BaseHandler):
 
     @handle_request
     def delete(self, req):
-        self.clear_cookie(cookieName)
+        self.clear_cookie(self.session_cookie_name, secure=self.request.protocol == 'https')
 
 
 class User(BaseHandler):
@@ -76,6 +77,24 @@ class ApiKey(BaseHandler):
     @handle_request
     def put(self, req):
         return apiKey.change(req.get('action'), req['__user']['id'])
+
+
+class Https(BaseHandler):
+    def set_default_headers(self):
+        self.set_header('Cache-Control', 'no-store')
+
+    @handle_request
+    def get(self, req):
+        return self.settings['https_listener'].status()
+
+    @handle_request
+    def put(self, req):
+        if self.request.query or not self.request.headers.get('Content-Type', '').startswith('application/json'):
+            raise ValueError(G('https_invalid_pair'))
+        try:
+            return self.settings['https_listener'].apply(req.get('enabled'), req.get('certificate'), req.get('privateKey'))
+        except HttpsError as exc:
+            raise ValueError(G(str(exc))) from None
 
 
 class Language(BaseHandler):

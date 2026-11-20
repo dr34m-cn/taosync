@@ -1,5 +1,17 @@
 import request from "@/utils/request";
 
+export function getJobLinks(params) {
+  return request({ url: '/job/links', method: 'get', params, headers: { isMask: false } });
+}
+
+export function addJobLink(data) {
+  return request({ url: '/job/links', method: 'post', data, headers: { isMask: false } });
+}
+
+export function deleteJobLinkData(data) {
+  return request({ url: '/job/links', method: 'delete', data, headers: { isMask: false } });
+}
+
 export function alistGet() {
   return request({
     url: "/alist",

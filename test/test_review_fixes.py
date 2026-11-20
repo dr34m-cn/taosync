@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sqlite3
@@ -693,8 +694,9 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(json.loads(self.fetch(path, method='PUT', body='{"action":"enable"}').body)['code'], 401)
         rejected('f' * 64)
         first = change('enable')['key']
-        self.assertRegex(first, '^[0-9a-f]{64}$')
-        self.assertNotEqual(sqlBase.fetch_first_val('select digest from api_key'), first)
+        self.assertRegex(first, '^t-[0-9a-f]{64}$')
+        self.assertEqual(sqlBase.fetch_first_val('select digest from api_key'), hashlib.sha256(first.encode()).hexdigest())
+        rejected(first[2:])
         self.assertEqual(change('enable'), {'enabled': True})
         self.assertEqual(json.loads(self.fetch(path, headers=cookie).body)['data'], {'enabled': True})
         headers = {'Authorization': first}
@@ -706,6 +708,7 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         upload = '/svr/settings/update/upload'
         self.assertEqual(self.fetch(upload, method='POST', headers=headers, body='').code, 403)
         second = change('reset')['key']
+        self.assertRegex(second, '^t-[0-9a-f]{64}$')
         self.assertNotEqual(first, second)
         rejected(first)
         rejected('Bearer ' + second)
@@ -716,6 +719,17 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         self.assertEqual(json.loads(self.fetch('/svr/user', headers=cookie).body)['code'], 200)
         self.assertNotIn(change('enable')['key'], (first, second))
         rejected(second)
+
+    def test_existing_unprefixed_api_key_remains_valid_until_reset(self):
+        legacy = 'a' * 64
+        sqlBase.execute_insert('insert into api_key(slot, userId, digest) values (1, 1, ?)',
+                               (hashlib.sha256(legacy.encode()).hexdigest(),))
+        headers = {'Authorization': legacy}
+        self.assertEqual(json.loads(self.fetch('/svr/user', headers=headers).body)['data']['userName'], 'admin')
+        reset = self.fetch('/svr/settings/api-key', method='PUT', headers={'Cookie': self._login_cookie()},
+                           body='{"action":"reset"}')
+        self.assertRegex(json.loads(reset.body)['data']['key'], '^t-[0-9a-f]{64}$')
+        self.assertEqual(self.fetch('/svr/user', headers=headers).code, 401)
 
     def test_rename_refreshes_cookie_invalidates_old_session_and_preserves_password(self):
         cookie = self._login_cookie()

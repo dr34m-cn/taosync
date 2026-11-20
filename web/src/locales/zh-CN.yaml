@@ -77,6 +77,46 @@ menu:
   engine: 引擎管理
   notify: 通知配置
   setting: 系统设置
+jobLinks:
+  title: "作业关联"
+  add: "新增关联"
+  logs: "调度日志"
+  clearAll: "清空所有调度日志"
+  empty: "暂无作业关联"
+  source: "条件作业"
+  condition: "执行条件"
+  timing: "执行方式"
+  targets: "就执行"
+  remove: "删除关联"
+  selectSource: "选择条件作业"
+  finished: "完成"
+  success: "完成且全部成功"
+  immediate: "立即执行"
+  afterMinutes: "等待 {minutes} 分钟后执行"
+  onCompletion: "完成后立即执行"
+  wait: "完成后等待"
+  delayMinutes: "等待分钟数"
+  minutesUnit: "分钟后执行"
+  selectTargets: "选择一个或多个作业"
+  refresh: "刷新"
+  clear: "清空调度日志"
+  emptyLog: "暂无调度日志"
+  dispatchedAt: "调度时间"
+  target: "目标作业"
+  result: "调度结果"
+  executed: "已执行目标作业"
+  skipped: "因目标作业执行中跳过"
+  failed: "调度失败"
+  back: "返回关联列表"
+  save: "保存关联"
+  close: "关闭"
+  added: "已添加作业关联"
+  removed: "已删除关联"
+  cleared: "已清空调度日志"
+  confirmTitle: "确认操作"
+  confirmRemove: "删除此关联、调度日志及尚未执行的调度？"
+  confirmClear: "清空此关联的调度日志？"
+  confirmClearAll: "清空所有关联的调度日志？"
 home:
   jobManagement: 作业管理
   mobileJobCount: 共 {count} 个作业
@@ -484,6 +524,16 @@ pathSelect:
   invalidName: 请输入单个有效的目录名
   title: 选择目录
   selectFirst: 请先选择路径
+https:
+  enable: 启用 HTTPS（8025 端口）
+  certificate: 证书链（PEM）
+  privateKey: 无密码私钥（PEM）
+  files: 证书链请将服务器证书放在首位，后接中间证书。HTTPS 使用 8025 端口，原 HTTP 地址仍可访问。
+  plainHttp: 当前连接未加密。请仅在本机或通过安全隧道上传私钥。
+  inactive: 已保存证书，但 HTTPS 未在监听。可保存并重试，或选择新的证书和私钥。
+  disableHint: 保存后将停止 HTTPS 并删除已保存的证书和私钥。之后可通过原 HTTP 地址访问。
+  fileSize: 文件不能为空，且每个文件不能超过 256 KiB。
+  readError: 无法读取所选文件，请重新选择。
 setting:
   title: 系统设置
   saveAndApply: 保存并生效

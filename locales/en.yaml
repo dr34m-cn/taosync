@@ -1,9 +1,23 @@
 success: Success
+link_invalid_action: Invalid job link action
+link_select_jobs: Select a trigger job and at least one target job
+link_invalid_condition: Select a valid completion condition
+link_invalid_delay: The delay must be a non-negative whole number of minutes within the allowed range
+link_job_missing: A selected job no longer exists
+link_cycle: Job links cannot form a cycle
+link_target_disabled: The target job is disabled or has been deleted
+link_updating: An application update is in progress
+link_start_failed: The target job could not start. Check its run history for details.
+link_interrupted: Dispatch was interrupted. It is unknown whether the target job started.
+link_dispatch_failed: Failed to dispatch linked jobs
 lost_part: Incomplete parameters
 same_exists: The same data already exists, please check!
 sign_in: Please sign in
 login_expired: Login expired
 running_success: "Running at: {url}"
+https_invalid_pair: Upload a PEM certificate chain and its matching unencrypted private key (up to 256 KiB each).
+https_port_unavailable: Cannot listen on HTTPS port 8025. Check whether the port is already in use.
+https_storage_error: Cannot read or save the HTTPS configuration. Check the data directory permissions.
 init_sql: Database initialization completed
 admin_password_generated: "Generated a random password for admin: {}"
 admin_password_configured: "The manually configured password is in use."

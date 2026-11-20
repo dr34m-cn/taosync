@@ -1,9 +1,23 @@
 success: 操作成功
+link_invalid_action: 无效的作业关联操作
+link_select_jobs: 请选择条件作业和至少一个目标作业
+link_invalid_condition: 请选择有效的完成条件
+link_invalid_delay: 等待分钟数必须是有效范围内的非负整数
+link_job_missing: 所选作业已不存在
+link_cycle: 不能创建循环作业关联
+link_target_disabled: 目标作业已禁用或已删除
+link_updating: 程序正在更新
+link_start_failed: 目标作业未能启动，请查看作业记录
+link_interrupted: 调度中断，无法确认目标是否启动
+link_dispatch_failed: 作业关联调度失败
 lost_part: 入参不全
 same_exists: 已存在相同数据，请检查！
 sign_in: 请登录
 login_expired: 登录失效
 running_success: 启动成功：{url}
+https_invalid_pair: 请上传 PEM 格式的证书链和匹配的无密码私钥，每个文件不超过 256 KiB。
+https_port_unavailable: 无法监听 HTTPS 端口 8025，请检查端口是否被占用。
+https_storage_error: 无法读写 HTTPS 配置，请检查数据目录权限。
 init_sql: 初始化数据库完成
 admin_password_generated: 已为 admin 生成随机密码：{}
 admin_password_configured: 已使用手动设定的密码。

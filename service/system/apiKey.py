@@ -22,7 +22,7 @@ def change(conn, action, userId):
         return {'enabled': False}
     if action not in ('enable', 'reset'):
         raise ValueError('未知的 API 密钥操作')
-    key = secrets.token_hex(32)
+    key = 't-' + secrets.token_hex(32)
     if action == 'enable':
         updated = conn.execute('insert or ignore into api_key(slot, userId, digest) values (1, ?, ?)',
                                (userId, _digest(key)))
@@ -35,7 +35,8 @@ def change(conn, action, userId):
 
 
 def resolveUser(key):
-    if not re.fullmatch(r'[0-9a-f]{64}', key):
+    # Existing unprefixed keys remain valid until rotated.
+    if not re.fullmatch(r'(?:t-)?[0-9a-f]{64}', key):
         return None
     rows = sqlBase.fetchall_to_table('select u.id, u.userName, u.createTime, k.digest '
                                      'from api_key k join user_list u on k.userId=u.id where k.slot=1')

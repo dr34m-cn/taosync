@@ -12,11 +12,11 @@ from pathlib import Path
 from unittest import mock
 
 from common import LNG, config, locales, sqlInit
-from mapper import jobMapper, userMapper
+from mapper import jobLinkMapper, jobMapper, userMapper
 from service.engine import engineService
 from service.storage import storageService
 from service.storage.drivers.local import LocalDriver
-from service.syncJob import jobService
+from service.syncJob import jobLinks, jobService
 
 
 def write(root, rel, content):
@@ -141,6 +141,83 @@ class EngineTestBase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+
+
+class JobLinksTest(EngineTestBase):
+    def link(self, source, targets, condition='finished', minutes=0):
+        return jobLinks.create(dict(source=source, targets=targets, condition=condition, minutes=minutes))
+
+    def test_immediate_fanout_reports_each_outcome(self):
+        source, target, busy, disabled = [self._job(dst=f'/D/{n}/', method=0) for n in range(4)]
+        write(self.src, 'one', '1')
+        link = self.link(source, [target, busy, disabled], 'success')
+        jobService.getJobClientById(disabled).job['enable'] = 0
+        with jobService.getJobClientById(busy).runLock:
+            self.assertEqual(self._run(source)[0], 2)
+        self._wait(jobService.getJobClientById(target))
+        rows = jobLinkMapper.history(link, 1)['rows']
+        self.assertEqual({r['target']: r['result'] for r in rows},
+                         {target: 'executed', busy: 'skipped', disabled: 'failed'})
+        self.assertTrue(all(r['runTime'] for r in rows))
+        self.assertEqual((Path(self.dst) / '1' / 'one').read_text(), '1')
+
+    def test_partial_completion_delay_cleanup_and_recovery(self):
+        source, target, other = [self._job(dst=f'/D/{n}/', method=0) for n in range(3)]
+        link = self.link(source, [target, other], minutes=5)
+        success = self.link(source, [target], 'success')
+        task = jobMapper.addJobTask(dict(jobId=source, runTime=1))
+        self.assertTrue(jobLinkMapper.finishAndEnqueue(task, 3, None, 100))
+        self.assertFalse(jobLinkMapper.finishAndEnqueue(task, 3, None, 100))
+        sqlInit.init_sql()  # re-open the same database, do not lose pending deliveries
+        jobLinkMapper.clear()
+        self.assertEqual(jobLinkMapper.due(399), [])
+        self.assertEqual({r['target'] for r in jobLinkMapper.due(400)}, {target, other})
+        jobService.removeJobClient(other)
+        jobLinks.dispatchDue()
+        self._wait(jobService.getJobClientById(target))
+        self.assertEqual(jobLinkMapper.history(link, 1)['count'], 1)
+        self.assertEqual(jobLinkMapper.history(success, 1)['count'], 0)
+        jobLinkMapper.clear(link)
+        self.assertEqual(jobLinkMapper.history(link, 1)['count'], 0)
+        task = jobMapper.addJobTask(dict(jobId=source, runTime=2))
+        jobLinkMapper.finishAndEnqueue(task, 2, None, 200)
+        jobLinkMapper.remove(link)
+        self.assertEqual(len(jobLinkMapper.due(600)), 1)
+        jobService.removeJobClient(source)
+        self.assertEqual(jobLinkMapper.due(600), [])
+        self.assertFalse(jobLinkMapper.overview()['rules'])
+
+    def test_reject_invalid_and_cyclic_rules(self):
+        a, b, c = [self._job(dst=f'/D/{n}/') for n in range(3)]
+        self.link(a, [b])
+        self.link(b, [c])
+        for source, targets in ((c, [a]), (b, [b]), (a, []), (a, [999])):
+            with self.assertRaises(ValueError):
+                self.link(source, targets)
+        for minutes in (-1, 1.5, True):
+            with self.assertRaises(ValueError):
+                self.link(a, [c], minutes=minutes)
+        self.assertEqual(len(jobLinkMapper.overview()['rules']), 2)
+
+    def test_interrupted_launch_not_reported_early_or_replayed(self):
+        source, target = [self._job(dst=f'/D/{n}/') for n in range(2)]
+        link = self.link(source, [target])
+        task = jobMapper.addJobTask(dict(jobId=source, runTime=1))
+        jobLinkMapper.finishAndEnqueue(task, 2, None, 1)
+        row, = jobLinkMapper.due(1)
+        self.assertTrue(jobLinkMapper.claim(row['id'], 1))
+        self.assertFalse(jobLinkMapper.claim(row['id'], 1))
+        self.assertEqual(jobLinkMapper.history(link, 1)['count'], 0)
+        jobLinkMapper.clear()
+        jobLinkMapper.recoverInterrupted()
+        self.assertFalse(jobLinkMapper.due(2))
+        self.assertEqual(jobLinkMapper.history(link, 1)['rows'][0]['result'], 'failed')
+        for stored in ('link_interrupted', '调度中断，无法确认目标是否启动', 'I/O error: sample'):
+            jobLinkMapper.setResult(row['id'], 'failed', stored)
+            for lang in ('en', 'zh_CN'):
+                LNG.set_context_lang(lang)
+                expected = stored if stored.startswith('I/O') else LNG.G('link_interrupted', lang)
+                self.assertEqual(jobLinks.history(link, 1)['rows'][0]['detail'], expected)
 
 
 class FileRetryTest(EngineTestBase):

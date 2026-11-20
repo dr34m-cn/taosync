@@ -43,7 +43,7 @@ const pageChange = (val) => {
       <div class="top-box-title">{{ t("taskDetail.title") }}</div>
       <menuRefresh :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1" @getData="getTaskItemList" />
     </div>
-    <taskDetailTable v-model:page-num="params.pageNum" class="table-page-box" :loading="loading" :taskItemData="taskItemData" :submitting="submitting" @retry="retryFile" @pageChange="pageChange" />
+    <taskDetailTable v-model:page-num="params.pageNum" class="table-page-box table-fill" :loading="loading" :taskItemData="taskItemData" :submitting="submitting" @retry="retryFile" @pageChange="pageChange" />
   </div>
 </template>
 
@@ -63,10 +63,6 @@ const pageChange = (val) => {
     width: 150px;
   }
 
-  .table-page-box {
-    width: 100%;
-    height: calc(100% - 54px);
-  }
 }
 
 @media (max-width: 768px) {

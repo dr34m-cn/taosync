@@ -77,6 +77,46 @@ menu:
   engine: Engines
   notify: Notifications
   setting: Settings
+jobLinks:
+  title: "Job links"
+  add: "Add link"
+  logs: "Dispatch log"
+  clearAll: "Clear all dispatch logs"
+  empty: "No job links"
+  source: "Trigger job"
+  condition: "Run condition"
+  timing: "Timing"
+  targets: "Then run"
+  remove: "Delete link"
+  selectSource: "Select a trigger job"
+  finished: "Completed"
+  success: "Completed without failures"
+  immediate: "Run immediately"
+  afterMinutes: "Run after {minutes} min"
+  onCompletion: "Run immediately after completion"
+  wait: "Wait after completion"
+  delayMinutes: "Delay in minutes"
+  minutesUnit: "minutes"
+  selectTargets: "Select one or more jobs"
+  refresh: "Refresh"
+  clear: "Clear dispatch log"
+  emptyLog: "No dispatch history"
+  dispatchedAt: "Dispatch time"
+  target: "Target job"
+  result: "Dispatch result"
+  executed: "Target job started"
+  skipped: "Skipped: target already running"
+  failed: "Dispatch failed"
+  back: "Back to job links"
+  save: "Save link"
+  close: "Close"
+  added: "Job link added"
+  removed: "Job link deleted"
+  cleared: "Dispatch logs cleared"
+  confirmTitle: "Confirm action"
+  confirmRemove: "Delete this link, its logs and its pending dispatches?"
+  confirmClear: "Clear the dispatch log for this link?"
+  confirmClearAll: "Clear dispatch logs for all job links?"
 home:
   jobManagement: Job Management
   mobileJobCount: "{count} jobs"
@@ -484,6 +524,16 @@ pathSelect:
   invalidName: Enter a single folder name
   title: Select Directory
   selectFirst: Select a path first
+https:
+  enable: Enable HTTPS on port 8025
+  certificate: Certificate chain (PEM)
+  privateKey: Unencrypted private key (PEM)
+  files: Use the server certificate followed by any intermediate certificates. Port 8025 serves HTTPS; the HTTP address stays available.
+  plainHttp: This connection is not encrypted. Upload the private key only from localhost or through a secure tunnel.
+  inactive: HTTPS is configured but not listening. Apply to retry, or select a replacement certificate and key.
+  disableHint: Applying this change stops HTTPS and removes the saved certificate and private key. Use the HTTP address to reconnect.
+  fileSize: Each file must be nonempty and no larger than 256 KiB.
+  readError: Could not read the selected files. Select them again.
 setting:
   title: Settings
   saveAndApply: Save and Apply

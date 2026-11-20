@@ -159,9 +159,20 @@ body {
 }
 
 .table-page {
+    display: flex;
+    flex-direction: column;
     padding: 16px;
     height: 100%;
     box-sizing: border-box;
+}
+
+.table-page > :not(.table-fill) {
+    flex-shrink: 0;
+}
+
+.table-fill {
+    flex: 1 1 0;
+    min-height: 0;
 }
 
 .top-box {

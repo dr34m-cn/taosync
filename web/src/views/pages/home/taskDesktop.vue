@@ -101,7 +101,7 @@ const currentChange = (val) => {
       <menuRefresh :loading="loading" :autoRefresh="false" :needShow="1" @getData="getTaskList" />
     </div>
     <taskCurrent @currentChange="currentChange" class="task-current" :style="`height: ${currentHeight}px;`" :jobId="String(params.id || '')" />
-    <div class="table-box" :style="`height: calc(100% - 117px - ${currentHeight}px);`">
+    <div class="table-box table-fill">
       <el-table class="task-table" :data="taskData.dataList" height="100%" scrollbar-always-on v-loading="loading" :empty-text="$t('task.noTask')">
         <el-table-column type="index" :label="$t('task.serial')" align="center" width="70" />
         <el-table-column prop="status" :label="$t('task.status')" width="140">
@@ -184,8 +184,7 @@ const currentChange = (val) => {
 .task {
   overflow-y: auto;
 
-  .task-current,
-  .table-box {
+  .task-current {
     transition: height 0.5s ease;
   }
 

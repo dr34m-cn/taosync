@@ -5,11 +5,12 @@ import time
 
 from common import commonUtils
 from common.LNG import G
-from mapper import jobMapper
+from mapper import jobLinkMapper, jobMapper
+from service.syncJob import jobLinks
 from service.notify import notifyService
 
 
-def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=None):
+def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=None, triggersLinks=False):
     """
     任务状态更新，任务完成后的操作，此处status一定大于1
     :param taskId: 任务id
@@ -21,7 +22,14 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
     """
     finished = time.time()
     duration = int(finished - createTime) if createTime is not None else None
-    jobMapper.updateJobTaskStatus(taskId, status, errMsg)
+    if triggersLinks and status in (2, 3):
+        if jobLinkMapper.finishAndEnqueue(taskId, status, errMsg, int(finished)):
+            try:
+                jobLinks.dispatchDue()
+            except Exception:
+                logging.getLogger().exception(G('link_dispatch_failed'))
+    else:
+        jobMapper.updateJobTaskStatus(taskId, status, errMsg)
     notifyList = notifyService.getNotifyList(True)
     job = jobMapper.getJobByTaskId(taskId)
     contextExt = ''

@@ -186,6 +186,7 @@ from tornado.web import Application, RequestHandler, StaticFileHandler
 from common.config import getConfig
 from controller import systemController, jobController, notifyController
 from service.system import onStart
+from service.system.httpsListener import HttpsListener
 
 
 # ======================================================================
@@ -469,12 +470,14 @@ def make_business_app(server_cfg):
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
         (r"/svr/settings", systemController.Settings),
+        (r"/svr/settings/https", systemController.Https),
         (r"/svr/settings/api-key", systemController.ApiKey),
         (r"/svr/settings/update", UpdateInfo),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
         (r"/svr/storage", jobController.Storage),
         (r"/svr/job", jobController.Job),
+        (r"/svr/job/links", jobController.JobLinks),
         (r"/svr/notify", notifyController.Notify),
         (r"/", MainIndex),
         (r"/(.*)", StaticFileHandler,
@@ -501,6 +504,8 @@ async def main():
     business_app = make_business_app(server_cfg)
     # 8023 业务端口监听 0.0.0.0，允许外部设备访问；服务进程作为前台服务不会被冻结
     business_app.listen(port, address='0.0.0.0')
+    https = business_app.settings['https_listener'] = HttpsListener(business_app, address='0.0.0.0')
+    https.restore()
     _file_log('INFO', f'业务服务已启动: http://0.0.0.0:{port}/')
 
     # 8024 日记页仅绑定 127.0.0.1，仅供本机 WebView 访问，不对外暴露

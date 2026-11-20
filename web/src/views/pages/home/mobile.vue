@@ -9,6 +9,7 @@ import { parseSize, parseTime } from "@/utils/utils";
 import { isFileSizeBoundaryValid, isFileSizeRangeValid } from "@/utils/fileSizeFilter";
 import fileSizeFilter from "./components/fileSizeFilter.vue";
 import jobLastRun from "./components/jobLastRun.vue";
+import JobLinks from "./components/jobLinks.vue";
 import menuRefresh from "./components/menuRefresh.vue";
 import pathSelect from "./components/pathSelect.vue";
 
@@ -375,7 +376,6 @@ onMounted(getJobList);
   <div class="mobile-job-page">
     <div class="mobile-job-header">
       <div>
-        <h1>{{ $t("home.jobManagement") }}</h1>
         <div class="job-count">{{ $t("home.mobileJobCount", { count: jobData.count }) }}</div>
       </div>
       <menuRefresh :auto-refresh="false" :need-show="1" :loading="loading" @get-data="getJobList" />
@@ -386,6 +386,7 @@ onMounted(getJobList);
       <el-button v-if="jobData.count > 1" type="success" :icon="CaretRight" :loading="btnLoading" @click="runAllJob">
         {{ $t("home.runAll") }}
       </el-button>
+      <JobLinks />
     </div>
 
     <div class="job-list" v-loading="loading">
@@ -635,7 +636,7 @@ onMounted(getJobList);
 <style lang="scss" scoped>
 .mobile-job-page {
   min-height: 100%;
-  padding: 14px 12px 24px;
+  padding: 14px 12px 16px;
   box-sizing: border-box;
   background: var(--home-background-color);
 
@@ -644,13 +645,6 @@ onMounted(getJobList);
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-
-    h1 {
-      margin: 0;
-      font-size: 22px;
-      line-height: 1.3;
-      color: var(--text-primary);
-    }
 
     .job-count {
       margin-top: 4px;
@@ -843,7 +837,7 @@ onMounted(getJobList);
   .mobile-pagination {
     display: flex;
     justify-content: center;
-    padding: 8px 0 4px;
+    padding-top: 8px;
   }
 }
 

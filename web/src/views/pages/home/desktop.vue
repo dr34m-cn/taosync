@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { alistGet, jobDelete, jobGetJob, jobPost, jobPut } from "@/api/job";
 import fileSizeFilter from "./components/fileSizeFilter.vue";
 import jobLastRun from "./components/jobLastRun.vue";
+import JobLinks from "./components/jobLinks.vue";
 import pathSelect from "./components/pathSelect.vue";
 import menuRefresh from "./components/menuRefresh.vue";
 import { parseSize, parseTime } from "@/utils/utils";
@@ -466,6 +467,7 @@ onMounted(() => {
         >
           {{ $t("home.enableAll") }}
         </el-button>
+        <JobLinks size="small" />
         <el-button
           v-if="jobData.dataList.length > 0"
           :icon="ArrowUp"
@@ -485,11 +487,10 @@ onMounted(() => {
           {{ $t("home.expandAll") }}
         </el-button>
       </div>
-      <div class="top-box-title">{{ $t("home.jobManagement") }}</div>
       <menuRefresh :autoRefresh="false" :freshInterval="5273" :loading="loading" @getData="getJobList" />
     </div>
 
-    <el-table ref="jobTableRef" class="job-table" :data="jobData.dataList" height="calc(100% - 117px)" v-loading="loading">
+    <el-table ref="jobTableRef" class="job-table table-fill" :data="jobData.dataList" height="100%" v-loading="loading">
       <el-table-column type="expand">
         <template #default="props">
           <div class="form-box">
@@ -989,10 +990,6 @@ onMounted(() => {
         flex: 1;
         min-width: 0;
         flex-wrap: wrap;
-      }
-
-      .top-box-title {
-        order: 0;
       }
 
       :deep(.menu-refresh) {

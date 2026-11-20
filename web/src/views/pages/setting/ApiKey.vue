@@ -55,19 +55,22 @@ onMounted(load);
     <header class="key-heading">
       <h2 id="api-key-title" class="section-heading"><el-icon><Key /></el-icon>API 密钥</h2>
       <el-button link type="primary" :icon="QuestionFilled" @click="help = true">使用说明</el-button>
+      <div v-if="enabled !== null" class="controls">
+        <el-switch :model-value="enabled" :disabled="busy" aria-label="启用 API 密钥" @change="change($event ? 'enable' : 'disable')" />
+        <span>{{ enabled ? '已启用' : '已禁用' }}</span>
+        <el-button v-if="enabled" size="small" :icon="Refresh" :disabled="busy" @click="change('reset')">重置</el-button>
+      </div>
+      <el-button v-else-if="!busy" size="small" :icon="Refresh" @click="load">重新加载状态</el-button>
     </header>
-    <div v-if="enabled !== null" class="controls">
-      <el-switch :model-value="enabled" :disabled="busy" aria-label="启用 API 密钥" @change="change($event ? 'enable' : 'disable')" />
-      <span>{{ enabled ? '已启用' : '已禁用' }}</span>
-      <el-button v-if="enabled" :icon="Refresh" :disabled="busy" @click="change('reset')">重置密钥</el-button>
-    </div>
-    <el-button v-else-if="!busy" :icon="Refresh" @click="load">重新加载密钥状态</el-button>
-    <template v-if="key">
-      <p>新密钥仅在本次显示，请立即复制并妥善保管。</p>
-      <el-input :model-value="key" readonly aria-label="新 API 密钥" @focus="$event.target.select()">
-        <template #append><el-button :icon="CopyDocument" @click="copy(key)">{{ copied ? '已复制' : '复制' }}</el-button></template>
-      </el-input>
-    </template>
+    <el-dialog :model-value="!!key" title="新 API 密钥" width="min(540px, 92vw)" append-to-body destroy-on-close
+      :close-on-click-modal="false" @close="key = ''">
+      <p class="key-notice">密钥仅显示一次，请立即复制并妥善保管。关闭后无法再次查看；如未保存，请重置密钥。</p>
+      <code class="issued-key">{{ key }}</code>
+      <template #footer>
+        <el-button :icon="CopyDocument" @click="copy(key)">{{ copied ? '已复制' : '复制密钥' }}</el-button>
+        <el-button type="primary" @click="key = ''">关闭</el-button>
+      </template>
+    </el-dialog>
     <el-dialog v-model="help" title="API 密钥使用说明" width="min(640px, 92vw)" append-to-body>
       <article class="key-guide" v-html="guideHtml" />
     </el-dialog>
@@ -75,10 +78,17 @@ onMounted(load);
 </template>
 
 <style scoped>
-.key-heading, .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.key-heading { margin-bottom: 16px; }
+.key-heading, .controls { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.key-heading { overflow-x: auto; }
 .key-heading .section-heading { margin-bottom: 0; }
-.controls, p { font-size: 14px; }
+.controls { margin-inline-start: auto; font-size: 14px; }
+.key-notice { margin: 0 0 12px; line-height: 1.6; }
+.issued-key { display: block; overflow-wrap: anywhere; user-select: all; }
+@container (max-width: 440px) {
+  .key-heading, .controls { gap: 6px; }
+  .key-heading .section-heading { gap: 4px; }
+  .key-heading .section-heading > .el-icon { display: none; }
+}
 .key-guide { line-height: 1.65; }
 .key-guide :deep(h3:first-child) { margin-top: 0; }
 .key-guide :deep(pre) { padding: 12px; overflow-x: auto; background: var(--el-fill-color-light); border-radius: 6px; }

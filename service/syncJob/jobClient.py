@@ -38,12 +38,18 @@ _runLocks = weakref.WeakSet()
 _updating = False
 
 
-def acquireRun(lock):
+def tryAcquireRun(lock):
     with _runGate:
-        if _updating or not lock.acquire(blocking=False):
-            return False
+        if _updating:
+            return 'updating'
+        if not lock.acquire(blocking=False):
+            return 'busy'
         _runLocks.add(lock)
-        return True
+        return None
+
+
+def acquireRun(lock):
+    return tryAcquireRun(lock) is None
 
 
 def beginProgramUpdate():
@@ -273,6 +279,8 @@ class CopyItem:
 
 
 class JobTask:
+    triggersLinks = True
+
     def __init__(self, taskId, vm):
         """
         作业任务类
@@ -1451,7 +1459,7 @@ class JobTask:
         else:
             status = 2 if failOrOtherNum == 0 else 3
         taskService.updateJobTaskStatus(self.taskId, status, errMsg, taskList=self.currentTasks,
-                                        createTime=self.createTime)
+                                        createTime=self.createTime, triggersLinks=self.triggersLinks)
 
 
 class JobClient:
@@ -1523,6 +1531,7 @@ class JobClient:
             task = JobTask(taskId, self)
             self.currentJobTask = task
             task.start()
+            return True
         except Exception as e:
             self.finishRun()
             logger = logging.getLogger()

@@ -6,11 +6,43 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tornado.concurrent import run_on_executor
 
+from common.LNG import G
+
 from controller.baseController import BaseHandler, handle_request
 from service.alist import alistService
 from service.storage import storageService
 from service.storage import discoveryService
 from service.syncJob import jobService, taskService
+from service.syncJob import jobLinks
+from mapper import jobLinkMapper
+
+
+class JobLinks(BaseHandler):
+    executor = ThreadPoolExecutor(2)
+
+    @run_on_executor
+    @handle_request
+    def get(self, req):
+        if 'id' in req:
+            return jobLinks.history(int(req['id']), max(1, int(req.get('page', 1))))
+        return jobLinkMapper.overview()
+
+    @run_on_executor
+    @handle_request
+    def post(self, req):
+        return jobLinks.create(req)
+
+    @run_on_executor
+    @handle_request
+    def delete(self, req):
+        if req.get('action') == 'clearAllLogs':
+            jobLinkMapper.clear()
+        elif req.get('action') == 'clearLogs':
+            jobLinkMapper.clear(int(req['id']))
+        elif req.get('action') == 'remove':
+            jobLinkMapper.remove(int(req['id']))
+        else:
+            raise ValueError(G('link_invalid_action'))
 
 
 class Alist(BaseHandler):

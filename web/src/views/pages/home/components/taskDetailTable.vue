@@ -35,7 +35,7 @@ const pageChange = () => emit("pageChange", { pageNum: pageNum.value, pageSize: 
 
 <template>
   <div class="task-detail-table">
-    <el-table class="detail-table" :data="taskItemData.dataList" :row-key="rowKey" height="calc(100% - 48px)" v-loading="loading" :empty-text="$t('empty')">
+    <el-table class="detail-table table-fill" :data="taskItemData.dataList" :row-key="rowKey" height="100%" v-loading="loading" :empty-text="$t('empty')">
       <el-table-column type="expand">
         <template #default="props">
           <div class="form-box">
@@ -114,6 +114,8 @@ const pageChange = () => emit("pageChange", { pageNum: pageNum.value, pageSize: 
 
 <style lang="scss" scoped>
 .task-detail-table {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
 }

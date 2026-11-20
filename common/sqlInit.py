@@ -1,6 +1,7 @@
 from common import commonUtils
 from common import sqlBase
 from common.config import DEFAULT_PASSWORD, getConfig
+from mapper import jobLinkMapper
 
 
 CU_VERSION = 260718
@@ -19,7 +20,7 @@ def init_sql(conn):
             # empty DDL tables behind. Recover that state, but never destroy a
             # database that still contains jobs, engines, mounts, or notices.
             has_business_data = False
-            for table in ('job_source_snapshot', 'job_source_snapshot_meta',
+            for table in ('job_dispatch', 'job_link_target', 'job_link', 'job_source_snapshot', 'job_source_snapshot_meta',
                           'storage_mount', 'notify', 'job_task_item', 'job_task', 'job'):
                 cursor.execute(
                     "select count(*) from sqlite_master where type='table' and name=?",
@@ -43,7 +44,7 @@ def init_sql(conn):
                 raise RuntimeError(
                     "database has storage data but no administrator user; refusing destructive recovery"
                 )
-            for table in ('job_source_snapshot', 'job_source_snapshot_meta',
+            for table in ('job_dispatch', 'job_link_target', 'job_link', 'job_source_snapshot', 'job_source_snapshot_meta',
                           'storage_mount', 'notify', 'job_task_item', 'job_task',
                           'job', 'alist_list', 'api_key', 'user_list'):
                 cursor.execute("drop table if exists " + table)
@@ -371,6 +372,7 @@ def init_sql(conn):
     else:
         cursor.execute("update alist_list set userName='TaoSync', url='taosync://internal', "
                        "engineType='taosync', protected=1 where systemKey='taosync'")
+    jobLinkMapper.initSchema(cursor)
     conn.commit()
     cursor.close()
     return passwd

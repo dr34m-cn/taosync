@@ -116,7 +116,7 @@ const handleCurrentChange = (value) => {
 <style lang="scss" scoped>
 .mobile-task-detail-page {
   min-height: 100%;
-  padding: 14px 12px 24px;
+  padding: 14px 12px 16px;
   box-sizing: border-box;
   background: var(--home-background-color);
 
@@ -304,7 +304,7 @@ const handleCurrentChange = (value) => {
   .mobile-pagination {
     display: flex;
     justify-content: center;
-    padding: 8px 0 4px;
+    padding-top: 8px;
   }
 }
 

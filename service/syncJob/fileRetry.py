@@ -9,6 +9,8 @@ from service.syncJob.jobClient import JobTask, virtualPathsOverlap
 class FileRetryTask(JobTask):
     """A normal queued run with a single-file producer instead of a tree scan."""
 
+    triggersLinks = False
+
     def __init__(self, taskId, client, item):
         super().__init__(taskId, client)
         self.item = item

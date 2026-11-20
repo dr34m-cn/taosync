@@ -37,11 +37,16 @@ def resolveSessionUser(cookieUser):
 
 
 class BaseHandler(RequestHandler):
+    @property
+    def session_cookie_name(self):
+        # Browser cookies share a host across ports. Keep the TLS session off HTTP.
+        return '__Host-tao_sync' if self.request.protocol == 'https' else cookieName
+
     def _get_signed_user_cookie(self):
         # 登录时和校验时必须使用同一个有效期，否则浏览器仍保留 Cookie 时，
         # 服务端会回退到 Tornado 默认的 31 天有效期。
         return self.get_signed_cookie(
-            cookieName,
+            self.session_cookie_name,
             max_age_days=getConfig()['server']['expires']
         )
 
@@ -50,9 +55,9 @@ class BaseHandler(RequestHandler):
         return json.loads(user) if user else None
 
     def set_session_cookie(self, user):
-        self.set_signed_cookie(cookieName, buildSessionCookie(user),
+        self.set_signed_cookie(self.session_cookie_name, buildSessionCookie(user),
                                expires_days=getConfig()['server']['expires'],
-                               httponly=True, samesite='Lax')
+                               httponly=True, samesite='Lax', secure=self.request.protocol == 'https')
 
     def authenticated_user(self):
         if 'Authorization' in self.request.headers:
@@ -64,7 +69,7 @@ class BaseHandler(RequestHandler):
 
 
 def _unauthorized(handler, msgKey):
-    handler.clear_cookie(cookieName)
+    handler.clear_cookie(handler.session_cookie_name, secure=handler.request.protocol == 'https')
     handler.set_header('Content-Type', 'application/json; charset=UTF-8')
     handler.write(commonService.result_map(G(msgKey), 401))
 
@@ -82,7 +87,7 @@ def handle_request(func):
                     self.set_header('Content-Type', 'application/json; charset=UTF-8')
                     self.write(commonService.result_map('API 密钥无效或已禁用', 401))
                 else:
-                    _unauthorized(self, 'login_expired' if self.get_cookie(cookieName) else 'sign_in')
+                    _unauthorized(self, 'login_expired' if self.get_cookie(self.session_cookie_name) else 'sign_in')
                 return
         try:
             req = commonService.get_post_data(self)
