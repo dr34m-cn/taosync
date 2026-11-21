@@ -7,19 +7,24 @@ from pathlib import Path
 import tornado.web
 
 if __package__:
-    from .trust_manifest import MAX_MANIFEST_BYTES, encode_manifest, parse_manifest
+    from .trust_manifest import MAX_MANIFEST_BYTES, encode_manifest, parse_builds
 else:  # Standalone apiServer Docker image
-    from trust_manifest import MAX_MANIFEST_BYTES, encode_manifest, parse_manifest
+    from trust_manifest import MAX_MANIFEST_BYTES, encode_manifest, parse_builds
 
 
 def snapshot(database, incoming=None):
     with closing(sqlite3.connect(database, timeout=15)) as db, db:
+        db.execute('BEGIN IMMEDIATE')
         db.execute('CREATE TABLE IF NOT EXISTS builds (version TEXT, arch TEXT, sha256 TEXT, '
                    'UNIQUE(version, arch, sha256))')
+        if 'published_at' not in {col[1] for col in db.execute('PRAGMA table_info(builds)')}:
+            db.execute('ALTER TABLE builds ADD COLUMN published_at TEXT')
         if incoming is not None:
-            db.executemany('INSERT OR IGNORE INTO builds VALUES (?, ?, ?)', parse_manifest(incoming))
+            db.executemany('INSERT INTO builds (version, arch, sha256, published_at) VALUES (?, ?, ?, ?) '
+                           'ON CONFLICT(version, arch, sha256) DO UPDATE SET published_at=excluded.published_at '
+                           'WHERE builds.published_at IS NULL', parse_builds(incoming))
         # Check the union's size before committing: never serve a truncated list.
-        return encode_manifest(db.execute('SELECT version, arch, sha256 FROM builds ORDER BY rowid'))
+        return encode_manifest(db.execute('SELECT version, arch, sha256, published_at FROM builds ORDER BY rowid'))
 
 
 class TrustIndex(tornado.web.RequestHandler):

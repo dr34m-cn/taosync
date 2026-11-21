@@ -1,9 +1,10 @@
 import os
-import re
-import shutil
 import stat
+from contextlib import contextmanager
+from pathlib import Path, PureWindowsPath
 
 from common.fileFingerprint import fileFingerprint
+from service.storage.localAccess import LocalBoundary, canonical, check_entry, denied, open_regular, copy_file_stat
 
 from .base import StorageDriver, check_cancel, normalize_path, transfer_temp_name
 
@@ -16,30 +17,25 @@ class LocalDriver(StorageDriver):
         root = config.get("root_path") or config.get("path")
         if not root:
             raise ValueError("local root_path is required")
-        self.root = os.path.realpath(os.path.abspath(os.path.expanduser(str(root))))
+        self.boundary = LocalBoundary()
+        root = canonical(str(root))
+        self.boundary.check(root)
+        self.root = str(root)
         if not os.path.isdir(self.root):
             raise ValueError("local root_path must be an existing directory")
 
     def _resolve(self, path, allow_root=True):
+        if '..' in str(path).replace('\\', '/').split('/'):
+            raise denied()
         path = normalize_path(path, allow_root=allow_root)
         relative = path.lstrip("/").replace("/", os.sep)
         if os.name == "nt":
             for component in relative.split(os.sep) if relative else []:
                 self._validate_windows_component(component)
-        candidate = os.path.abspath(os.path.join(self.root, relative))
-        try:
-            if os.path.commonpath((self.root, candidate)) != self.root:
-                raise ValueError("path escapes local root")
-        except ValueError:
-            raise ValueError("path escapes local root")
-        current = self.root
-        for part in relative.split(os.sep) if relative else []:
-            current = os.path.join(current, part)
-            if os.path.lexists(current) and os.path.islink(current):
-                raise ValueError("symbolic links are not supported inside a local mount")
-        resolved = os.path.realpath(candidate)
-        if os.path.commonpath((self.root, resolved)) != self.root:
-            raise ValueError("path escapes local root")
+        candidate = Path(self.root, relative)
+        if not candidate.is_relative_to(self.root):
+            raise denied()
+        self.boundary.check(candidate)
         return candidate
 
     @staticmethod
@@ -50,27 +46,20 @@ class LocalDriver(StorageDriver):
             or any(ord(char) < 32 or char in '<>:"/\\|?*' for char in component)
         ):
             raise ValueError("invalid Windows local file name")
-        stem = component.split(".", 1)[0].upper()
-        if stem in {"CON", "PRN", "AUX", "NUL"} or re.fullmatch(
-            r"(?:COM|LPT)[1-9]", stem
-        ):
+        if PureWindowsPath(component).is_reserved():
             raise ValueError("reserved Windows local file name")
 
     def list(self, path, details=False):
         target = self._resolve(path)
-        if not os.path.isdir(target):
-            raise FileNotFoundError(path)
         result = []
-        with os.scandir(target) as entries:
+        with self.boundary.directory(target) as fd, os.scandir(target if fd is None else fd) as entries:
             for entry in entries:
                 try:
-                    if entry.is_symlink():
-                        continue
-                    resolved_entry = os.path.realpath(entry.path)
-                    if os.path.commonpath((self.root, resolved_entry)) != self.root:
-                        continue
-                    is_dir = entry.is_dir(follow_symlinks=True)
+                    self.boundary.check(target / entry.name)
                     info = entry.stat(follow_symlinks=False)
+                    # DirEntry on Windows omits the link count and inode.
+                    check_entry(os.lstat(entry.path) if os.name == "nt" else info)
+                    is_dir = stat.S_ISDIR(info.st_mode)
                     size = None if is_dir else info.st_size
                 except (OSError, ValueError):
                     continue
@@ -94,7 +83,9 @@ class LocalDriver(StorageDriver):
 
     def file_metadata(self, path):
         target = self._resolve(path, allow_root=False)
-        info = os.stat(target, follow_symlinks=False)
+        with self.boundary.directory(target.parent) as fd:
+            info = os.stat(target if fd is None else target.name, dir_fd=fd, follow_symlinks=False)
+            check_entry(info)
         if stat.S_ISDIR(info.st_mode):
             raise IsADirectoryError(path)
         if not stat.S_ISREG(info.st_mode):
@@ -111,20 +102,32 @@ class LocalDriver(StorageDriver):
         }
 
     def mkdir(self, path):
-        os.makedirs(self._resolve(path), exist_ok=True)
+        with self.boundary.directory(self._resolve(path), create_from=self.root):
+            pass
 
     def delete(self, path):
         target = self._resolve(path, allow_root=False)
-        if os.path.isdir(target) and not os.path.islink(target):
-            shutil.rmtree(target)
-        else:
-            os.remove(target)
+        self._delete(target)
+
+    def _delete(self, target):
+        self.boundary.check(target, subtree=True)
+        with self.boundary.directory(target.parent) as parent:
+            name = target if parent is None else target.name
+            info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            check_entry(info)
+            if stat.S_ISDIR(info.st_mode):
+                with self.boundary.directory(target) as fd:
+                    for child in os.listdir(target if fd is None else fd):
+                        self._delete(target / child)
+                os.rmdir(name, dir_fd=parent)
+            else:
+                os.unlink(name, dir_fd=parent)
 
     def download(self, path, target, progress=None, cancel=None):
         source = self._resolve(path, allow_root=False)
-        size = os.path.getsize(source)
         done = 0
-        with open(source, "rb") as fp:
+        with self.boundary.directory(source.parent) as parent, open_regular(source, parent) as fp:
+            size = os.fstat(fp.fileno()).st_size
             while True:
                 check_cancel(cancel)
                 chunk = fp.read(1024 * 1024)
@@ -141,7 +144,8 @@ class LocalDriver(StorageDriver):
 
     def read_range(self, path, offset, length, cancel=None):
         check_cancel(cancel)
-        with open(self._resolve(path, allow_root=False), "rb") as source:
+        path = self._resolve(path, allow_root=False)
+        with self.boundary.directory(path.parent) as fd, open_regular(path, fd) as source:
             source.seek(offset)
             data = source.read(length)
         check_cancel(cancel)
@@ -149,67 +153,61 @@ class LocalDriver(StorageDriver):
             raise IOError("source file changed during range read")
         return data
 
+    @contextmanager
+    def _output(self, destination):
+        with self.boundary.directory(destination.parent, create_from=self.root) as fd:
+            name = destination if fd is None else destination.name
+            try:
+                info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                check_entry(info)
+                if stat.S_ISDIR(info.st_mode):
+                    raise IsADirectoryError(str(destination))
+            except FileNotFoundError:
+                pass
+            temporary = transfer_temp_name()
+            if fd is None:
+                temporary = destination.parent / temporary
+            handle = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_BINARY', 0),
+                             0o666, dir_fd=fd)
+            try:
+                with os.fdopen(handle, 'wb') as fp:
+                    yield fp
+                os.replace(temporary, name, src_dir_fd=fd, dst_dir_fd=fd)
+            finally:
+                try:
+                    os.unlink(temporary, dir_fd=fd)
+                except FileNotFoundError:
+                    pass
+
     def upload(self, path, source, size=None, progress=None, cancel=None):
         destination = self._resolve(path, allow_root=False)
-        if os.path.isdir(destination):
-            raise IsADirectoryError(path)
-        os.makedirs(os.path.dirname(destination), exist_ok=True)
-        temporary = os.path.join(os.path.dirname(destination), transfer_temp_name())
+        with self._output(destination) as fp:
+            self._transfer(source, fp, size, progress, cancel)
+
+    @staticmethod
+    def _transfer(source, output, size, progress, cancel):
         done = 0
-        try:
-            with open(temporary, "wb") as fp:
-                while True:
-                    check_cancel(cancel)
-                    chunk = source.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    fp.write(chunk)
-                    done += len(chunk)
-                    if progress:
-                        progress(done / size if size else 1.0)
-            if size is not None and done != int(size):
-                raise IOError("source stream ended before the expected file size")
+        while True:
             check_cancel(cancel)
-            os.replace(temporary, destination)
-            if progress and size == 0:
-                progress(1.0)
-        finally:
-            try:
-                if os.path.exists(temporary):
-                    os.remove(temporary)
-            except OSError:
-                pass
+            chunk = source.read(1024 * 1024)
+            if not chunk:
+                break
+            output.write(chunk)
+            done += len(chunk)
+            if progress:
+                progress(done / size if size else 1.0)
+        if size is not None and done != int(size):
+            raise IOError("source stream ended before the expected file size")
+        check_cancel(cancel)
+        if progress and size == 0:
+            progress(1.0)
 
     def copy(self, source_path, destination_path, size=None, progress=None, cancel=None, metadata=None):
         source = self._resolve(source_path, allow_root=False)
         destination = self._resolve(destination_path, allow_root=False)
-        if os.path.isdir(destination):
-            raise IsADirectoryError(destination_path)
-        os.makedirs(os.path.dirname(destination), exist_ok=True)
-        temporary = os.path.join(os.path.dirname(destination), transfer_temp_name())
-        total = os.path.getsize(source) if size is None else size
-        done = 0
-        try:
-            with open(source, "rb") as src, open(temporary, "wb") as dst:
-                while True:
-                    check_cancel(cancel)
-                    chunk = src.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    dst.write(chunk)
-                    done += len(chunk)
-                    if progress:
-                        progress(done / total if total else 1.0)
-            if total is not None and done != int(total):
-                raise IOError("source file size changed during copy")
-            check_cancel(cancel)
-            shutil.copystat(source, temporary, follow_symlinks=False)
-            os.replace(temporary, destination)
-            if progress and total == 0:
-                progress(1.0)
-        finally:
-            try:
-                if os.path.exists(temporary):
-                    os.remove(temporary)
-            except OSError:
-                pass
+        with self.boundary.directory(source.parent) as fd, open_regular(source, fd) as src:
+            info = os.fstat(src.fileno())
+            with self._output(destination) as dst:
+                self._transfer(src, dst, info.st_size if size is None else size, progress, cancel)
+                dst.flush()
+                copy_file_stat(dst.fileno(), info)

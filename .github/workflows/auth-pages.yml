@@ -26,7 +26,7 @@ jobs:
       - name: 仅部署静态清单和页面
         run: |
           mkdir "$RUNNER_TEMP/site"
-          cp auth.json index.html "$RUNNER_TEMP/site/"
+          cp auth.json index.html logo.ico "$RUNNER_TEMP/site/"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/site

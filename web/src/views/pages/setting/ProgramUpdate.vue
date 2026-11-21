@@ -137,7 +137,6 @@ onBeforeUnmount(() => { clearTimeout(refreshTimer); controller.abort(); });
           <i18n-t keypath="programUpdate.online" tag="p">
             <template #registry><a href="https://taoapi.dr34m.cn/" target="_blank" rel="noopener noreferrer">{{ t('programUpdate.registry') }}</a></template>
           </i18n-t>
-          <p v-if="info.pinned">{{ t('programUpdate.pin') }}</p>
           <p v-if="info.container">{{ t('programUpdate.container') }}</p>
         </template>
         <p v-else>{{ t('programUpdate.unsupported') }}</p>

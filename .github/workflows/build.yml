@@ -21,6 +21,7 @@ jobs:
       TAG_LIST: ${{ steps.getVersion.outputs.TAG_LIST }}
       VERSION: ${{ steps.getVersion.outputs.VERSION }}
       DOCKER_PLATFORMS: ${{ steps.getVersion.outputs.DOCKER_PLATFORMS }}
+      STATICX_TARGETS: ${{ steps.getVersion.outputs.STATICX_TARGETS }}
 
     steps:
       - name: 检出仓库代码
@@ -39,6 +40,12 @@ jobs:
             dockerPlatforms='["linux/amd64","linux/arm64","linux/arm/v7","linux/386","linux/arm/v6","linux/s390x","linux/ppc64le"]'
           fi
           echo "DOCKER_PLATFORMS=$dockerPlatforms" >> "$GITHUB_OUTPUT"
+          staticxTargets=$(jq -cn --argjson platforms "$dockerPlatforms" '[
+            {platform:"amd64", target_arch:"amd64",  cache_platform:"linux-amd64",  lib_path:"/usr/lib/x86_64-linux-gnu"},
+            {platform:"arm64", target_arch:"arm64",  cache_platform:"linux-arm64",  lib_path:"/usr/lib/aarch64-linux-gnu"},
+            {platform:"arm32", target_arch:"arm/v7", cache_platform:"linux-arm-v7", lib_path:"/usr/lib/arm-linux-gnueabihf"}
+          ] | map(select(("linux/" + .target_arch) as $target | $platforms | index($target)))')
+          echo "STATICX_TARGETS=$staticxTargets" >> "$GITHUB_OUTPUT"
           for version in "${versionList[@]}"; do
             tagList+="-t $DOCKER_USER/$DOCKER_NAME:$version "
           done
@@ -299,19 +306,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: amd64
-            target_arch: amd64
-            cache_platform: linux-amd64
-            lib_path: /usr/lib/x86_64-linux-gnu
-          - platform: arm64
-            target_arch: arm64
-            cache_platform: linux-arm64
-            lib_path: /usr/lib/aarch64-linux-gnu
-          - platform: arm32
-            target_arch: arm/v7
-            cache_platform: linux-arm-v7
-            lib_path: /usr/lib/arm-linux-gnueabihf
+        include: ${{ fromJSON(needs.get-version.outputs.STATICX_TARGETS) }}
 
     steps:
       - name: 检出仓库代码

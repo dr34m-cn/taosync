@@ -19,6 +19,8 @@ from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from common.config import getConfig
 from common.LNG import G
+from common.fileRetryReason import FileRetryError
+from service.storage.localAccess import LocalPathError
 from mapper import jobMapper
 from service.engine import engineService
 from service.syncJob import taskService
@@ -32,6 +34,10 @@ ABORT_DRAIN_SECONDS = 60
 
 _scheduler = None
 _schedulerLock = threading.Lock()
+
+
+def failure_reason(error):
+    return error if isinstance(error, FileRetryError) else str(error)
 
 _runGate = threading.Lock()
 _runLocks = weakref.WeakSet()
@@ -150,7 +156,7 @@ class CopyItem:
             else:
                 self.alistTaskId = self.alistClient.copyFile(self.srcPath, self.dstPath, self.fileName)
         except Exception as e:
-            self.errMsg = str(e)
+            self.errMsg = failure_reason(e)
             self.status = 7
         else:
             if self.status == 4:
@@ -159,7 +165,7 @@ class CopyItem:
                 self.status = 2
             elif self.status != 4:
                 self.checkAndGetStatus()
-                if self.status == 7 and self.canVerify and not self.jobTask.breakFlag:
+                if self.status == 7 and self.canVerify and not self.jobTask.breakFlag and not isinstance(self.errMsg, LocalPathError):
                     self.verifyDelivered()
         self.endIt()
 
@@ -204,7 +210,7 @@ class CopyItem:
                         self.alistClient.copyTaskDelete(self.alistTaskId)
                     except Exception as e:
                         self.status = 7
-                        self.errMsg = str(e)
+                        self.errMsg = failure_reason(e)
                 break
             cuTime = time.time()
             self.waitForChange(0.61 if cuTime - self.jobTask.lastWatching < 3 else 2.93)
@@ -243,6 +249,8 @@ class CopyItem:
         self.status = info['state']
         self.progress = info.get('progress', self.progress)
         self.errMsg = info.get('error') or None
+        if info.get('localError') and isinstance(self.alistClient, engineService.TaoSyncClient):
+            self.errMsg = LocalPathError(*info['localError'])
 
     def waitForChange(self, interval):
         """等待下一次状态查询；支持完成通知的引擎（内置 TaoSync）在任务结束时立即返回。"""
@@ -443,7 +451,8 @@ class JobTask:
         return result
 
     def getCurrentByStatus(self, status):
-        return self.currentTasks.get(status, [])
+        return [dict(row, errMsg=str(row['errMsg'])) if isinstance(row.get('errMsg'), FileRetryError) else row
+                for row in self.currentTasks.get(status, [])]
 
     def _stateLock(self):
         lock = self.__dict__.get('stateLock')
@@ -498,7 +507,7 @@ class JobTask:
                     self.job['id'], entry, self.sourceSnapshotIdentity, directories=directories)
             except Exception as exc:
                 logging.getLogger().exception(exc)
-                self.copyHook(srcPath, dstPath, fileName, entry['size'], status=7, errMsg=str(exc))
+                self.copyHook(srcPath, dstPath, fileName, entry['size'], status=7, errMsg=failure_reason(exc))
 
     def checkTimeout(self):
         timeout = self.timeoutSeconds = taskTimeoutSeconds()
@@ -532,7 +541,7 @@ class JobTask:
                         mount, _ = self.alistClient.resolve(copyItem.dstPath)
                         limiter = engineService.getMountCopyLimiter(mount['id'])
                     except Exception as exc:
-                        self.finish.append(copyItem.toRecord(status=7, errMsg=str(exc)))
+                        self.finish.append(copyItem.toRecord(status=7, errMsg=failure_reason(exc)))
                         continue
                 if limiter is not None and not limiter.tryAcquire():
                     self.waiting.append(copyItem)
@@ -694,7 +703,7 @@ class JobTask:
                 freshEntry = freshSourceDirectories[srcPath].get(fileName)
                 freshSize = None if freshEntry is None else freshEntry.get('size')
             except Exception as e:
-                self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], str(e))
+                self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], failure_reason(e))
                 continue
             if freshEntry is not None and (
                     freshEntry.get('isDir') or freshSize != entry['size']):
@@ -721,7 +730,7 @@ class JobTask:
             try:
                 self.alistClient.deleteFile(srcPath, [fileName], 0)
             except Exception as e:
-                errMsg = G('copy_success_but_delete_fail').format(str(e))
+                errMsg = e if isinstance(e, FileRetryError) else G('copy_success_but_delete_fail').format(str(e))
                 self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], errMsg)
             else:
                 movedPaths.add(entry['path'])
@@ -738,7 +747,7 @@ class JobTask:
                     cache[dstDir] = details
                 detail = cache[dstDir].get(fileName)
             except Exception as e:
-                return G('move_target_verify_failed').format(dstDir + fileName, str(e))
+                return e if isinstance(e, FileRetryError) else G('move_target_verify_failed').format(dstDir + fileName, str(e))
             if detail is None or detail.get('isDir') or detail.get('size') != size:
                 found = '-' if detail is None else ('dir' if detail.get('isDir') else detail.get('size'))
                 return G('move_target_verify_failed').format(
@@ -787,7 +796,8 @@ class JobTask:
                 self.alistClient.deleteFile(parent, [name], 0)
             except Exception as e:
                 self.copyHook(parent + name + '/', None, None, None, status=7,
-                              errMsg=G('move_remove_dir_fail').format(str(e)), isPath=1, copyType=2)
+                              errMsg=e if isinstance(e, FileRetryError) else G('move_remove_dir_fail').format(str(e)),
+                              isPath=1, copyType=2)
                 continue
             self.removedSourceDirectories.add(path)
             self.copyHook(parent + name + '/', None, None, None, status=2, isPath=1, copyType=2)
@@ -834,7 +844,7 @@ class JobTask:
             logger = logging.getLogger()
             logger.exception(e)
             self.copyHook(self.normalizeRoot(self.job['srcPath']), None, None, None,
-                          status=7, errMsg=str(e), isPath=1)
+                          status=7, errMsg=failure_reason(e), isPath=1)
 
     def copyHook(self, srcPath, dstPath, name, size, alistTaskId=None, status=0, errMsg=None, isPath=0,
                  copyType=0, createTime=None):
@@ -930,8 +940,8 @@ class JobTask:
             logger = logging.getLogger()
             logger.exception(e)
             self.sourceScanFailed = True
-            self.recordRootFailure(str(e), True)
-            self.copyHook(srcPath, None, None, None, status=7, errMsg=str(e), isPath=1)
+            self.recordRootFailure(failure_reason(e), True)
+            self.copyHook(srcPath, None, None, None, status=7, errMsg=failure_reason(e), isPath=1)
         finally:
             self.scanFinish = True
             self._wake()
@@ -1026,7 +1036,7 @@ class JobTask:
                     self.alistClient.mkdir(dstPath, self.job['scanIntervalT'])
                 except Exception as e:
                     status = 7
-                    errMsg = str(e)
+                    errMsg = failure_reason(e)
                     failedDirectoryPrefixes.append(entry['path'])
                 self.copyHook(srcPath, dstPath, None, None, status=status, errMsg=errMsg, isPath=1)
 
@@ -1073,7 +1083,7 @@ class JobTask:
                 return False
             self.alistClient.deleteFile(parent, [name], self.job['scanIntervalT'])
         except Exception as exc:
-            self.delHook(parent, name + '/', None, status=7, errMsg=str(exc), isPath=1)
+            self.delHook(parent, name + '/', None, status=7, errMsg=failure_reason(exc), isPath=1)
             return False
         self.delHook(parent, name + '/', None, isPath=1)
         return True
@@ -1180,7 +1190,7 @@ class JobTask:
             self.alistClient.deleteFile(path, [fileName if not isPath else fileName[:-1]], self.job['scanIntervalT'])
         except Exception as e:
             status = 7
-            errMsg = str(e)
+            errMsg = failure_reason(e)
         self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath, createTime)
 
     def listDir(self, path, firstDst, spec, rootPath, isSrc=True, recordError=True):
@@ -1213,7 +1223,7 @@ class JobTask:
             if not recordError:
                 raise
             logger = logging.getLogger()
-            errMsg = G('scan_error').format(G('src' if isSrc else 'dst'), str(e))
+            errMsg = e if isinstance(e, FileRetryError) else G('scan_error').format(G('src' if isSrc else 'dst'), str(e))
             logger.error(errMsg)
             logger.exception(e)
             if path == rootPath:
@@ -1395,7 +1405,7 @@ class JobTask:
                 if not dstFiles:
                     self.copyHook(srcPath, dstPath, None, None, status=2, isPath=1)
                 return dstFiles
-        errMsg = G('scan_error').format(G('dst'), str(error))
+        errMsg = error if isinstance(error, FileRetryError) else G('scan_error').format(G('dst'), str(error))
         self.recordRootFailure(errMsg, False)
         self.copyHook(None, dstPath, None, None, status=7, errMsg=errMsg, isPath=1)
         return None
@@ -1419,7 +1429,7 @@ class JobTask:
             self.alistClient.mkdir(dstPath, self.job['scanIntervalT'])
         except Exception as e:
             status = 7
-            errMsg = str(e)
+            errMsg = failure_reason(e)
         # 目录回调
         self.copyHook(srcPath, dstPath, None, None, status=status, errMsg=errMsg, isPath=1)
         if status != 2:

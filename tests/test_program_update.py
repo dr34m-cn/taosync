@@ -48,7 +48,8 @@ class UploadTest(AsyncHTTPTestCase):
         self.enterContext(patch.dict(os.environ, TAO_UPDATE_CHANNEL=str(root),
                                      TAO_UPDATE_DIR=str(self.directory), TAO_UPDATE_SHA256=DIGEST))
         self.enterContext(patch.object(update.sys, 'frozen', True, create=True))
-        self.mirrors = self.enterContext(patch.object(update, 'fetch_manifest', side_effect=ValueError('offline')))
+        self.mirrors = self.enterContext(patch.object(update, 'fetch_manifest',
+                                         return_value=[('v1', update.platform_target(), DIGEST)]))
         self.auth = self.enterContext(patch.object(ProgramUpload, 'authenticated', return_value=True))
         self.restart = Mock()
         self.addCleanup(jobClient.cancelProgramUpdate)
@@ -72,12 +73,12 @@ class UploadTest(AsyncHTTPTestCase):
 
     def test_stages_only_the_verified_bytes_and_requests_restart(self):
         self.assert_installed(self.upload())
-        self.mirrors.assert_not_called()
+        self.mirrors.assert_awaited()
 
-    def test_zip_installs_nested_executable_with_offline_pin(self):
+    def test_zip_installs_registered_nested_executable(self):
         body = release_archive('zip', ('release/taoSync.exe', PAYLOAD), ('release/notes.txt', b'notes'))
         self.assert_installed(self.upload(body=body))
-        self.mirrors.assert_not_called()
+        self.mirrors.assert_awaited()
 
     def test_tar_gz_installs_program_registered_for_current_platform(self):
         body = release_archive('tar.gz', ('notes.txt', b'notes'), ('./taoSync', PAYLOAD))
@@ -95,9 +96,10 @@ class UploadTest(AsyncHTTPTestCase):
                 outer = hashlib.sha256(body).hexdigest()
                 self.mirrors.return_value = [('v1', 'other', DIGEST), ('v1', update.platform_target(), outer)]
                 with patch.dict(os.environ, TAO_UPDATE_SHA256=outer):
-                    res = self.upload(headers={**HEADERS, 'Accept-Language': 'en'}, body=body)
+                    res = self.upload(body=body)
                 self.assertEqual(res.code, 400)
-                self.assertIn('not registered for this platform', json.loads(res.body)['msg'])
+                self.assertEqual(json.loads(res.body)['msg'],
+                                 f'架构错误，本系统架构为{update.platform_target()}，更新包架构为other，请上传正确架构的更新包')
                 self.assertEqual(list(self.directory.iterdir()), [])
         self.assertFalse((self.channel / 'request').exists())
         self.restart.assert_not_called()
@@ -106,9 +108,9 @@ class UploadTest(AsyncHTTPTestCase):
         for kind in ('tar.gz', 'zip'):
             valid = release_archive(kind, ('taoSync', PAYLOAD))
             for reason, body, code, message in (
-                ('missing', release_archive(kind, ('notes', PAYLOAD)), 400, 'exactly one'),
-                ('ambiguous', release_archive(kind, ('taoSync', PAYLOAD), ('bin/taoSync.exe', PAYLOAD)), 400, 'exactly one'),
-                ('truncated', valid[:-16], 400, 'complete .tar.gz or .zip'),
+                ('missing', release_archive(kind, ('notes', PAYLOAD)), 400, 'not trusted'),
+                ('ambiguous', release_archive(kind, ('taoSync', PAYLOAD), ('bin/taoSync.exe', PAYLOAD)), 400, 'not trusted'),
+                ('truncated', valid[:-16], 400, 'not trusted'),
                 ('oversize', release_archive(kind, ('taoSync', bytes(2048))), 413, 'size limit'),
             ):
                 with self.subTest(kind=kind, reason=reason), patch.object(update, 'MAX_BYTES', 1024):
@@ -117,7 +119,6 @@ class UploadTest(AsyncHTTPTestCase):
                     self.assertEqual(res.code, code, res.body)
                     self.assertIn(message, json.loads(res.body)['msg'])
                     self.assertEqual(list(self.directory.iterdir()), [])
-        self.mirrors.assert_not_called()
         self.assertFalse((self.channel / 'request').exists())
         self.restart.assert_not_called()
 
@@ -128,12 +129,23 @@ class UploadTest(AsyncHTTPTestCase):
             self.assertEqual(self.upload().code, 200)
         self.restart.assert_called_once()
 
-    def test_offline_pin_miss_never_stages_or_restarts(self):
-        res = self.upload(headers={**HEADERS, 'Accept-Language': 'en'}, body=b'untrusted')
+    def test_offline_even_matching_pin_never_stages_or_restarts(self):
+        self.mirrors.side_effect = ValueError('offline')
+        res = self.upload(headers={**HEADERS, 'Accept-Language': 'en'})
         self.assertEqual(res.code, 400)
         self.assertIn('Neither trust source', json.loads(res.body)['msg'])
         self.assertEqual(self.mirrors.await_count, 2)
         self.assertEqual(list(self.directory.iterdir()), [])
+        self.restart.assert_not_called()
+
+    def test_unlisted_file_and_registered_apk(self):
+        self.mirrors.return_value = []
+        self.assertEqual(json.loads(self.upload().body)['msg'], '文件不可信，请仅在可信位置下载更新包')
+        apk = release_archive('zip', ('AndroidManifest.xml', b'test'))
+        self.mirrors.return_value = [('v1', 'android-arm64', hashlib.sha256(apk).hexdigest())]
+        response = self.upload(headers={**HEADERS, 'Accept-Language': 'en'}, body=apk)
+        self.assertIn('Architecture mismatch', json.loads(response.body)['msg'])
+        self.assertIn('android-arm64', json.loads(response.body)['msg'])
         self.restart.assert_not_called()
 
     def test_authentication_and_non_simple_request_required_before_staging(self):
@@ -182,7 +194,7 @@ class ReleaseTest(unittest.TestCase):
 
 
 class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
-    async def test_first_valid_list_wins_even_on_miss_and_closes_other_request(self):
+    async def test_current_arch_match_closes_other_request(self):
         started, cancelled = asyncio.Event(), asyncio.Event()
         async def fetch(url):
             if url == 'https://taoapi.dr34m.cn/auth.json':
@@ -193,10 +205,9 @@ class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
                     cancelled.set()
             self.assertEqual(url, 'https://dr34m-cn.github.io/taosync/auth.json')
             await started.wait()
-            return [('v1', 'other', DIGEST)]
+            return [('v1', update.platform_target(), DIGEST)]
         with patch.dict(os.environ, TAO_UPDATE_SHA256=''), patch.object(update, 'fetch_manifest', fetch):
-            with self.assertRaisesRegex(ValueError, 'update_not_trusted'):
-                await asyncio.wait_for(update.verify_digest(DIGEST), 1)
+            await asyncio.wait_for(update.verify_digest(DIGEST), 1)
         self.assertTrue(cancelled.is_set())
 
     async def test_bad_first_json_then_history_across_versions_with_optional_pin(self):
@@ -212,19 +223,17 @@ class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
                 with patch.dict(os.environ, TAO_UPDATE_SHA256=configured):
                     for digest in (DIGEST, sha2):
                         await update.verify_digest(digest)
-                    with self.assertRaisesRegex(ValueError, 'update_not_trusted'):
+                    with self.assertRaises(update.ArchitectureMismatch):
                         await update.verify_digest('d' * 64)
 
-    async def test_offline_only_valid_pin_can_allow_a_file(self):
-        for pin in ('', 'invalid', DIGEST.upper()):
-            with patch.dict(os.environ, TAO_UPDATE_SHA256=pin), patch.object(update, 'fetch_manifest', side_effect=ValueError) as get:
-                if pin == DIGEST.upper():
-                    await update.verify_digest(DIGEST)
-                    get.assert_not_called()
-                else:
-                    with self.assertRaises(ValueError):
-                        await update.verify_digest(DIGEST)
-                    self.assertEqual(get.await_count, 2)
+    async def test_stale_mirror_miss_does_not_hide_registered_file(self):
+        async def fetch(url):
+            if url == update.TRUST_URLS[0]:
+                return []
+            await asyncio.sleep(0)
+            return [('v1', update.platform_target(), DIGEST)]
+        with patch.object(update, 'fetch_manifest', fetch):
+            await update.verify_digest(DIGEST)
 
 
 class LauncherTest(unittest.TestCase):

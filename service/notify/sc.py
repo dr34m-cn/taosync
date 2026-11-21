@@ -24,7 +24,7 @@ def send(sendKey, title, timeout, content=''):
         'Content-Type': 'application/json;charset=utf-8'
     }
     r = requests.post(url, json=params, headers=headers, timeout=timeout)
-    if r.status_code != 200:
+    if not 200 <= r.status_code < 300:
         raise Exception(r.text)
     else:
         scRs = r.json()

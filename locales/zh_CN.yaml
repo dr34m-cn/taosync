@@ -128,5 +128,7 @@ update_busy: 有同步任务或更新正在进行，请稍后重试
 update_stage_failed: 无法暂存文件，请检查安装目录的写权限和可用空间
 update_write_failed: 写入更新文件失败，请检查可用空间
 update_trust_unavailable: 无法从两个授信来源取得有效清单，未安装更新。请检查网络后重试。
-update_not_trusted: 可执行文件的 SHA-256 未列入当前平台的授信记录，请选择当前平台的可执行文件或发布包。
+update_not_trusted: 文件不可信，请仅在可信位置下载更新包
+local_path_protected: 此本地路径受保护，请选择程序目录以外的普通文件或目录
+update_wrong_arch: 架构错误，本系统架构为{system}，更新包架构为{package}，请上传正确架构的更新包
 update_already_running: 当前已在运行这个程序

@@ -31,9 +31,10 @@ class ProgramUpload(BaseHandler):
     owns_lock = False
     processing = False
 
-    def reject(self, message, code=400):
+    def reject(self, message, code=400, **details):
         self.set_status(code)
-        self.finish({'code': code, 'data': None, 'msg': t(message, self.request.headers.get('Accept-Language', 'zh_CN'))})
+        msg = t(message, self.request.headers.get('Accept-Language', 'zh_CN'))
+        self.finish({'code': code, 'data': None, 'msg': msg.format(**details) if details else msg})
 
     def authenticated(self):
         return self.authenticated_user() is not None
@@ -84,7 +85,15 @@ class ProgramUpload(BaseHandler):
             self.stream.flush()
             os.fsync(self.stream.fileno())
             self.stream.close()
-            digest = await asyncio.to_thread(prepare_payload, self.temporary, self.digest.hexdigest(), update.MAX_BYTES)
+            raw_digest = self.digest.hexdigest()
+            try:
+                digest = await asyncio.to_thread(prepare_payload, self.temporary, raw_digest, update.MAX_BYTES)
+            except ValueError as exc:
+                if str(exc) in ('update_size', 'update_archive_limit'):
+                    raise
+                # An APK is a registered Android artifact and also a ZIP without a desktop executable.
+                await update.verify_digest(raw_digest)
+                raise
             await update.verify_digest(digest)
             if self.request.connection.stream.closed():
                 return
@@ -100,6 +109,9 @@ class ProgramUpload(BaseHandler):
                 if not committed:
                     jobClient.cancelProgramUpdate()
             await self.finish({'code': 200, 'data': {'id': attempt}, 'msg': ''})
+        except update.ArchitectureMismatch as exc:
+            if not self._finished:
+                self.reject(str(exc), **exc.details)
         except ValueError as exc:
             if not self._finished:
                 message = str(exc)

@@ -583,6 +583,7 @@ def make_app(config, oauth=None, store=None):
     return tornado.web.Application(
         [
             (r"/(?:index\.html)?", TrustIndex),
+            (r"/(logo\.ico)", tornado.web.StaticFileHandler, {"path": str(Path(__file__).parent)}),
             (r"/auth\.json", PublicManifest),
             (r"/v1/trust/manifest", TrustPush),
             (r"/health", HealthHandler, args),

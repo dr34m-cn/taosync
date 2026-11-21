@@ -125,7 +125,7 @@ def sendNotify(notify, title, content, needNotSync=False):
                 raise Exception("ContentType not allowed")
         else:
             raise Exception("Method not supported")
-        if r.status_code != 200:
+        if not 200 <= r.status_code < 300:
             raise Exception(r.text)
     elif notify['method'] == 1:
         # server酱

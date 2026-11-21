@@ -107,11 +107,6 @@ class FileRetryTask(JobTask):
         else:
             self.delFile(dst, name, files[name])
 
-    def getCurrentByStatus(self, status):
-        # The worker still needs the typed reason for persistence; render a copy for this viewer.
-        return [dict(row, errMsg=str(row['errMsg'])) if isinstance(row.get('errMsg'), FileRetryError) else row
-                for row in super().getCurrentByStatus(status)]
-
     def retryProgress(self):
         state = self.getCurrent()
         count = sum(state['num'].values())

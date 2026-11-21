@@ -1,4 +1,6 @@
 import json
+import sqlite3
+from contextlib import closing
 import tempfile
 from pathlib import Path
 
@@ -6,7 +8,7 @@ from tornado.testing import AsyncHTTPTestCase
 
 from apiServer.app import make_app
 from apiServer.trust import snapshot
-from apiServer.trust_manifest import encode_manifest, parse_manifest
+from apiServer.trust_manifest import encode_manifest, parse_manifest, parse_builds
 
 
 class TrustServiceTest(AsyncHTTPTestCase):
@@ -47,3 +49,13 @@ class TrustServiceTest(AsyncHTTPTestCase):
                     json.dumps({'schema': 1, 'entries': [None]}).encode()):
             self.assertEqual(self.push(bad).code, 400)
         self.assertEqual(parse_manifest(self.fetch('/auth.json').body), [])
+
+    def test_legacy_registry_keeps_first_publication_date(self):
+        stamp = '2026-11-20T09:54:33Z'
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.execute('CREATE TABLE builds (version TEXT, arch TEXT, sha256 TEXT, UNIQUE(version, arch, sha256))')
+            db.execute('INSERT INTO builds VALUES (?, ?, ?)', self.first)
+        for row in ((*self.first, stamp), self.first, (*self.first, '2026-11-21T08:00:00Z')):
+            self.assertEqual(self.push(encode_manifest([row])).code, 204)
+        self.assertEqual(parse_builds(self.fetch('/auth.json').body), [(*self.first, stamp)])
+        self.assertEqual(self.fetch('/logo.ico').body, Path(__file__).resolve().parents[1].joinpath('logo.ico').read_bytes())

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>TaoSync · 构建授信列表</title>
+  <link rel="icon" href="./logo.ico">
   <style>
     :root { color-scheme:light dark; --bg:#fbfcfb; --ink:#192822; --muted:#52645d; --line:#cbd8d1; --accent:#006749; --band:#eff4f0; }
     @media(prefers-color-scheme:dark){ :root { --bg:#171c19; --ink:#edf3ed; --muted:#aec1b5; --line:#415049; --accent:#86ddaf; --band:#232c26; } }
@@ -15,15 +16,21 @@
     table{border-collapse:collapse;width:100%;table-layout:fixed;text-align:start} col:nth-child(1){width:21%} col:nth-child(2){width:22%}
     th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:start;overflow-wrap:anywhere} th{background:var(--band);font-size:14px}
     td{font:14px/1.55 ui-monospace,Consolas,monospace} nav{justify-content:flex-end;margin:16px 0}
-    button,a{font:inherit;color:var(--accent)} button{border:1px solid var(--line);border-radius:4px;background:var(--bg);padding:6px 12px;cursor:pointer}
+    button,a,select{font:inherit;color:var(--accent)} button,select{border:1px solid var(--line);border-radius:4px;background:var(--bg);padding:6px 12px;cursor:pointer}
+    header strong,.filters,.filters label{display:flex;align-items:center;gap:8px}
+    .filters{flex-wrap:wrap;gap:12px 24px;margin-bottom:18px}.filters select{max-width:100%}
     button:disabled{opacity:.48;cursor:default} :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     @media(max-width:580px){main{padding:12px 12px 16px} col:nth-child(1),col:nth-child(2){width:25%} th,td{padding:8px 5px} td{font-size:12px} nav{justify-content:space-between}}
   </style>
 </head>
 <body><main>
-  <header><strong>TaoSync</strong><button id="language" type="button">English</button></header>
+  <header><strong><img src="./logo.ico" width="28" height="28" alt="">TaoSync</strong><button id="language" type="button">English</button></header>
   <div class="heading"><h1 id="title">构建授信列表</h1><a href="./auth.json">auth.json</a></div>
-  <table aria-labelledby="title"><colgroup><col><col><col></colgroup><thead><tr><th scope="col" id="version">版本号</th><th scope="col" id="arch">架构</th><th scope="col">SHA-256</th></tr></thead><tbody id="rows"></tbody></table>
+  <div class="filters">
+    <label><span id="versions">版本范围</span><select id="scope"><option value="stable" id="stable" selected>仅正式版</option><option value="all" id="all">展示全部版本</option></select></label>
+    <label><span id="architecture">架构</span><select id="target"><option value="" id="any">全部架构</option></select></label>
+  </div>
+  <table aria-labelledby="title"><colgroup><col><col><col style="width:21%"><col></colgroup><thead><tr><th scope="col" id="version">版本号</th><th scope="col" id="arch">架构</th><th scope="col" id="published">发布时间</th><th scope="col">SHA-256</th></tr></thead><tbody id="rows"></tbody></table>
   <nav><button id="prev" type="button" disabled>上一页</button><p id="status" role="status" aria-live="polite"></p><button id="next" type="button" disabled>下一页</button></nav>
 </main><script>
   'use strict';
@@ -32,22 +39,29 @@
     en: {title:'Trusted builds',version:'Version',arch:'Architecture',prev:'Previous',next:'Next',other:'中文',loading:'Loading registry…',empty:'No trusted builds yet',error:'Could not load the registry',page:(p,n,total)=>`Page ${p} of ${n} · ${total} builds`}
   };
   const byId = id => document.getElementById(id);
+  Object.assign(strings['zh-CN'], {versions:'版本范围',stable:'仅正式版',all:'展示全部版本',architecture:'架构',any:'全部架构',published:'发布时间',noMatch:'没有符合筛选条件的记录',unknown:'未知'});
+  Object.assign(strings.en, {versions:'Versions',stable:'Official releases only',all:'Show all versions',architecture:'Architecture',any:'All architectures',published:'Published',noMatch:'No builds match these filters',unknown:'Unknown'});
   const size = 20;
   let lang = navigator.language.startsWith('zh') ? 'zh-CN' : 'en', entries = [], page = 1, state = 'loading';
   function render(){
-    const s = strings[lang], pages = Math.ceil(entries.length / size);
+    const s = strings[lang], target = byId('target').value;
+    const filtered = entries.filter(e => (!target || target === e.arch) &&
+      (byId('scope').value === 'all' || !/build|dev|test/i.test(e.version)));
+    const pages = Math.ceil(filtered.length / size);
     document.documentElement.lang = lang; document.title = 'TaoSync · ' + s.title;
-    for(const id of ['title','version','arch','prev','next']) byId(id).textContent = s[id];
+    for(const id of ['title','version','arch','prev','next','versions','stable','all','architecture','any','published']) byId(id).textContent = s[id];
     byId('language').textContent = s.other; byId('prev').disabled = page <= 1; byId('next').disabled = page >= pages;
-    byId('status').textContent = state === 'ready' ? (pages ? s.page(page,pages,entries.length) : s.empty) : s[state];
+    byId('status').textContent = state === 'ready' ? (pages ? s.page(page,pages,filtered.length) : entries.length ? s.noMatch : s.empty) : s[state];
     const rows = byId('rows'); rows.replaceChildren();
-    for(const entry of entries.slice((page-1)*size,page*size)){
+    for(const entry of filtered.slice((page-1)*size,page*size)){
       const row = rows.insertRow();
-      for(const key of ['version','arch','sha256']) row.insertCell().textContent = entry[key];
+      for(const value of [entry.version, entry.arch, entry.date ? new Date(entry.date).toLocaleString(lang) : s.unknown, entry.sha256])
+        row.insertCell().textContent = value;
     }
   }
   byId('prev').onclick = () => {page--; render()}; byId('next').onclick = () => {page++; render()};
   byId('language').onclick = () => {lang = lang === 'en' ? 'zh-CN' : 'en'; render()};
+  byId('scope').onchange = byId('target').onchange = () => {page = 1; render()};
   render();
   (async () => {
     try {
@@ -55,7 +69,11 @@
       if (!res.ok) throw Error();
       const doc = await res.json();
       if (doc.schema !== 1 || !Array.isArray(doc.entries) || !doc.entries.every(e => e && typeof e.version==='string' && typeof e.arch==='string' && /^[a-f0-9]{64}$/.test(e.sha256))) throw Error();
-      entries = doc.entries.reverse(); state = 'ready';
+      entries = doc.entries.reverse().map(e => ({...e, date:doc.publishedAt?.[[e.version,e.arch,e.sha256].join('/')]}));
+      entries.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+      for(const arch of [...new Set(entries.map(e => e.arch))].sort())
+        byId('target').add(new Option(arch,arch));
+      state = 'ready';
     } catch {state = 'error'}
     render();
   })();

@@ -617,7 +617,6 @@ programUpdate:
   arch: Processor architecture
   online: You can install development, prerelease and stable builds listed for this platform in the {registry}.
   registry: trusted build registry
-  pin: A match with the SHA-256 configured for this deployment is accepted without a network request. Other files are checked against the online registry.
   container: Updates survive container restarts. Recreating the container uses the selected image.
   unsupported: For source and mobile deployments, use the original installation method to update.
   source: 'Never upload an update file from an unknown source. Official downloads:'

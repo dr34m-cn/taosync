@@ -19,6 +19,7 @@ from service.storage.drivers.base import (
     stream_transfer,
 )
 from service.storage.factory import createDriver
+from service.storage.localAccess import LocalPathError
 from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
 from service.storage.drivers.aliyun import AliyunDriveDriver
 from service.storage.drivers.crypt import CryptDriver
@@ -136,7 +137,7 @@ class _CopyTask:
         except Exception as exc:
             with self.lock:
                 self.state = 7
-                self.error = str(exc)
+                self.error = exc.args if isinstance(exc, LocalPathError) else str(exc)
         finally:
             with self.lock:
                 delete_when_done = self.delete_when_done
@@ -153,7 +154,8 @@ class _CopyTask:
                 "status": "running" if self.state == 1 else "finished",
                 "progress": self.progress,
                 "rapidUpload": self.rapid_upload,
-                "error": self.error,
+                "error": str(LocalPathError(*self.error)) if isinstance(self.error, tuple) else self.error,
+                **({"localError": self.error} if isinstance(self.error, tuple) else {}),
             }
 
     def cancel(self):
@@ -227,7 +229,7 @@ class TaoSyncClient:
                 # Keep a bad/offline mount visible and repairable without
                 # preventing healthy mounts from being used.
                 row["driver"] = None
-                row["driverError"] = str(exc)
+                row["driverError"] = exc.args if isinstance(exc, LocalPathError) else str(exc)
             self.mounts[row["name"]] = row
             by_id[mount_id] = row
         self.related_mounts = {mount_id: group for group in self.related_mounts.values() for mount_id in group}
@@ -293,6 +295,8 @@ class TaoSyncClient:
         driver = mount.get("driver")
         if driver is None:
             detail = mount.get("driverError") or "driver could not be initialized"
+            if isinstance(detail, tuple):
+                raise LocalPathError(*detail)
             raise RuntimeError(
                 "storage directory '{}' is unavailable: {}".format(
                     mount.get("name", ""), detail

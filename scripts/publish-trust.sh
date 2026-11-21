@@ -21,7 +21,8 @@ for attempt in {1..10}; do
   python3 scripts/release-checksums.py merge "$previous" "$delta" "$tmp/auth.json"
   json=$(git hash-object -w "$tmp/auth.json")
   html=$(git hash-object -w apiServer/index.html)
-  tree=$(printf '100644 blob %s\tauth.json\n100644 blob %s\tindex.html\n' "$json" "$html" | git mktree)
+  icon=$(git hash-object -w logo.ico)
+  tree=$(printf '100644 blob %s\tauth.json\n100644 blob %s\tindex.html\n100644 blob %s\tlogo.ico\n' "$json" "$html" "$icon" | git mktree)
   if [[ -n "${base:-}" && $(git rev-parse "$base^{tree}") == "$tree" ]]; then
     revision=$base
   else

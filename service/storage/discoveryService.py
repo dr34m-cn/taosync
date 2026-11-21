@@ -14,6 +14,7 @@ import socket
 import string
 import threading
 import time
+from service.storage.localAccess import LocalBoundary, canonical, check_entry
 
 
 # Keep discovery responsive even on a machine with several interfaces.  These
@@ -287,25 +288,26 @@ def list_smb_shares(config):
     return _list_smb_shares(config)
 
 
-def _safe_root(name, path):
+def _safe_root(name, path, boundary):
     try:
-        path = os.path.realpath(os.path.abspath(path))
-    except OSError:
+        path = canonical(path)
+        boundary.check(path)
+    except (ValueError, OSError):
         return None
     try:
         if os.path.islink(path) or not os.path.isdir(path):
             return None
     except OSError:
         return None
-    return {"name": name, "path": path}
+    return {"name": name, "path": str(path)}
 
 
-def _filesystem_roots():
+def _filesystem_roots(boundary):
     roots = []
     seen = set()
 
     def add(name, path):
-        root = _safe_root(name, path)
+        root = _safe_root(name, path, boundary)
         if root is None:
             return
         key = os.path.normcase(root["path"])
@@ -326,14 +328,24 @@ def _filesystem_roots():
     return roots
 
 
-def _browse_path(path):
+def _browse_path(path, boundary):
     if path is None or str(path) == "":
         path = os.getcwd()
+        while True:
+            try:
+                boundary.check(canonical(path))
+                break
+            except ValueError:
+                parent = os.path.dirname(path)
+                if path == parent:
+                    raise
+                path = parent
     path = str(path)
     if "\x00" in path or not os.path.isabs(path):
         raise ValueError("local browse path must be absolute")
     try:
-        path = os.path.realpath(os.path.abspath(path))
+        path = canonical(path)
+        boundary.check(path)
         if not os.path.isdir(path):
             raise ValueError("local browse path must be an existing directory")
     except OSError as exc:
@@ -343,34 +355,34 @@ def _browse_path(path):
 
 def localBrowse(path=None):
     """List safe child directories for the local-directory picker."""
-    current = _browse_path(path)
+    boundary = LocalBoundary()
+    current = _browse_path(path, boundary)
     parent = os.path.dirname(current)
     # ``dirname`` of a filesystem root is the root itself.
     if os.path.normcase(parent) == os.path.normcase(current):
         parent = None
     directories = []
     try:
-        entries = os.scandir(current)
-    except (OSError, PermissionError) as exc:
-        raise ValueError("local browse path is not accessible") from exc
-    try:
-        for entry in entries:
-            try:
-                if entry.is_symlink() or not entry.is_dir(follow_symlinks=False):
+        with boundary.directory(current) as fd, os.scandir(current if fd is None else fd) as entries:
+            for entry in entries:
+                try:
+                    if not entry.is_dir(follow_symlinks=False):
+                        continue
+                    info = entry.stat(follow_symlinks=False)
+                    check_entry(info)
+                    boundary.check_directory(info)
+                    entry_path = current / entry.name
+                    boundary.check(entry_path)
+                    directories.append({"name": entry.name, "path": str(entry_path)})
+                except (OSError, ValueError):
                     continue
-                entry_path = os.path.realpath(os.path.abspath(entry.path))
-                directories.append({"name": entry.name, "path": entry_path})
-            except (OSError, PermissionError):
-                continue
-    finally:
-        close = getattr(entries, "close", None)
-        if close is not None:
-            close()
+    except OSError as exc:
+        raise ValueError("local browse path is not accessible") from exc
     directories.sort(key=lambda item: item["name"].casefold())
     return {
-        "path": current,
+        "path": str(current),
         "parent": parent,
-        "roots": _filesystem_roots(),
+        "roots": _filesystem_roots(boundary),
         "directories": directories,
     }
 

@@ -4,7 +4,7 @@ import platform
 import sys
 from pathlib import Path
 
-from apiServer.trust_manifest import MAX_MANIFEST_BYTES, SHA256, parse_manifest
+from apiServer.trust_manifest import MAX_MANIFEST_BYTES, parse_manifest
 
 from service.system import updateLauncher as launcher
 
@@ -31,7 +31,7 @@ def supported():
 def info():
     enabled = supported()
     return {'architecture': platform.machine(), 'target': platform_target(),
-            'supported': enabled, 'maxBytes': MAX_BYTES, 'pinned': bool(os.getenv('TAO_UPDATE_SHA256')),
+            'supported': enabled, 'maxBytes': MAX_BYTES,
             'container': Path('/.dockerenv').exists(),
             'result': launcher.read_json(Path(os.environ['TAO_UPDATE_CHANNEL']) / 'result') if enabled else {}}
 
@@ -54,10 +54,16 @@ async def fetch_manifest(url):
         raise ValueError('manifest unavailable') from exc
 
 
+class ArchitectureMismatch(ValueError):
+    def __init__(self, target, packages):
+        super().__init__('update_wrong_arch')
+        self.details = {'system': target, 'package': ', '.join(sorted(packages))}
+
+
 async def verify_digest(digest):
-    pinned = os.getenv('TAO_UPDATE_SHA256', '').lower()
-    if SHA256.fullmatch(pinned) and digest == pinned:
-        return
+    target = platform_target()
+    packages = set()
+    available = False
     tasks = [asyncio.create_task(fetch_manifest(url)) for url in TRUST_URLS]
     try:
         for completed in asyncio.as_completed(tasks):
@@ -65,9 +71,13 @@ async def verify_digest(digest):
                 rows = await completed
             except ValueError:
                 continue
-            target = platform_target()
-            if any(arch == target and sha == digest for _, arch, sha in rows):
+            available = True
+            packages.update(arch for _, arch, sha in rows if sha == digest)
+            if target in packages:
                 return
+        if packages:
+            raise ArchitectureMismatch(target, packages)
+        if available:
             raise ValueError('update_not_trusted')
         raise ValueError('update_trust_unavailable')
     finally:

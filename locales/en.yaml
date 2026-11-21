@@ -128,5 +128,7 @@ update_busy: A sync job or update is in progress. Try again later.
 update_stage_failed: Cannot stage the file. Check the installation directory permissions and free space.
 update_write_failed: Cannot write the update. Check the available disk space.
 update_trust_unavailable: Neither trust source returned a valid registry. No update was installed. Check your connection and try again.
-update_not_trusted: The executable's SHA-256 is not registered for this platform. Select an executable or release archive for this platform.
+update_not_trusted: This file is not trusted. Download update packages only from a trusted source.
+local_path_protected: This local path is protected. Select a regular file or directory outside the application directory.
+update_wrong_arch: 'Architecture mismatch: this system is {system}, but the update package is {package}. Upload a package for the correct architecture.'
 update_already_running: This executable is already running

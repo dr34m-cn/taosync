@@ -4,9 +4,10 @@ import sys
 import tarfile
 import zipfile
 from pathlib import Path
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from apiServer.trust_manifest import LABEL, encode_manifest, parse_manifest
+from apiServer.trust_manifest import LABEL, encode_manifest, parse_builds
 
 
 def manifest(directory, tag, include_apk=False):
@@ -34,13 +35,14 @@ def manifest(directory, tag, include_apk=False):
 if __name__ == '__main__':
     if sys.argv[1] == 'collect':
         _, _, directory, version, output = sys.argv
-        rows = [(version, arch, sha) for sha, arch in manifest(Path(directory), version, include_apk=True)]
+        stamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        rows = [(version, arch, sha, stamp) for sha, arch in manifest(Path(directory), version, include_apk=True)]
         if rows:
             Path(output).write_bytes(encode_manifest(rows))
     elif sys.argv[1] == 'merge':
         _, _, previous, addition, output = sys.argv
-        old = parse_manifest(Path(previous).read_bytes()) if previous != '-' else []
-        Path(output).write_bytes(encode_manifest(old + parse_manifest(Path(addition).read_bytes())))
+        old = parse_builds(Path(previous).read_bytes()) if previous != '-' else []
+        Path(output).write_bytes(encode_manifest(old + parse_builds(Path(addition).read_bytes())))
     else:
         for digest, target in manifest(Path(sys.argv[1]), sys.argv[2]):
             print(digest, target)
