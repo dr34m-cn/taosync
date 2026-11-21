@@ -18,7 +18,11 @@ Always review and update README.md and README_EN.md together. Keep their user-fa
 
 # Release Changelogs
 
-Write `doc/changelog/` entries from the perspective of a user upgrading from the previous released version. When extending an existing entry, review commits since its last edit and merge related changes into the existing bullets. Use the previous release, not the individual commit messages, to classify the result: describe a feature introduced in this release once in its final form under 特性, including any refinements made before release. Use 优化 for improvements to previously released behavior and 修复 only for defects present in the previous release.
+Write `doc/changelog/` entries from the perspective of a user upgrading from the previous released version. When extending an existing entry, review commits since its last edit and merge related changes into the existing items. Use the previous release, not the individual commit messages, to classify the result: describe a feature introduced in this release once in its final form under 特性, including any refinements made before release. Use 优化 for improvements to previously released behavior and 修复 only for defects present in the previous release.
+
+Within each category, give every item a short Markdown level-three heading (`###`) that says what changed in a few words. Use normal paragraph text beneath it for the specific behavior, upgrade notes, and related issue links.
+
+Write the complete Simplified Chinese changelog first, then append the complete English translation. Separate them with a single Markdown horizontal rule (`---`) and omit language headings. Keep the categories, item order, upgrade notes, and issue links aligned across both languages. Exclude build-related changes, including CI, packaging workflows, and build matrices.
 
 # Frontend Preferences
 
