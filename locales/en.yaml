@@ -21,7 +21,8 @@ notify_invalid_remark: Notification note must be text
 api_key_unknown_action: Unknown API key action
 api_key_enable_first: Enable the API key first
 https_invalid_pair: Provide a PEM certificate chain and its matching unencrypted private key (up to 256 KiB each).
-https_port_unavailable: Cannot listen on HTTPS port 8025. Check whether the port is already in use.
+https_invalid_port: HTTPS requires a port from 1 to 65535 other than the HTTP port or 8024.
+https_port_unavailable: Cannot listen on the selected HTTPS port. Check whether the port is already in use.
 https_storage_error: Cannot read or save the HTTPS configuration. Check the data directory permissions.
 init_sql: Database initialization completed
 admin_password_generated: "Generated a random password for admin: {}"

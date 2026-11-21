@@ -720,6 +720,28 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         self.assertNotIn(change('enable')['key'], (first, second))
         rejected(second)
 
+    def test_execution_key_is_limited_to_manual_runs(self):
+        path = '/svr/settings/api-key'
+        cookie = {'Cookie': self._login_cookie()}
+        def change(action):
+            response = self.fetch(path, method='PUT', headers=cookie,
+                                  body=json.dumps(dict(scope='execute', action=action)))
+            return json.loads(response.body)['data']
+        key = change('enable')['key']
+        headers = {'Authorization': key}
+        with mock.patch('controller.jobController.jobService.doJobManual') as run:
+            response = self.fetch('/svr/job', method='PUT', headers=headers, body='{"id":123,"pause":null}')
+            self.assertEqual(json.loads(response.body)['code'], 200)
+            run.assert_called_once_with(123)
+        for body in ({'id': 123, 'pause': True}, {'pause': None, 'action': 'retryAll', 'taskId': 1}):
+            self.assertEqual(self.fetch('/svr/job', method='PUT', body=json.dumps(body), headers=headers).code, 401)
+        self.assertEqual(self.fetch('/svr/job', headers=headers).code, 401)
+        self.assertEqual(self.fetch(path, headers=headers).code, 401)
+        self.assertFalse(json.loads(self.fetch(path, headers=cookie).body)['data']['enabled'])
+        change('reset')
+        self.assertEqual(self.fetch('/svr/job', method='PUT', headers=headers, body='{"pause":null}').code, 401)
+        change('disable')
+
     def test_api_key_errors_follow_request_language(self):
         path = '/svr/settings/api-key'
         headers = {**JSON_HEADERS, 'Cookie': self._login_cookie()}

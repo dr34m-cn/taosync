@@ -345,6 +345,14 @@ class TaoSyncClient:
             for name, detail in details.items()
         }
 
+    def fileDetail(self, directory, name):
+        mount, relative = self.resolve(child_path(directory, name))
+        try:
+            item = self.fileMetadata(mount, relative)
+        except (FileNotFoundError, IsADirectoryError):
+            return None
+        return {'isDir': 0, 'size': item['size'], 'fingerprint': item.get('fingerprint')}
+
     def fileListDetailApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """Return driver metadata without changing fileListApi's legacy shape."""
         self.checkWait(path, scanInterval)

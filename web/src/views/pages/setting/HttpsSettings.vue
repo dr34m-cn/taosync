@@ -8,6 +8,9 @@ import { applyHttps, clearHttpsCertificate, getHttpsStatus } from '@/api/setting
 const { t } = useI18n();
 const status = ref(null);
 const enabled = ref(false);
+const port = ref(8025);
+const validPort = computed(() => Number.isInteger(port.value) && port.value >= 1 && port.value <= 65535
+  && port.value !== 8024 && port.value !== status.value?.httpPort);
 const pending = ref('');
 const busy = computed(() => !!pending.value);
 const maxPemBytes = 256 * 1024;
@@ -26,9 +29,11 @@ const inputs = computed(() => fields.value.map(field => {
   return { field, value, invalid };
 }));
 const canApply = computed(() => {
-  if (!enabled.value) return status.value?.autoStart;
+  if (!validPort.value) return false;
+  const changedPort = port.value !== status.value?.port;
+  if (!enabled.value) return changedPort || status.value?.autoStart;
   if (inputs.value.every(({ value, invalid }) => value && !invalid)) return true;
-  return status.value?.configured && !status.value.enabled && inputs.value.every(({ value }) => !value);
+  return status.value?.configured && (!status.value.enabled || changedPort) && inputs.value.every(({ value }) => !value);
 });
 
 function newFields() {
@@ -41,6 +46,7 @@ function newFields() {
 function reset(data) {
   status.value = data;
   enabled.value = data.autoStart;
+  port.value = data.port;
   fields.value = newFields();
 }
 
@@ -54,7 +60,7 @@ async function save() {
   if (busy.value || !canApply.value) return;
   pending.value = 'save';
   try {
-    const data = { enabled: enabled.value };
+    const data = { enabled: enabled.value, port: port.value };
     if (enabled.value) {
       try {
         for (const { field, value } of inputs.value) {
@@ -99,7 +105,12 @@ onMounted(load);
     <template v-if="status">
       <a v-if="status.enabled" :href="address" target="_blank" rel="noopener noreferrer">{{ address }}</a>
       <p v-else-if="status.configured" role="status">{{ t(status.autoStart ? 'https.inactive' : 'https.retained') }}</p>
-      <form v-if="enabled || status.configured" @submit.prevent="save">
+      <form @submit.prevent="save">
+        <label class="port-field">
+          {{ t('https.port') }}
+          <el-input-number v-model="port" :controls="false" :disabled="busy" :aria-label="t('https.port')" />
+        </label>
+        <p v-if="!validPort" class="pem-error" role="alert">{{ t('https.invalidPort') }}</p>
         <template v-if="enabled">
           <p>{{ t('https.files') }}</p>
           <p v-if="plainHttp" class="warning">{{ t('https.plainHttp') }}</p>
@@ -126,7 +137,7 @@ onMounted(load);
         </template>
         <p v-else-if="status.autoStart">{{ t('https.disableHint') }}</p>
         <div class="https-actions">
-          <el-button v-if="enabled || status.autoStart" type="primary" native-type="submit" :icon="Check" :loading="pending === 'save'" :disabled="busy || !canApply">{{ t('setting.saveAndApply') }}</el-button>
+          <el-button type="primary" native-type="submit" :icon="Check" :loading="pending === 'save'" :disabled="busy || !canApply">{{ t('setting.saveAndApply') }}</el-button>
           <el-button v-if="status.configured" type="danger" plain :icon="Delete" :loading="pending === 'clear'" :disabled="busy" @click="clearSaved">{{ t('https.clear') }}</el-button>
         </div>
       </form>
@@ -139,6 +150,7 @@ onMounted(load);
 p, a { font-size: 14px; }
 a { color: var(--el-color-primary); overflow-wrap: anywhere; }
 .warning { color: var(--el-color-warning-dark-2); }
+.port-field { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: 14px; }
 .pem-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 16px 0; }
 .pem-field { min-width: 0; margin: 0; padding: 0; border: 0; }
 .pem-field legend { margin-bottom: 8px; padding: 0; font-size: 14px; font-weight: 600; }

@@ -9,6 +9,8 @@ import { changeApiKey, getApiKeyStatus } from '@/api/settings';
 import guideZh from './api-key.md?raw';
 import guideEn from './api-key.en.md?raw';
 
+const props = defineProps({ scope: { type: String, default: 'general' } });
+const titleId = `api-key-${props.scope}`;
 const help = ref(false);
 const { t, locale } = useI18n();
 const guideHtml = computed(() => marked.parse(locale.value === 'en' ? guideEn : guideZh));
@@ -20,7 +22,7 @@ const { copy, copied } = useClipboard({ source: key, legacy: true });
 async function load() {
   busy.value = true;
   try {
-    enabled.value = (await getApiKeyStatus()).data.enabled;
+    enabled.value = (await getApiKeyStatus(props.scope)).data.enabled;
   } catch {
     enabled.value = null;
   } finally {
@@ -39,7 +41,7 @@ async function change(action) {
       }).then(() => true, () => false);
       if (!confirmed) return;
     }
-    const { data } = await changeApiKey(action);
+    const { data } = await changeApiKey(action, props.scope);
     enabled.value = data.enabled;
     key.value = data.key || '';
   } catch {
@@ -54,9 +56,9 @@ onMounted(load);
 </script>
 
 <template>
-  <section aria-labelledby="api-key-title" :aria-busy="busy">
+  <section :aria-labelledby="titleId" :aria-busy="busy">
     <header class="section-toolbar key-heading">
-      <h2 id="api-key-title" class="section-heading"><el-icon aria-hidden="true"><Key /></el-icon>{{ t('apiKey.title') }}</h2>
+      <h2 :id="titleId" class="section-heading"><el-icon aria-hidden="true"><Key /></el-icon>{{ t(scope === 'execute' ? 'apiKey.executeTitle' : 'apiKey.title') }}</h2>
       <el-button class="guide-action" link type="primary" :icon="QuestionFilled" :aria-label="t('apiKey.help')" :title="t('apiKey.help')" @click="help = true">{{ t('apiKey.help') }}</el-button>
       <div v-if="enabled !== null" class="controls">
         <el-switch :model-value="enabled" :disabled="busy" :aria-label="t('apiKey.enable')" @change="change($event ? 'enable' : 'disable')" />
@@ -67,6 +69,7 @@ onMounted(load);
     </header>
     <el-dialog :model-value="!!key" :title="t('apiKey.newKey')" width="min(540px, 92vw)" append-to-body destroy-on-close
       :close-on-click-modal="false" @close="key = ''">
+      <el-alert :title="t('apiKey.warning')" type="error" show-icon :closable="false" />
       <p class="key-notice">{{ t('apiKey.notice') }}</p>
       <code class="issued-key">{{ key }}</code>
       <template #footer>
@@ -81,7 +84,7 @@ onMounted(load);
 </template>
 
 <style scoped>
-.key-heading { white-space: nowrap; }
+.key-heading { flex-wrap: wrap; }
 .controls { display: flex; align-items: center; gap: var(--toolbar-gap, 12px); margin-inline-start: auto; font-size: 14px; }
 .key-notice { margin: 0 0 12px; line-height: 1.6; }
 .issued-key { display: block; overflow-wrap: anywhere; user-select: all; }

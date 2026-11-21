@@ -243,6 +243,7 @@ task:
   fail: Failed
   other: Other
 current:
+  retrying: Retrying failed items
   notRunning: Job is not running
   overall: Overall
   noSyncFound: No files to sync yet
@@ -271,6 +272,13 @@ current:
   abortConfirm: Running or waiting items will be canceled. Completed items are not affected. Continue?
   abortSent: Abort command sent. Please wait.
 taskDetail:
+  retryAll: Retry all failed items
+  noRetries: No failed files available to retry
+  addedRetries: 'Added {count} failed files to the retry queue'
+  stats: Task statistics
+  allTransfers: All transfer methods
+  transferMethod: Transfer method
+  rapidOnly: Instant uploads only
   retryQueued: Waiting to retry
   retrySucceeded: Retry succeeded
   retryFailed: Retry failed
@@ -532,7 +540,9 @@ pathSelect:
   title: Select Directory
   selectFirst: Select a path first
 apiKey:
-  title: API key
+  title: General API key
+  executeTitle: Job execution key
+  warning: Treat this key like your account password. Never share it!
   help: Usage guide
   helpTitle: API key usage guide
   enable: Enable API key
@@ -547,7 +557,9 @@ apiKey:
   copied: Copied
   close: Close
 https:
-  enable: Enable HTTPS on port 8025
+  enable: Enable HTTPS
+  port: HTTPS port
+  invalidPort: Choose a port from 1 to 65535 other than the HTTP port or 8024.
   certificate: Certificate chain (PEM)
   privateKey: Unencrypted private key (PEM)
   inputMode: 'Input method for {field}'
@@ -557,7 +569,7 @@ https:
   chooseFile: choose a file
   fileHint: '{formats} · Up to 256 KiB'
   pemPlaceholder: Enter or paste the PEM text, including the BEGIN and END lines.
-  files: Use the server certificate followed by any intermediate certificates. Port 8025 serves HTTPS; the HTTP address stays available.
+  files: Use the server certificate followed by any intermediate certificates. The HTTP address stays available.
   plainHttp: This connection is not encrypted. Submit the private key only from localhost or through a secure tunnel.
   inactive: HTTPS is configured but not listening. Apply to retry, or provide a replacement certificate and key.
   retained: The certificate and private key are saved. Leave both fields empty to use them when re-enabling HTTPS.

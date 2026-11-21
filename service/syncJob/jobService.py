@@ -248,27 +248,43 @@ def launchLinkedJob(jobId):
 
 
 def retryFile(taskId, itemId):
-    item = jobMapper.getRetryItem(taskId, itemId)
-    client = getJobClientById(item['jobId'])
-    if not jobClient.acquireRun(client.runLock):
-        raise ValueError(G('job_running'))
-    retryId = None
-    try:
+    if itemId is None:
+        raise ValueError(G('file_retry_ineligible'))
+    return retryFiles(taskId, itemId)
+
+
+def retryFiles(taskId, itemId=None):
+    source = jobMapper.getJobTaskById(taskId)
+    with _configLock:
+        client = getJobClientById(source['jobId'])
         if client.removed or client.job['enable'] != 1:
             raise ValueError(G('disabled_job_cannot_run'))
-        retryId = jobMapper.createFileRetry(item)
-        task = FileRetryTask(retryId, client, item)
-        client.currentJobTask = task
-        client.jobDoing = True
-        task.start()
-        return {'id': retryId}
-    except Exception as exc:
+        task = client.currentJobTask
+        if isinstance(task, FileRetryTask) and not task.breakFlag:
+            retryId, items = jobMapper.claimFileRetries(taskId, client.jobId, itemId, task.taskId)
+            task.enqueue(items)
+            return {'id': retryId, 'count': len(items)}
+        if not jobClient.acquireRun(client.runLock):
+            raise ValueError(G('job_running'))
+        retryId = None
         try:
-            if retryId is not None:
-                jobMapper.updateJobTaskStatus(retryId, 6, str(exc))
-        finally:
-            client.finishRun()
-        raise
+            retryId, items = jobMapper.claimFileRetries(taskId, client.jobId, itemId)
+            if not items:
+                client.finishRun()
+                return {'id': None, 'count': 0}
+            task = FileRetryTask(retryId, client, _configLock)
+            task.enqueue(items)
+            client.currentJobTask = task
+            client.jobDoing = True
+            task.start()
+            return {'id': retryId, 'count': len(items)}
+        except Exception as exc:
+            try:
+                if retryId is not None:
+                    jobMapper.updateJobTaskStatus(retryId, 6, str(exc))
+            finally:
+                client.finishRun()
+            raise
 
 
 def getTaskDetails(req):
@@ -277,14 +293,20 @@ def getTaskDetails(req):
     ids = {row['retryTaskId'] for row in rows if row.get('retryTaskId')}
     if ids:
         retries = {run['id']: run for run in jobMapper.getFileRetryResults(ids)}
-        for run in retries.values():
-            renderReason(run)
-            client = jobClientList.get(run['jobId'])
-            task = client.currentJobTask if client else None
-            if run['status'] < 2 and isinstance(task, FileRetryTask) and task.taskId == run['id']:
-                run.update(task.retryProgress())
         for row in rows:
-            row['retry'] = retries.get(row.get('retryTaskId'))
+            run = retries.get(row.get('retryTaskId'))
+            if run is None:
+                continue
+            retry = dict(run)
+            if row.get('lastRetryStatus') is not None:
+                retry.update(status=row['lastRetryStatus'], errMsg=row['lastRetryError'],
+                             retryReason=row['lastRetryReason'])
+            elif run['status'] < 2:
+                client = jobClientList.get(run['jobId'])
+                task = client.currentJobTask if client else None
+                if isinstance(task, FileRetryTask) and task.taskId == run['id']:
+                    retry.update(task.retryProgress(row['id']), errMsg=None, retryReason=None)
+            row['retry'] = renderReason(retry)
     return result
 
 

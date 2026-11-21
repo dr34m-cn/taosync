@@ -11,7 +11,7 @@ from service.syncJob import jobLinks
 from service.notify import notifyService
 
 
-def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=None, triggersLinks=False):
+def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=None, triggersLinks=False, notify=True):
     """
     任务状态更新，任务完成后的操作，此处status一定大于1
     :param taskId: 任务id
@@ -31,8 +31,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
                 logging.getLogger().exception(G('link_dispatch_failed'))
     else:
         jobMapper.updateJobTaskStatus(taskId, status, errMsg)
-    notifyList = notifyService.getNotifyList(True)
-    job = jobMapper.getJobByTaskId(taskId)
+    notifyList = notifyService.getNotifyList(True) if notify else []
     contextExt = ''
     if taskList is not None:
         hours, minutes, seconds = commonUtils.convertSeconds(duration)
@@ -58,6 +57,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
     }])
     statusName = G('task_status')[status]
     if notifyList:
+        job = jobMapper.getJobByTaskId(taskId)
         # 无需同步标识
         needNotSync = False
         if status == 2 and taskNum['allNum'] == 0:

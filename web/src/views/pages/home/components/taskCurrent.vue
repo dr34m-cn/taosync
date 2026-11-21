@@ -259,7 +259,7 @@ watch(isMobile, () => {
             <div class="metric">
               {{ $t("current.currentStatus") }}:
               {{
-                current.scanFinish
+                current.fileRetry ? $t("current.retrying") : current.scanFinish
                   ? $t("current.scanDoneSyncing")
                   : current.firstSync === null
                     ? $t("current.scanningOnly")

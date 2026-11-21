@@ -9,7 +9,7 @@ try {
   for (const mobile of [false, true]) {
     const language = mobile ? 'en' : 'zh-CN';
     const { context, page, errors } = await preparePage(browser, demo.url, mobile, language);
-    const state = { enabled: false, configured: false, autoStart: false, port: 8025 };
+    const state = { enabled: false, configured: false, autoStart: false, port: 8025, httpPort: 8023 };
     const writes = [];
     let deletes = 0;
     await context.route('**/svr/settings', route => route.fulfill({ json: { code: 200, data: {} } }));
@@ -19,7 +19,7 @@ try {
         const body = route.request().postDataJSON();
         writes.push(body);
         if (writes.length === 1) return route.fulfill({ json: { code: 500, msg: 'Test validation error' } });
-        Object.assign(state, { enabled: body.enabled, autoStart: body.enabled, configured: true });
+        Object.assign(state, { enabled: body.enabled, autoStart: body.enabled, configured: true, port: body.port });
       } else if (route.request().method() === 'DELETE') {
         deletes++;
         Object.assign(state, { enabled: false, autoStart: false, configured: false });
@@ -36,6 +36,13 @@ try {
     const clearLabel = mobile ? 'Clear certificate' : '清空证书';
     const clear = https.getByRole('button', { name: clearLabel });
     await clickSwitch();
+    const port = https.getByRole('spinbutton');
+    assert.equal(await port.inputValue(), '8025');
+    await port.fill('8024');
+    await port.blur();
+    await https.getByRole('alert').waitFor();
+    await port.fill('8443');
+    await port.blur();
     const [left, right] = await Promise.all([cert.boundingBox(), key.boundingBox()]);
     assert.ok(mobile ? right.y >= left.y + left.height : right.x >= left.x + left.width);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
@@ -59,21 +66,21 @@ try {
     assert.equal(writes.length, 0);
     await save.click();
     await page.getByText('Test validation error', { exact: true }).waitFor();
-    assert.deepEqual(writes[0], { enabled: true, certificate: 'replacement cert', privateKey: 'draft key\nsecond line' });
+    assert.deepEqual(writes[0], { enabled: true, port: 8443, certificate: 'replacement cert', privateKey: 'draft key\nsecond line' });
     assert.equal(await text.inputValue(), writes[0].privateKey);
     await save.click();
     await https.getByRole('link').waitFor();
     await clickSwitch();
     await save.click();
-    await save.waitFor({ state: 'hidden' });
-    assert.deepEqual(writes[2], { enabled: false });
+    await https.getByRole('link').waitFor({ state: 'hidden' });
+    assert.deepEqual(writes[2], { enabled: false, port: 8443 });
     await page.reload();
     await clear.waitFor();
     assert.equal(await toggle.isChecked(), false);
     await clickSwitch();
     await save.click();
     await https.getByRole('link').waitFor();
-    assert.deepEqual(writes[3], { enabled: true });
+    assert.deepEqual(writes[3], { enabled: true, port: 8443 });
     const dialog = page.getByRole('dialog', { name: clearLabel });
     await clear.click();
     await dialog.getByRole('button', { name: mobile ? 'Cancel' : '取消' }).click();

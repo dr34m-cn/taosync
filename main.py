@@ -53,7 +53,7 @@ async def main():
     logger = logging.getLogger()
     restart = asyncio.Event()
     http = app.listen(server['port'])
-    https = app.settings['https_listener'] = HttpsListener(app)
+    https = app.settings['https_listener'] = HttpsListener(app, http_port=int(server['port']))
     https.restore()
     if getattr(sys, 'frozen', False) and os.getenv('TAO_UPDATE_CHANNEL'):
         app.settings['restart_for_update'] = restart.set

@@ -463,30 +463,43 @@ def getJobTaskItemList(req):
                                     "order by createTime desc, id desc ", req)
 
 
-def getRetryItem(taskId, itemId):
-    rows = sqlBase.fetchall_to_table(
-        "select i.*, t.jobId from job_task_item i join job_task t on t.id=i.taskId "
-        "where i.taskId=? and i.id=? and t.status>1 and i.status=7 and i.isPath=0 "
-        "and i.type in (0,1,2) and i.fileName is not null", (taskId, itemId))
-    if not rows:
-        raise FileRetryError('file_retry_ineligible')
-    return rows[0]
-
-
 @sqlBase.connect_sql
-def createFileRetry(conn, item):
-    # Claim the original row and create its linked run in one transaction.
+def claimFileRetries(conn, sourceId, jobId, itemId=None, retryId=None):
+    """Claim eligible items and their shared run in one transaction."""
     with conn:
-        taskId = conn.execute('insert into job_task (jobId,runTime) values (?,?)',
-                              (item['jobId'], int(time.time()))).lastrowid
-        changed = conn.execute(
-            'update job_task_item set retryTaskId=? where id=? and taskId=? and status=7 '
-            'and retryTaskId is ? and not exists '
-            '(select 1 from job_task where id=retryTaskId and status in (0,1,2))',
-            (taskId, item['id'], item['taskId'], item['retryTaskId']))
-        if changed.rowcount != 1:
-            raise FileRetryError('file_retry_already_retried')
-    return taskId
+        conn.execute('begin immediate')
+        cursor = conn.execute(
+            "select i.*, coalesce(i.lastRetryStatus, r.status) as previousStatus "
+            "from job_task_item i join job_task t on t.id=i.taskId "
+            "left join job_task r on r.id=i.retryTaskId "
+            "where t.id=? and t.jobId=? and t.status>1 and i.status=7 and i.isPath=0 "
+            "and i.type in (0,1,2) and i.fileName != '' "
+            + ("and i.id=? " if itemId is not None else "") + "order by i.id",
+            (sourceId, jobId) if itemId is None else (sourceId, jobId, itemId))
+        columns = [col[0] for col in cursor.description]
+        rows = [dict(zip(columns, row)) for row in cursor]
+        if not rows and itemId is not None:
+            raise FileRetryError('file_retry_ineligible')
+        items = [row for row in rows if row['previousStatus'] not in (0, 1, 2)
+                 and (retryId is None or row['retryTaskId'] != retryId)]
+        if not items:
+            if itemId is not None:
+                raise FileRetryError('file_retry_already_retried')
+            return retryId, []
+        if retryId is None:
+            retryId = conn.execute('insert into job_task (jobId,runTime,status,fileRetry) values (?,?,1,1)',
+                                   (jobId, int(time.time()))).lastrowid
+        conn.executemany('update job_task_item set retryTaskId=?, lastRetryStatus=null, '
+                         'lastRetryError=null, lastRetryReason=null where id=?',
+                         [(retryId, row['id']) for row in items])
+    return retryId, items
+
+
+def saveFileRetryResult(retryId, itemId, status, error):
+    text, reason = storedReason(error)
+    sqlBase.execute_update('update job_task_item set lastRetryStatus=?, lastRetryError=?, '
+                           'lastRetryReason=? where id=? and retryTaskId=?',
+                           (status, text, reason, itemId, retryId))
 
 
 def getFileRetryResults(taskIds):

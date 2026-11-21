@@ -1,4 +1,5 @@
 <script setup>
+import RetryAllButton from "./components/RetryAllButton.vue";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { jobDeleteTask, jobGetTask } from "@/api/job";
@@ -107,7 +108,8 @@ const currentChange = (val) => {
         <el-table-column prop="status" :label="$t('task.status')" width="140">
           <template #default="scope">
             <div :class="`bg-status bg-${scope.row.status < 6 ? scope.row.status : 7}`">
-              <template v-if="scope.row.status == 1 && scope.row.allNum == 0">
+              <template v-if="scope.row.fileRetry && scope.row.status == 1">{{ $t('current.retrying') }}</template>
+              <template v-else-if="scope.row.status == 1 && scope.row.allNum == 0">
                 {{ $t("task.scanning") }}
               </template>
               <template v-else-if="scope.row.status == 2 && scope.row.allNum == 0">
@@ -136,10 +138,11 @@ const currentChange = (val) => {
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="任务统计" min-width="220">
+        <el-table-column :label="$t('taskDetail.stats')" min-width="220">
           <template #default="{ row }">
             <taskHistoryStats v-if="row.fileStats" :key="row.id" :task="row" />
             <span v-else>--</span>
+            <RetryAllButton v-if="row.status > 1 && row.failNum" :task-id="row.id" @submitted="getTaskList" />
           </template>
         </el-table-column>
         <el-table-column prop="createTime" :label="$t('common.createdAt')" width="170">

@@ -229,6 +229,13 @@ class AlistClient:
             seen.update((item['name'], item['is_dir']) for item in entries)
             page += 1
 
+    def fileDetail(self, directory, name):
+        item = self.post('/api/fs/get', data={'path': directory.rstrip('/') + '/' + name})
+        if item['name'] != name or item['is_dir']:
+            return None
+        return {'isDir': 0, 'size': item['size'], 'fingerprint': fileFingerprint(
+            'alist', item.get('hash_info') or item.get('hash'), item.get('modified') or item.get('updated_at'))}
+
     def fileListDetailApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """Return AList entries with stable metadata while keeping fileListApi compatible."""
         rts = {

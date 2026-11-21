@@ -99,6 +99,7 @@ onMounted(load);
 
     <HttpsSettings class="settings-section" />
     <ApiKey class="settings-section" />
+    <ApiKey class="settings-section" scope="execute" />
     <ProgramUpdate class="settings-section" />
     <footer class="setting-footer">
       <span>{{ $t('setting.version') }}</span>

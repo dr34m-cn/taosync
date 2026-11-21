@@ -46,7 +46,7 @@ def init_sql(conn):
                 )
             for table in ('job_dispatch', 'job_link_target', 'job_link', 'job_source_snapshot', 'job_source_snapshot_meta',
                           'storage_mount', 'notify', 'job_task_item', 'job_task',
-                          'job', 'alist_list', 'api_key', 'user_list'):
+                          'job', 'alist_list', 'api_key', 'execution_api_key', 'user_list'):
                 cursor.execute("drop table if exists " + table)
             userTableExists = False
     passwd = None
@@ -285,6 +285,8 @@ def init_sql(conn):
     # No row means API authentication is disabled (including on upgrade).
     cursor.execute("create table if not exists api_key("
                    "slot integer primary key check(slot=1), userId integer not null, digest text not null)")
+    cursor.execute("create table if not exists execution_api_key("
+                   "slot integer primary key check(slot=1), userId integer not null, digest text not null)")
     notifyColumns = {row[1] for row in cursor.execute('pragma table_info(notify)')}
     if notifyColumns and 'onlyFailed' not in notifyColumns:
         cursor.execute('alter table notify add column onlyFailed integer not null default 0')
@@ -342,9 +344,14 @@ def init_sql(conn):
         cursor.execute("alter table job_task_item add column rapidUpload integer not null default 0")
     if itemColumns and 'retryTaskId' not in itemColumns:
         cursor.execute("alter table job_task_item add column retryTaskId integer")
+    for column, kind in (('lastRetryStatus', 'integer'), ('lastRetryError', 'text'), ('lastRetryReason', 'text')):
+        if itemColumns and column not in itemColumns:
+            cursor.execute(f'alter table job_task_item add column {column} {kind}')
     if itemColumns and 'retryReason' not in itemColumns:
         cursor.execute("alter table job_task_item add column retryReason text")
     taskColumns = {row[1] for row in cursor.execute('pragma table_info(job_task)')}
+    if taskColumns and 'fileRetry' not in taskColumns:
+        cursor.execute('alter table job_task add column fileRetry integer not null default 0')
     if taskColumns and 'retryReason' not in taskColumns:
         cursor.execute("alter table job_task add column retryReason text")
     cursor.execute("pragma table_info(job_source_snapshot)")

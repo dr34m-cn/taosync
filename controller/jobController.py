@@ -6,7 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tornado.concurrent import run_on_executor
 
+from common import commonService
 from common.LNG import G
+from service.system import apiKey
 
 from controller.baseController import BaseHandler, handle_request
 from service.alist import alistService
@@ -129,6 +131,19 @@ class Storage(BaseHandler):
 class Job(BaseHandler):
     executor = ThreadPoolExecutor(4)
 
+    def authenticated_user(self):
+        key = self.request.headers.get('Authorization', '')
+        if not key.startswith('tx-'):
+            return super().authenticated_user()
+        if self.request.method == 'PUT':
+            try:
+                req = commonService.get_post_data(self)
+            except (UnicodeError, ValueError):
+                return None
+            if isinstance(req, dict) and req.get('pause', False) is None and req.keys() <= {'pause', 'id'}:
+                return apiKey.resolveUser(key, scope='execute')
+        return None
+
     @run_on_executor
     @handle_request
     def get(self, req):
@@ -151,6 +166,8 @@ class Job(BaseHandler):
     @run_on_executor
     @handle_request
     def put(self, req):
+        if req.get('action') == 'retryAll':
+            return jobService.retryFiles(req['taskId'])
         if req.get('action') == 'retryFile':
             return jobService.retryFile(req['taskId'], req['itemId'])
         if req['pause'] is None:

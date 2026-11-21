@@ -21,7 +21,8 @@ notify_invalid_remark: 通知备注必须是文本
 api_key_unknown_action: 未知的 API 密钥操作
 api_key_enable_first: 请先开启 API 密钥
 https_invalid_pair: 请提供 PEM 格式的证书链和匹配的无密码私钥，每项不超过 256 KiB。
-https_port_unavailable: 无法监听 HTTPS 端口 8025，请检查端口是否被占用。
+https_invalid_port: HTTPS 端口须为 1 至 65535 的整数，且不能与 HTTP 端口或 8024 重复。
+https_port_unavailable: 无法监听所选 HTTPS 端口，请检查端口是否被占用。
 https_storage_error: 无法读写 HTTPS 配置，请检查数据目录权限。
 init_sql: 初始化数据库完成
 admin_password_generated: 已为 admin 生成随机密码：{}

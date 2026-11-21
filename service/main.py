@@ -504,7 +504,7 @@ async def main():
     business_app = make_business_app(server_cfg)
     # 8023 业务端口监听 0.0.0.0，允许外部设备访问；服务进程作为前台服务不会被冻结
     business_app.listen(port, address='0.0.0.0')
-    https = business_app.settings['https_listener'] = HttpsListener(business_app, address='0.0.0.0')
+    https = business_app.settings['https_listener'] = HttpsListener(business_app, address='0.0.0.0', http_port=port)
     https.restore()
     _file_log('INFO', f'业务服务已启动: http://0.0.0.0:{port}/')
 

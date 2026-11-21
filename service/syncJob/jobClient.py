@@ -288,6 +288,7 @@ class CopyItem:
 
 class JobTask:
     triggersLinks = True
+    notify = True
 
     def __init__(self, taskId, vm):
         """
@@ -578,23 +579,24 @@ class JobTask:
             for copyItem in leftovers:
                 self.finish.append(copyItem.toRecord(status=7, errMsg=G('copy_interrupted')))
 
+    def runTransfers(self):
+        while not self.checkTimeout() and not self.breakFlag:
+            started = self._submitReady()
+            if started is None:
+                break
+            for copyItem in started:
+                copyItem.doByThread()
+            self._waitWake(0.5)
+        if self.breakFlag:
+            self._drainAfterBreak()
+
     def taskSubmit(self):
         """
         队列检验与提交
         :return:
         """
         try:
-            while True:
-                if self.checkTimeout() or self.breakFlag:
-                    break
-                self._waitWake(0.5)
-                started = self._submitReady()
-                if started is None:
-                    break
-                for copyItem in started:
-                    copyItem.doByThread()
-            if self.breakFlag:
-                self._drainAfterBreak()
+            self.runTransfers()
             if self._jobRemoved():
                 return
             if self.job.get('method') == 2 and not self.breakFlag and self.sourceScanAttempted:
@@ -656,7 +658,7 @@ class JobTask:
         parent, name = relativePath.rsplit('/', 1)
         return rootPath + parent + '/', name
 
-    def finalizeMove(self):
+    def finalizeMove(self, finishItems=None):
         """Delete each source file once every target holds a verified copy.
 
         Files are decided one by one: a file that failed for any target keeps
@@ -672,7 +674,7 @@ class JobTask:
             if self.breakFlag or entry['isDir'] or not self.fileSizeAllowed(entry['size']):
                 continue
             srcPath, fileName = self.entryLocation(self.job['srcPath'], entry['path'])
-            matching = [item for item in self.finish
+            matching = [item for item in (self.finish if finishItems is None else finishItems)
                         if item['type'] == 2 and item['srcPath'] == srcPath and item['fileName'] == fileName]
             if any(item['status'] != 2 for item in matching):
                 # At least one target failed: the failed item already explains why; keep the source.
@@ -1469,7 +1471,7 @@ class JobTask:
         else:
             status = 2 if failOrOtherNum == 0 else 3
         taskService.updateJobTaskStatus(self.taskId, status, errMsg, taskList=self.currentTasks,
-                                        createTime=self.createTime, triggersLinks=self.triggersLinks)
+                                        createTime=self.createTime, triggersLinks=self.triggersLinks, notify=self.notify)
 
 
 class JobClient:

@@ -1,24 +1,105 @@
+import logging
 import posixpath
+import threading
+from collections import deque
 
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from common.fileRetryReason import FileRetryError
+from mapper import jobMapper
 from service.syncJob.jobClient import JobTask, virtualPathsOverlap
 
 
 class FileRetryTask(JobTask):
-    """A normal queued run with a single-file producer instead of a tree scan."""
+    """One appendable run per job, with independent outcomes for its source rows."""
 
     triggersLinks = False
+    notify = False
 
-    def __init__(self, taskId, client, item):
+    def __init__(self, taskId, client, admissionLock):
         super().__init__(taskId, client)
-        self.item = item
+        self.job = dict(self.job, scanIntervalT=0)
+        self.admissionLock = admissionLock
+        self.pending = deque()
+        self.item = None
+        self.moved = set()
 
-    def commitSourceSnapshot(self):
-        # A single-file view must never replace the job's complete snapshot.
-        pass
+    def enqueue(self, items):
+        with self.stateLock:
+            self.pending.extend(items)
+
+    def start(self):
+        self.submitThread.start()
+
+    def getCurrent(self):
+        with self.stateLock:
+            state = super().getCurrent()
+            queued = [dict(item, status=0, progress=0) for item in self.pending]
+            self.currentTasks[0].extend(queued)
+            state['num']['wait'] += len(queued)
+            state['size']['wait'] += sum((item['fileSize'] or 0) for item in queued if item['type'] != 1)
+        state.update(fileRetry=True, scanFinish=True)
+        return state
+
+    def taskSubmit(self):
+        try:
+            while True:
+                # Admission and the empty-queue transition must agree on who owns the run.
+                with self.admissionLock:
+                    if self.breakFlag or not self.pending:
+                        if not self._jobRemoved():
+                            self.updateTaskStatus()
+                        self.jobClient.finishRun(self)
+                        return
+                    with self.stateLock:
+                        self.item = self.pending.popleft()
+                        self.itemStart = len(self.finish)
+                self.runItem()
+        except Exception as exc:
+            logging.getLogger().exception(exc)
+            with self.admissionLock:
+                try:
+                    if not self._jobRemoved():
+                        jobMapper.updateJobTaskStatus(self.taskId, 6, str(exc))
+                finally:
+                    self.jobClient.finishRun(self)
+        finally:
+            if self._jobRemoved():
+                jobMapper.deleteJobTaskByTaskId(self.taskId)
+
+    def runItem(self):
+        self.scanFinish = False
+        self.sourceSnapshot.clear()
+        self.deliveredSourceFiles.clear()
+        self.itemError = None
+        self.syncThread = threading.Thread(target=self.sync)
+        self.syncThread.start()
+        self.runTransfers()
+        if self._jobRemoved():
+            return
+        records = self.finish[self.itemStart:]
+        if self.job['method'] == 2 and not self.breakFlag:
+            self.finalizeMove(records)
+            records = self.finish[self.itemStart:]
+        failure = next((row for row in records if row['status'] != 2), None)
+        status = 7 if self.breakFlag else 6 if self.itemError else 3 if failure else 2
+        if self.timedOut:
+            status = 5
+        error = self.itemError or (failure and failure['errMsg'])
+        if records:
+            jobMapper.addJobTaskItemMany(records)
+        if status == 2 and self.item['type'] == 2:
+            self.moved.add(self.moveKey())
+        jobMapper.saveFileRetryResult(self.taskId, self.item['id'], status, error)
+        # Preserve a task-level reason for a wholly failed run.
+        if self.itemStart == 0:
+            self.fatalError = self.itemError
+        elif self.itemError is None:
+            self.fatalError = None
+
+    def moveKey(self):
+        return self.item['taskId'], self.item['srcPath'], self.item['fileName']
 
     def removeMovedDirectories(self, movedPaths):
         # The retry is authorized for one file, not its parent directories.
@@ -28,10 +109,10 @@ class FileRetryTask(JobTask):
         try:
             self.retryFile()
         except Exception as exc:
-            self.fatalError = exc if isinstance(exc, FileRetryError) else str(exc)
+            self.itemError = exc if isinstance(exc, FileRetryError) else str(exc)
             item = self.item
             self.copyHook(item['srcPath'], item['dstPath'], item['fileName'], item['fileSize'],
-                          status=7, errMsg=self.fatalError, copyType=item['type'])
+                          status=7, errMsg=self.itemError, copyType=item['type'])
         finally:
             self.scanFinish = True
             self._wake()
@@ -71,9 +152,16 @@ class FileRetryTask(JobTask):
             self.retryDelete(srcRoot, parts, spec)
             return
 
+        # One successful move already delivered this source version to every target.
+        if operation == 2 and self.moveKey() in self.moved:
+            return
         src = item['srcPath']
-        _, details = self.readDirectory(src, 0, 0)
-        entry = details.get(name)
+        if operation == 2:
+            # A move must verify the exact source name and version before deletion.
+            _, details = self.readDirectory(src, 0, 0)
+            entry = details.get(name)
+        else:
+            entry = self.alistClient.fileDetail(src, name)
         if not entry or entry['isDir'] or not self.fileSizeAllowed(entry['size']):
             raise FileRetryError('file_retry_source_missing_or_size')
         self.sourceSnapshot[relative] = dict(entry, path=relative)
@@ -107,10 +195,13 @@ class FileRetryTask(JobTask):
         else:
             self.delFile(dst, name, files[name])
 
-    def retryProgress(self):
-        state = self.getCurrent()
-        count = sum(state['num'].values())
-        done = state['num']['success'] * 100
-        progress = done + sum(float(row.get('progress') or 0) for row in state['doingTask'])
-        return {'queued': not self.firstSync and not self.scanFinish or state['num']['wait'] == count,
-                'progress': min(100, progress / count) if count else 0}
+    def retryProgress(self, itemId):
+        with self.stateLock:
+            if not self.item or self.item['id'] != itemId:
+                return {'queued': True, 'progress': 0}
+            active = list(self.doing.values())
+            finished = self.finish[self.itemStart:]
+            total = len(active) + len(finished) + len(self.waiting)
+            progress = sum(float(item.progress or 0) for item in active)
+            progress += 100 * sum(row['status'] == 2 for row in finished)
+            return {'queued': False, 'progress': min(100, progress / total) if total else 0}

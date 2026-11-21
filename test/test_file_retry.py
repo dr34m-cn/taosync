@@ -1,9 +1,11 @@
 """Single-file retry safety on local mounts and a temporary database."""
 import json
+import threading
 from unittest import mock
 
 from common import LNG
 from mapper import jobMapper
+from service.alist.alistClient import AlistClient
 from service.syncJob import jobService, taskService
 from test_builtin_engine_sync import EngineTestBase, tree, write
 
@@ -76,6 +78,62 @@ class FileRetrySafetyTest(EngineTestBase):
                 with self.assertRaises(ValueError) as error:
                     jobService.retryFile(task, candidate)
                 self.assertEqual(str(error.exception), expected)
+
+    def test_copy_retry_reads_only_named_file(self):
+        job = self._job()
+        task, item = self.failed_item(job, 0)
+        write(self.src, 'one', b'1')
+        with mock.patch.object(jobService.FileRetryTask, 'readDirectory', side_effect=AssertionError) as scan:
+            self.assertEqual(self.retry(job, task, item)['status'], 2)
+            scan.assert_not_called()
+        client = object.__new__(AlistClient)
+        with mock.patch.object(client, 'post', return_value=dict(name='one', is_dir=False, size=1)) as request:
+            self.assertEqual(client.fileDetail('/S/', 'one')['size'], 1)
+            request.assert_called_once_with('/api/fs/get', data={'path': '/S/one'})
+
+    def test_append_single_then_bulk_to_same_run_and_keep_individual_results(self):
+        job = self._job()
+        task, one = self.failed_item(job, 0)
+        template, = jobMapper.getJobTaskItemList({'taskId': task})
+        jobMapper.addJobTaskItemMany([dict(template, fileName=name) for name in ('two', 'missing')])
+        write(self.src, 'one', b'1')
+        write(self.src, 'two', b'2')
+        two = next(row['id'] for row in jobMapper.getJobTaskItemList({'taskId': task}) if row['fileName'] == 'two')
+        entered, resume = threading.Event(), threading.Event()
+        original = jobService.FileRetryTask.retryFile
+
+        def hold_first(worker):
+            if worker.item['id'] == one:
+                entered.set()
+                resume.wait(10)
+            original(worker)
+
+        with mock.patch.object(jobService.FileRetryTask, 'retryFile', hold_first), \
+                mock.patch.object(taskService.notifyService, 'getNotifyList') as notifications, \
+                mock.patch.object(taskService.jobLinkMapper, 'finishAndEnqueue') as links:
+            run = jobService.retryFile(task, one)['id']
+            try:
+                self.assertTrue(entered.wait(5))
+                self.assertEqual(jobService.retryFile(task, two), {'id': run, 'count': 1})
+                self.assertEqual(jobService.retryFiles(task), {'id': run, 'count': 1})
+                self.assertEqual(jobService.retryFiles(task)['count'], 0)
+                current = jobService.getJobCurrent(job)
+                self.assertTrue(current['fileRetry'])
+                self.assertEqual(current['num']['wait'], 2)
+            finally:
+                resume.set()
+            self._wait(jobService.getJobClientById(job))
+            notifications.assert_not_called()
+            links.assert_not_called()
+        rows = jobService.getTaskDetails({'taskId': task})
+        self.assertEqual({r['fileName']: r['retry']['status'] for r in rows}, {'one': 2, 'two': 2, 'missing': 6})
+        self.assertEqual(jobMapper.getJobTaskById(run)['status'], 3)
+        write(self.src, 'missing', b'3')
+        later = jobService.retryFiles(task)
+        self.assertNotEqual(later['id'], run)
+        self.assertEqual(later['count'], 1)
+        self._wait(jobService.getJobClientById(job))
+        self.assertEqual(jobService.retryFiles(task), {'id': None, 'count': 0})
 
     def test_delete_requires_nonempty_source_after_exclusions(self):
         job = self._job(exclude='*.tmp')

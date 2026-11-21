@@ -582,9 +582,9 @@ onMounted(() => {
           {{ scope.row.remark || "--" }}
         </template>
       </el-table-column>
-      <el-table-column prop="enable" :label="$t('home.status')" width="90">
+      <el-table-column prop="enable" :label="$t('home.status')" width="106">
         <template #default="scope">
-          <div :class="`bg-status bg-${scope.row.enable ? '2' : '7'}`">
+          <div style="white-space: nowrap" :class="`bg-status bg-${scope.row.enable ? '2' : '7'}`">
             {{ scope.row.enable ? $t("common.enabled") : $t("common.disabled") }}
           </div>
         </template>

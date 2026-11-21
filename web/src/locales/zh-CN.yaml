@@ -243,6 +243,7 @@ task:
   fail: 失败
   other: 其他
 current:
+  retrying: 失败项重试中
   notRunning: 作业未在进行中
   overall: 整体进度
   noSyncFound: 暂未发现需同步文件
@@ -271,6 +272,13 @@ current:
   abortConfirm: 中止任务不影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？
   abortSent: 中止指令已发送，请等待中止完成
 taskDetail:
+  retryAll: 重试所有失败项
+  noRetries: 没有可加入重试的失败文件
+  addedRetries: '已将 {count} 个失败文件加入重试'
+  stats: 任务统计
+  allTransfers: 全部传输方式
+  transferMethod: 传输方式
+  rapidOnly: 仅看秒传
   retryQueued: 等待重试
   retrySucceeded: 重试成功
   retryFailed: 重试失败
@@ -532,7 +540,9 @@ pathSelect:
   title: 选择目录
   selectFirst: 请先选择路径
 apiKey:
-  title: API 密钥
+  title: 通用API秘钥
+  executeTitle: 执行作业专用秘钥
+  warning: 秘钥等同于账号密码，切勿泄露！
   help: 使用说明
   helpTitle: API 密钥使用说明
   enable: 启用 API 密钥
@@ -547,7 +557,9 @@ apiKey:
   copied: 已复制
   close: 关闭
 https:
-  enable: 启用 HTTPS（8025 端口）
+  enable: 启用 HTTPS
+  port: HTTPS 端口
+  invalidPort: 请输入 1 到 65535 之间的整数，且不能与 HTTP 端口或 8024 重复。
   certificate: 证书链（PEM）
   privateKey: 无密码私钥（PEM）
   inputMode: '{field}的输入方式'
@@ -557,7 +569,7 @@ https:
   chooseFile: 点击选择
   fileHint: '{formats} · 最大 256 KiB'
   pemPlaceholder: 输入或粘贴 PEM 内容，保留 BEGIN 和 END 行。
-  files: 证书链请将服务器证书放在首位，后接中间证书。HTTPS 使用 8025 端口，原 HTTP 地址仍可访问。
+  files: 证书链请将服务器证书放在首位，后接中间证书。原 HTTP 地址仍可访问。
   plainHttp: 当前连接未加密。请仅在本机或通过安全隧道提交私钥。
   inactive: 已保存证书，但 HTTPS 未在监听。可保存并重试，或提供新的证书和私钥。
   retained: 已保留证书和私钥。再次启用 HTTPS 时，两项留空即可沿用。

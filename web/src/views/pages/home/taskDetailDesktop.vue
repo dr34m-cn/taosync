@@ -1,4 +1,5 @@
 <script setup>
+import RetryAllButton from "./components/RetryAllButton.vue";
 import { useRouter } from "vue-router";
 import { useTaskDetail } from "./useTaskDetail";
 import { taskItemStatusKeys } from "@/utils/taskItemStatus";
@@ -35,10 +36,11 @@ const pageChange = (val) => {
           <el-option :label="$t('taskDetail.delete')" :value="1" />
           <el-option :label="$t('taskDetail.move')" :value="2" />
         </el-select>
-        <el-select v-model="params.rapidUpload" aria-label="传输方式" class="type-select" @change="filterChange">
-          <el-option label="全部传输方式" value="all" />
-          <el-option label="仅看秒传" :value="1" />
+        <el-select v-model="params.rapidUpload" :aria-label="$t('taskDetail.transferMethod')" class="type-select" @change="filterChange">
+          <el-option :label="$t('taskDetail.allTransfers')" value="all" />
+          <el-option :label="$t('taskDetail.rapidOnly')" :value="1" />
         </el-select>
+        <RetryAllButton v-if="params.status === 7 && !loading && taskItemData.count > 0" :task-id="params.taskId" @submitted="getTaskItemList(true)" />
       </div>
       <div class="top-box-title">{{ t("taskDetail.title") }}</div>
       <menuRefresh :freshInterval="9973" :autoRefresh="false" :loading="loading" :needShow="1" @getData="getTaskItemList" />

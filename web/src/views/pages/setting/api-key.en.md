@@ -1,6 +1,6 @@
 ### Request header
 
-Use the complete key as the `Authorization` header value. Do not add a `Bearer` prefix. No login cookie is needed. The key grants administrator access: use HTTPS for remote calls and keep the key out of URLs, logs, and source control.
+Use the complete key as the `Authorization` header value. No login cookie is needed. The general API key grants administrator access. The job execution key can only run jobs using the request below. Use HTTPS for remote calls and keep keys out of URLs, logs, and source control.
 
 ### Run a specific job
 

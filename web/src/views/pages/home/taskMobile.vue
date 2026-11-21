@@ -1,4 +1,5 @@
 <script setup>
+import RetryAllButton from "./components/RetryAllButton.vue";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -42,6 +43,7 @@ const getTaskList = () => {
 };
 
 const statusText = (row) => {
+  if (row.status === 1 && row.fileRetry) return t('current.retrying');
   if (row.status === 1 && row.allNum === 0) return t("task.scanning");
   if (row.status === 2 && row.allNum === 0) return t("task.noNeedSync");
   if (row.status === 6) return t("taskDetail.failedReason");
@@ -153,6 +155,7 @@ const currentChange = (value) => {
         </div>
 
         <taskHistoryStats v-if="item.fileStats" :task="item" class="history-summary" />
+        <RetryAllButton v-if="item.status > 1 && item.failNum" :task-id="item.id" @submitted="getTaskList" />
 
         <div v-if="item.status == 6 && item.errMsg" class="error-reason">
           <span>{{ $t("common.reason") }}</span>

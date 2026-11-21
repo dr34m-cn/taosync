@@ -72,11 +72,11 @@ class ApiKey(BaseHandler):
 
     @handle_request
     def get(self, req):
-        return apiKey.status()
+        return apiKey.status(req.get('scope', 'general'))
 
     @handle_request
     def put(self, req):
-        return apiKey.change(req.get('action'), req['__user']['id'])
+        return apiKey.change(req.get('action'), req['__user']['id'], req.get('scope', 'general'))
 
 
 class Https(BaseHandler):
@@ -95,7 +95,8 @@ class Https(BaseHandler):
         if self.request.query or not self.request.headers.get('Content-Type', '').startswith('application/json'):
             raise ValueError(G('https_invalid_pair'))
         try:
-            return self.settings['https_listener'].apply(req.get('enabled'), req.get('certificate'), req.get('privateKey'))
+            return self.settings['https_listener'].apply(req.get('enabled'), req.get('certificate'),
+                                                        req.get('privateKey'), port=req.get('port'))
         except HttpsError as exc:
             raise ValueError(G(str(exc))) from None
 

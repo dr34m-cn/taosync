@@ -1,5 +1,6 @@
 import asyncio
 import os
+import socket
 import ssl
 import tempfile
 import unittest
@@ -124,6 +125,35 @@ class HttpsTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.listener.status()['autoStart'])
         self.listener.apply(True)
         await self.check_peer(cert)
+
+    async def test_port_validation_switch_and_restore(self):
+        self.listener.http_port = 8023
+        cert, key = pair()
+        self.listener.apply(True, cert, key)
+        previous = self.listener.server
+        for invalid in (8023, 8024, -1, 65536, True, 4.5, '9999'):
+            with self.assertRaisesRegex(HttpsError, 'invalid_port'):
+                self.listener.apply(True, port=invalid)
+            self.assertIs(self.listener.server, previous)
+        with socket.socket() as reserved:
+            reserved.bind(('127.0.0.1', 0))
+            port = reserved.getsockname()[1]
+            reserved.listen()
+            with self.assertRaisesRegex(HttpsError, 'port_unavailable'):
+                self.listener.apply(True, port=port)
+            self.assertIs(self.listener.server, previous)
+        self.listener.apply(True, port=port)
+        self.assertIsNot(self.listener.server, previous)
+        self.assertEqual(self.listener.status()['port'], port)
+        await self.check_peer(cert)
+        self.listener.stop()
+        self.listener = HttpsListener(self.app, self.path, address='127.0.0.1', http_port=8023)
+        self.listener.restore()
+        self.assertEqual(self.listener.status()['port'], port)
+        await self.check_peer(cert)
+        self.listener.clear()
+        self.assertEqual(self.listener.status()['port'], port)
+        self.assertFalse(self.listener.status()['configured'])
 
     async def test_bind_and_commit_failures_leave_no_config(self):
         cert, key = pair()
