@@ -277,8 +277,8 @@ onMounted(() => {
           <el-image v-if="item.method < 5 || [6, 7, 8].includes(item.method)" :src="`/notify/${item.method}.png`" :alt="notifyMethod(item.method)" fit="contain" class="notify-logo" />
           <el-icon v-else class="notify-logo" :size="40"><Connection v-if="item.method === 5" /><Bell v-else /></el-icon>
           <div class="notify-info">
-            <div class="card-item-user">{{ notifyMethod(item.method) }}</div>
-            <div v-if="item.remark" class="notify-remark">{{ item.remark }}</div>
+            <div class="notify-title">{{ item.remark || notifyMethod(item.method) }}</div>
+            <div v-if="item.remark" class="notify-method">{{ notifyMethod(item.method) }}</div>
             <div :class="`card-item-enable enable-${item.enable == 1 ? 'enable' : 'disable'}`">
               {{ item.enable == 1 ? $t("notify.enabled") : $t("notify.disabled") }}
             </div>
@@ -535,15 +535,17 @@ onMounted(() => {
       min-width: 0;
     }
 
-    .notify-remark {
+    .notify-method {
       margin-top: 4px;
+      font-size: 13px;
       color: var(--text-secondary);
       overflow-wrap: anywhere;
     }
 
-    .card-item-user {
+    .notify-title {
       font-size: 18px;
       color: var(--text-primary);
+      overflow-wrap: anywhere;
     }
 
     .card-item-enable {

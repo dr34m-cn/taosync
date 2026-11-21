@@ -35,8 +35,11 @@ try {
     const save = https.getByRole('button', { name: mobile ? 'Save and Apply' : '保存并生效' });
     const clearLabel = mobile ? 'Clear certificate' : '清空证书';
     const clear = https.getByRole('button', { name: clearLabel });
-    await clickSwitch();
     const port = https.getByRole('spinbutton');
+    assert.equal(await port.count(), 0);
+    await clickSwitch();
+    const [switchBox, portBox] = await Promise.all([https.locator('.el-switch').boundingBox(), port.boundingBox()]);
+    assert.ok(Math.abs(switchBox.y + switchBox.height / 2 - portBox.y - portBox.height / 2) < 2);
     assert.equal(await port.inputValue(), '8025');
     await port.fill('8024');
     await port.blur();
@@ -70,7 +73,11 @@ try {
     assert.equal(await text.inputValue(), writes[0].privateKey);
     await save.click();
     await https.getByRole('link').waitFor();
+    await port.fill('8024');
+    await port.blur();
     await clickSwitch();
+    assert.equal(await port.count(), 0);
+    assert.equal(await https.getByRole('alert').count(), 0);
     await save.click();
     await https.getByRole('link').waitFor({ state: 'hidden' });
     assert.deepEqual(writes[2], { enabled: false, port: 8443 });

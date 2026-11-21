@@ -1,5 +1,4 @@
 <script setup>
-import RetryAllButton from "./components/RetryAllButton.vue";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -154,8 +153,7 @@ const currentChange = (value) => {
           </div>
         </div>
 
-        <taskHistoryStats v-if="item.fileStats" :task="item" class="history-summary" />
-        <RetryAllButton v-if="item.status > 1 && item.failNum" :task-id="item.id" @submitted="getTaskList" />
+        <taskHistoryStats v-if="item.fileStats" :task="item" class="history-summary" @submitted="getTaskList" />
 
         <div v-if="item.status == 6 && item.errMsg" class="error-reason">
           <span>{{ $t("common.reason") }}</span>

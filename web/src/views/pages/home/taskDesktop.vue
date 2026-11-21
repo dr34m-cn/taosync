@@ -1,5 +1,4 @@
 <script setup>
-import RetryAllButton from "./components/RetryAllButton.vue";
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { jobDeleteTask, jobGetTask } from "@/api/job";
@@ -140,9 +139,8 @@ const currentChange = (val) => {
         </el-table-column>
         <el-table-column :label="$t('taskDetail.stats')" min-width="220">
           <template #default="{ row }">
-            <taskHistoryStats v-if="row.fileStats" :key="row.id" :task="row" />
+            <taskHistoryStats v-if="row.fileStats" :key="row.id" :task="row" @submitted="getTaskList" />
             <span v-else>--</span>
-            <RetryAllButton v-if="row.status > 1 && row.failNum" :task-id="row.id" @submitted="getTaskList" />
           </template>
         </el-table-column>
         <el-table-column prop="createTime" :label="$t('common.createdAt')" width="170">

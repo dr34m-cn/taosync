@@ -1,8 +1,10 @@
 <script setup>
 import { computed } from "vue";
 import { formatDuration, parseTime, parseSize } from "@/utils/utils";
+import RetryAllButton from "./RetryAllButton.vue";
 
 const props = defineProps({ task: { type: Object, required: true } });
+defineEmits(["submitted"]);
 const operations = [
   ["copy", "taskDetail.copy"], ["move", "taskDetail.move"], ["delete", "taskDetail.delete"],
 ];
@@ -32,6 +34,7 @@ const totals = computed(() => operations.reduce((sum, [key]) => {
         <dd>{{ task.fileStats.failed.count }} 个文件 · {{ parseSize(task.fileStats.failed.size) }}</dd>
       </template>
     </dl>
+    <RetryAllButton v-if="task.status > 1 && task.failNum > 0" class="retry-all" :task-id="task.id" @submitted="$emit('submitted')" />
   </details>
 </template>
 
@@ -41,4 +44,5 @@ summary { cursor: pointer; color: var(--text-primary); }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; }
 dt { color: var(--text-muted); }
 dd { margin: 0; overflow-wrap: anywhere; }
+.retry-all { margin-top: 8px; }
 </style>

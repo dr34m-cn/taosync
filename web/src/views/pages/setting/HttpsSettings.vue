@@ -29,9 +29,9 @@ const inputs = computed(() => fields.value.map(field => {
   return { field, value, invalid };
 }));
 const canApply = computed(() => {
+  if (!enabled.value) return status.value?.autoStart;
   if (!validPort.value) return false;
   const changedPort = port.value !== status.value?.port;
-  if (!enabled.value) return changedPort || status.value?.autoStart;
   if (inputs.value.every(({ value, invalid }) => value && !invalid)) return true;
   return status.value?.configured && (!status.value.enabled || changedPort) && inputs.value.every(({ value }) => !value);
 });
@@ -60,7 +60,7 @@ async function save() {
   if (busy.value || !canApply.value) return;
   pending.value = 'save';
   try {
-    const data = { enabled: enabled.value, port: port.value };
+    const data = { enabled: enabled.value, port: enabled.value ? port.value : status.value.port };
     if (enabled.value) {
       try {
         for (const { field, value } of inputs.value) {
@@ -99,19 +99,22 @@ onMounted(load);
   <section aria-labelledby="https-heading" :aria-busy="busy">
     <header class="section-toolbar">
       <h2 id="https-heading" class="section-heading"><el-icon aria-hidden="true"><Lock /></el-icon>HTTPS</h2>
-      <el-switch v-if="status" v-model="enabled" :aria-label="t('https.enable')" :disabled="busy" @change="fields = newFields()" />
+      <div v-if="status" class="https-controls">
+        <el-switch v-model="enabled" :aria-label="t('https.enable')" :disabled="busy" @change="fields = newFields()" />
+        <label v-if="enabled" class="port-field">
+          {{ t('https.port') }}
+          <el-input-number v-model="port" :controls="false" :disabled="busy" :aria-label="t('https.port')"
+            :aria-invalid="!validPort" @keyup.enter="save" />
+        </label>
+      </div>
     </header>
     <el-button v-if="!status && !busy" :icon="Refresh" @click="load">{{ t('retry') }}</el-button>
     <template v-if="status">
       <a v-if="status.enabled" :href="address" target="_blank" rel="noopener noreferrer">{{ address }}</a>
       <p v-else-if="status.configured" role="status">{{ t(status.autoStart ? 'https.inactive' : 'https.retained') }}</p>
       <form @submit.prevent="save">
-        <label class="port-field">
-          {{ t('https.port') }}
-          <el-input-number v-model="port" :controls="false" :disabled="busy" :aria-label="t('https.port')" />
-        </label>
-        <p v-if="!validPort" class="pem-error" role="alert">{{ t('https.invalidPort') }}</p>
         <template v-if="enabled">
+          <p v-if="!validPort" class="pem-error" role="alert">{{ t('https.invalidPort') }}</p>
           <p>{{ t('https.files') }}</p>
           <p v-if="plainHttp" class="warning">{{ t('https.plainHttp') }}</p>
           <div class="pem-fields">
@@ -150,7 +153,10 @@ onMounted(load);
 p, a { font-size: 14px; }
 a { color: var(--el-color-primary); overflow-wrap: anywhere; }
 .warning { color: var(--el-color-warning-dark-2); }
-.port-field { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: 14px; }
+.section-toolbar { flex-wrap: wrap; }
+.https-controls, .port-field { display: flex; align-items: center; gap: 8px; }
+.port-field { font-size: 14px; white-space: nowrap; }
+.port-field .el-input-number { width: 80px; }
 .pem-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 16px 0; }
 .pem-field { min-width: 0; margin: 0; padding: 0; border: 0; }
 .pem-field legend { margin-bottom: 8px; padding: 0; font-size: 14px; font-weight: 600; }
