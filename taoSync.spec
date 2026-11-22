@@ -5,6 +5,10 @@ from PyInstaller.utils.hooks import collect_all
 
 
 charset_datas, charset_binaries, charset_hiddenimports = collect_all('charset_normalizer')
+build_target = Path('build-target.txt')
+tzdata_datas, tzdata_hiddenimports = [], []
+if build_target.is_file() and build_target.read_text().strip().startswith('linux-StaticX-'):
+    tzdata_datas, _, tzdata_hiddenimports = collect_all('tzdata')
 
 
 a = Analysis(
@@ -14,8 +18,8 @@ a = Analysis(
     datas=[
         ('web/dist/', 'front'),
         ('locales/', 'locales'),
-    ] + ([('build-target.txt', '.')] if Path('build-target.txt').is_file() else []) + charset_datas,
-    hiddenimports=charset_hiddenimports + ['anyio._backends._asyncio'],
+    ] + ([('build-target.txt', '.')] if build_target.is_file() else []) + charset_datas + tzdata_datas,
+    hiddenimports=charset_hiddenimports + ['anyio._backends._asyncio'] + tzdata_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
