@@ -435,6 +435,7 @@ jobs:
               python -m pip install setuptools wheel scons hatchling
               python -m pip install --no-build-isolation \
                 "pyinstaller>=6,<7" \
+                "tzdata==2026.3" \
                 "staticx==0.14.2"
 
               export LD_LIBRARY_PATH="/usr/local/lib:${LIB_PATH}"
