@@ -114,15 +114,10 @@ def cleanJobInput(job):
     job['maxFileSize'] = normalizeFileSize(job['maxFileSize'])
     job['sourceMode'] = normalizeSourceMode(job['sourceMode'])
     if job.get('srcPath') and job.get('dstPath'):
-        for dstPath in job['dstPath'].split(':'):
-            engineId = job.get('alistId')
-            pathsOverlap = (
-                jobClient.virtualPathsOverlap(job['srcPath'], dstPath)
-                if engineId is None
-                else storageService.enginePathsOverlap(engineId, job['srcPath'], dstPath)
-            )
-            if pathsOverlap:
-                raise Exception(G('source_target_overlap'))
+        engineId = job.get('alistId')
+        overlaps = jobClient.virtualPathsOverlap if engineId is None else (
+            lambda a, b: storageService.enginePathsOverlap(engineId, a, b))
+        jobClient.validateJobPaths(job['srcPath'], job['dstPath'].split(':'), overlaps)
     if (job['minFileSize'] is not None
             and job['maxFileSize'] is not None
             and job['minFileSize'] > job['maxFileSize']):

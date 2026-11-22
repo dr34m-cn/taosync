@@ -1,8 +1,9 @@
 """TaoSync backup codec v1. All sizes are bytes.
 
-Names are single UTF-8 components encoded as ``tsb-1-`` + unpadded base32
-of AES-SIV ciphertext. Equal names under one passphrase are intentionally
-linkable across directories, file types and backups. No Unicode normalization.
+Names up to 139 UTF-8 bytes use ``tsb-1-`` + unpadded base32 of AES-SIV
+ciphertext. Longer names use ``tsb-2-`` + SHA-256 of a domain-separated
+AES-SIV record stored alongside it as ``tsb-n-`` + the same digest.
+Equal names under one passphrase are linkable. No Unicode normalization.
 
 File layout: magic/version | 32-byte random salt | AES-GCM records. All but
 the final record carry 64 KiB of plaintext; the final record carries 1..64 KiB
@@ -13,6 +14,7 @@ to its file, position and finality. No unauthenticated length fields.
 
 import base64
 import binascii
+import hashlib
 import os
 from operator import index
 
@@ -23,6 +25,9 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 from .drivers.base import check_cancel
+from common.fileRetryReason import FileRetryError
+from common.LNG import get_context_lang
+from common.locales import t
 
 
 class ForeignBackupName(ValueError):
@@ -33,12 +38,21 @@ class InvalidBackupName(ValueError):
     """A reserved name is malformed, unsupported or unauthenticated."""
 
 
+class BackupNamespaceError(FileRetryError):
+    def __str__(self):
+        return t(self.args[0], get_context_lang())
+
+
 class InvalidBackupData(ValueError):
     """The encrypted stream is malformed, incomplete or unauthenticated."""
 
 
 _PREFIX = 'tsb-1-'
 _NAME_AAD = b'TaoSync backup name v1'
+LONG_PREFIX = 'tsb-2-'
+RECORD_PREFIX = 'tsb-n-'
+MAX_NAME_RECORD = 4096 + 16
+_LONG_AAD = b'TaoSync long backup name v2'
 _MAGIC = b'TSBK\x01'
 _SALT = 32
 _HEADER = len(_MAGIC) + _SALT
@@ -46,6 +60,7 @@ _TAG = 16
 _CHUNK = 64 * 1024
 _RECORD = _CHUNK + _TAG
 _MAX_RECORDS = 1 << 32
+OWNERSHIP_PREFIX_SIZE = _HEADER + _RECORD + 1
 
 
 def is_reserved_backup_name(name):
@@ -123,6 +138,25 @@ class BackupCipher:
             raise InvalidBackupName('encoded component exceeds 255 bytes')
         return _PREFIX + _base32(self._names.encrypt(raw, [_NAME_AAD]))
 
+    def storage_name(self, name):
+        """Preserve every v1 spelling. Longer names have one immutable SIV record."""
+        raw = _component(name).encode('utf-8')
+        if len(raw) <= 139:
+            return _PREFIX + _base32(self._names.encrypt(raw, [_NAME_AAD])), None
+        if len(raw) + _TAG > MAX_NAME_RECORD:
+            raise BackupNamespaceError('crypt_name_too_long')
+        record = self._names.encrypt(raw, [_LONG_AAD])
+        return LONG_PREFIX + hashlib.sha256(record).hexdigest(), record
+
+    def decode_record(self, physical, record):
+        if (len(record) <= 139 + _TAG or len(record) > MAX_NAME_RECORD
+                or physical.lower() != LONG_PREFIX + hashlib.sha256(record).hexdigest()):
+            raise BackupNamespaceError('crypt_name_record_invalid')
+        try:
+            return _component(self._names.decrypt(record, [_LONG_AAD]).decode('utf-8'))
+        except (InvalidTag, UnicodeError, InvalidBackupName) as exc:
+            raise BackupNamespaceError('crypt_name_record_invalid') from exc
+
     def decode_name(self, physical, is_dir):
         """Accept ASCII case variations, never return a foreign name as cleartext."""
         if not is_reserved_backup_name(physical):
@@ -145,6 +179,18 @@ class BackupCipher:
         """
         encrypted_size(plaintext_size)
         return _Reader(self._records(source, plaintext_size, cancel), cancel)
+
+    def authenticate_prefix(self, data):
+        """Authenticate one GCM record before replacing or deleting an existing file."""
+        header = data[:_HEADER]
+        if len(header) != _HEADER or not header.startswith(_MAGIC):
+            raise BackupNamespaceError('crypt_name_conflict')
+        final = len(data) < OWNERSHIP_PREFIX_SIZE
+        block = data[_HEADER:] if final else data[_HEADER:-1]
+        try:
+            _file_cipher(self._files, header).decrypt(_nonce(0, final), block, header)
+        except InvalidTag as exc:
+            raise BackupNamespaceError('crypt_name_conflict') from exc
 
     def _records(self, source, remaining, cancel):
         header = _MAGIC + os.urandom(_SALT)

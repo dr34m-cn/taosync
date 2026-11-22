@@ -5,11 +5,15 @@ import re
 import stat
 import sys
 from contextlib import contextmanager, ExitStack
+from contextvars import ContextVar
 from pathlib import Path
 
 from common.LNG import get_context_lang
 from common.fileRetryReason import FileRetryError
 from common.locales import t
+
+
+sync_listing = ContextVar('sync_listing', default=False)
 
 
 class LocalPathError(FileRetryError):

@@ -658,7 +658,7 @@ onMounted(() => {
             <div v-else class="label-width">
               {{ editData.srcPath }}
               <el-button type="primary" size="small" :style="`margin-left: ${editData.srcPath == '' ? 0 : 12}px;`" @click="selectPath(true)">
-                {{ editData.srcPath == "" ? $t("common.select") : $t("common.change") }}{{ $t("home.selectDir") }}
+                {{ $t(editData.srcPath ? "home.changeDir" : "home.selectDir") }}
               </el-button>
             </div>
           </el-form-item>
@@ -671,7 +671,7 @@ onMounted(() => {
                   <el-button type="danger" size="small" @click="delDstPath(index)">{{ $t("home.deleteDir") }}</el-button>
                 </div>
                 <el-button type="primary" size="small" @click="selectPath(false)">
-                  {{ editData.dstPath.length == 0 ? $t("common.select") : $t("common.add") }}{{ $t("home.selectDir") }}
+                  {{ $t(editData.dstPath.length ? "home.addDir" : "home.selectDir") }}
                 </el-button>
               </div>
             </div>

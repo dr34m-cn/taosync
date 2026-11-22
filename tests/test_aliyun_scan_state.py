@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from service.engine.taosyncClient import TaoSyncClient
 from service.storage.drivers.aliyun import AliyunAPIError, AliyunDriveDriver
 from service.storage.drivers.base import StorageDriver
+from service.storage.drivers.crypt import CryptDriver
 from service.storage.drivers.scanState import ScanState
 from service.syncJob.jobClient import JobTask
 
@@ -18,6 +19,17 @@ class Source(StorageDriver):
 
 
 class ScannedUploadTests(unittest.TestCase):
+    def test_comparable_hash_must_be_explicitly_identified_by_aliyun(self):
+        raw = dict(name='sample', type='file', file_id='file', size=3, content_hash='A' * 40)
+        for algorithm in (None, 'md5', 'sha1'):
+            with self.subTest(algorithm=algorithm):
+                item = dict(raw, content_hash_name=algorithm)
+                self.entries['root'] = [item]
+                for detail in (self.client.fileListDetailApi('/D/', useCache=0)['sample'],
+                               self.client.fileDetail('/D/', 'sample')):
+                    expected = {'sha1': 'a' * 40} if algorithm == 'sha1' else {}
+                    self.assertEqual(detail.get('contentHashes', {}), expected)
+
     def setUp(self):
         self.driver = AliyunDriveDriver({
             'client_id': 'client', 'client_secret': 'secret',
@@ -97,6 +109,39 @@ class ScannedUploadTests(unittest.TestCase):
         state = self.client.scan_states[2].get('/folder')
         self.assertEqual(state[1][0]['file_id'], 'new-a')
         self.assertIsNone(self.driver.scan_state.get())
+
+    def test_encrypted_batch_shares_one_listing_and_refuses_unseen_cloud_object(self):
+        view = CryptDriver(self.driver, '/folder', 'test passphrase', False)
+        self.client.mounts['C'] = dict(id=3, name='C', driverType='crypt',
+                                       config={'target_mount_id': 2, 'target_path': '/folder'}, driver=view)
+        def accept_part(url, data, **kwargs):
+            self.assertEqual(len(data.read()), int(kwargs['headers']['Content-Length']))
+            return Mock(status_code=200)
+        self.driver.session.put.side_effect = accept_part
+        for index in range(24):
+            self.upload(name='long-' + str(index) + 'x' * 145, directory='/C')
+        endpoints = self.endpoints()
+        # Once to resolve /folder, once to load its contents. Each long name
+        # needs exactly two new cloud objects (mapping and ciphertext).
+        self.assertEqual(endpoints.count('list'), 2)
+        self.assertEqual(endpoints.count('search'), 0)
+        self.assertEqual((endpoints.count('create'), endpoints.count('complete')), (48, 48))
+        physical, _ = view.cipher.storage_name('external')
+        self.entries['parent'].append({'name': physical, 'file_id': 'outside', 'type': 'file', 'size': 5})
+        self.driver._request.reset_mock()
+        self.driver.session.put.reset_mock()
+        task = self.client.copyFile('/S', '/C', 'external')
+        self.client.waitTask(task, 5)
+        for lang, fragment in [('en', 'already exists'), ('zh_CN', '同名')]:
+            with patch('service.storage.localAccess.get_context_lang', return_value=lang):
+                info = self.client.taskInfo(task)
+                self.assertEqual(info['state'], 7)
+                self.assertEqual(info['localError'], ('crypt_name_conflict',))
+                self.assertIn(fragment, info['error'])
+        self.assertEqual(self.endpoints(), ['create'])
+        self.driver.session.put.assert_not_called()
+        self.assertEqual(self.entries['parent'][-1]['file_id'], 'outside')
+        self.assertIsNone(self.client.scan_states[2].get('/folder'))
 
     def test_parallel_copies_share_scan_but_keep_all_completed_entries(self):
         self.scan()

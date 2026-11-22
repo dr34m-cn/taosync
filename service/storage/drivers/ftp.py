@@ -102,7 +102,7 @@ class FtpDriver(StorageDriver):
                     )
                 result.append(item)
             return result
-        except (AttributeError, ftplib.all_errors) as exc:
+        except AttributeError as exc:
             # NLST + cwd cannot distinguish an ordinary directory from a
             # symlink on many FTP servers. Refusing that fallback keeps the
             # configured root an actual security boundary.
@@ -125,9 +125,52 @@ class FtpDriver(StorageDriver):
         remote = self._remote(path)
         with self._connect() as ftp:
             self._assert_root_directory(ftp)
-            result = self._entries(ftp, remote, details)
+            try:
+                result = self._entries(ftp, remote, details)
+            except ftplib.error_perm as exc:
+                # MLSD can report an absent directory as 501 or 550. Confirm absence
+                # in a readable parent before allowing creation of the child.
+                if str(exc)[:3] in ("501", "550"):
+                    current = self.root
+                    for part in normalize_path(path).strip("/").split("/"):
+                        if part:
+                            current = posixpath.join(current, part)
+                            if self._path_kind(ftp, current) is None:
+                                raise FileNotFoundError(current) from exc
+                raise
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
+
+    def entry_kind(self, path):
+        remote = self._remote(path, allow_root=False)
+        with self._connect() as ftp:
+            self._assert_root_directory(ftp)
+            try:
+                response = ftp.sendcmd("MLST " + remote)
+            except AttributeError:
+                response = ""
+            except ftplib.error_perm as exc:
+                if str(exc).startswith("550") and "no such file or directory" in str(exc).lower():
+                    return None
+                if str(exc)[:3] not in ("500", "501", "502", "504", "550"):
+                    raise
+            else:
+                for line in response.splitlines():
+                    facts = line.strip().split(" ", 1)[0].lower().split(";")
+                    for kind in ("dir", "file"):
+                        if "type=" + kind in facts:
+                            return kind
+            # Some servers implement MLSD alone or return an ambiguous 550.
+            try:
+                return self._path_kind(ftp, remote)
+            except ftplib.error_perm as exc:
+                if str(exc)[:3] in ("501", "550"):
+                    current = self.root
+                    for part in normalize_path(path).strip("/").split("/")[:-1]:
+                        current = posixpath.join(current, part)
+                        if self._path_kind(ftp, current) is None:
+                            return None
+                raise
 
     def mkdir(self, path):
         remote = self._remote(path)
@@ -250,11 +293,16 @@ class FtpDriver(StorageDriver):
                 self._replace_file(ftp, temporary, remote)
                 if progress:
                     progress(1.0)
-            finally:
+            except BaseException:
+                # An interrupted STOR leaves transfer replies on the control
+                # connection. A fresh connection can reliably delete staging.
+                ftp.close()
                 try:
-                    ftp.delete(temporary)
+                    with self._connect() as cleanup:
+                        cleanup.delete(temporary)
                 except ftplib.all_errors:
                     pass
+                raise
 
     @staticmethod
     def _replace_file(ftp, temporary, destination):
@@ -302,7 +350,7 @@ class FtpDriver(StorageDriver):
                 if item_type == "file":
                     return "file"
                 return "unsafe"
-        except (AttributeError, ftplib.all_errors) as exc:
+        except AttributeError as exc:
             raise RuntimeError(
                 "FTP server must support MLSD for a root-isolated mount"
             ) from exc

@@ -288,6 +288,60 @@ class FileRetryTest(EngineTestBase):
 
 
 class BuiltinEngineSyncTest(EngineTestBase):
+    def test_overlapping_destinations_rejected_at_creation_and_execution(self):
+        # The second mount aliases a child of D, with no shared virtual prefix.
+        child = Path(self.dst, 'child')
+        child.mkdir()
+        self._mount('Alias', str(child))
+        write(self.src, 'name', b'payload')
+        write(child, 'name', b'payload')
+        with self.assertRaises(ValueError):
+            self._job(dst='/Alias/:/D/')
+        job = self._job(dst='/D/')
+        # Model a job saved by an earlier release without calling today's validator.
+        jobService.getJobClientById(job).job['dstPath'] = '/Alias/:/D/'
+        self.assertEqual(self._run(job)[0], 6)
+        self.assertEqual(tree(self.dst), {'child/': 'DIR', 'child/name': b'payload'})
+
+    def test_source_hardlink_blocks_mirror_snapshot_removals(self):
+        for source_mode in (0, 1):
+            with self.subTest(source_mode=source_mode):
+                rel = str(source_mode)
+                write(self.src, rel+'/plain', b'other')
+                write(self.src, rel+'/important', b'backup')
+                job = self._job(src='/S/'+rel+'/', dst='/D/'+rel+'/', sourceMode=source_mode)
+                self.assertEqual(self._run(job)[0], 2)
+                before = jobMapper.getSourceSnapshot(job)
+                os.link(Path(self.src, rel, 'important'), self.base / ('linked-'+rel))
+                self.assertEqual(self._run(job)[0], 6)
+                self.assertEqual(Path(self.dst, rel, 'important').read_bytes(), b'backup')
+                self.assertEqual(jobMapper.getSourceSnapshot(job), before)
+
+    def test_nested_exclusions_survive_complete_mirror_cleanup(self):
+        write(self.src, 'active', b'source')
+        write(self.dst, 'old/protected/nested/precious.keep', b'keep')
+        write(self.dst, 'old/protected/remove', b'delete')
+        write(self.dst, 'old/unprotected/remove', b'delete')
+        job = self._job(exclude='*.keep', sourceMode=1)
+        self.assertEqual(self._run(job)[0], 2)
+        self.assertEqual(Path(self.dst, 'old/protected/nested/precious.keep').read_bytes(), b'keep')
+        self.assertFalse(Path(self.dst, 'old/protected/remove').exists())
+        self.assertFalse(Path(self.dst, 'old/unprotected').exists())
+
+    def test_changed_source_is_rechecked_per_file_before_removal(self):
+        write(self.src, 'a', b'aaa')
+        write(self.src, 'z', b'old')
+        original = LocalDriver.delete
+        def delete(driver, path):
+            original(driver, path)
+            if path=='/a' and Path(driver.root) == Path(self.src):
+                write(self.src, 'z', b'replacement')
+        with mock.patch.object(LocalDriver, 'delete', delete):
+            self.assertEqual(self._run(self._job(method=2))[0], 3)
+        self.assertFalse(Path(self.src, 'a').exists())
+        self.assertEqual(Path(self.src, 'z').read_bytes(), b'replacement')
+        self.assertEqual(Path(self.dst, 'z').read_bytes(), b'old')
+
     def test_encrypted_folder_backup_and_restore_through_sync_jobs(self):
         backing = self.base / 'dst' / 'vaults'
         source = Path(self.src)

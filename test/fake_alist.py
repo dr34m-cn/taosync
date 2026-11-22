@@ -59,10 +59,12 @@ class FakeAlist:
             raise FileNotFoundError('object not found')
         out = []
         for entry in os.scandir(real):
-            st = entry.stat()
-            out.append({'name': entry.name, 'is_dir': entry.is_dir(), 'size': 0 if entry.is_dir() else st.st_size,
-                        'modified': str(st.st_mtime_ns), 'hash_info': None})
+            out.append(self.metadata(entry.path, entry.stat()))
         return out
+
+    def metadata(self, real, info):
+        return {'name': os.path.basename(real), 'is_dir': os.path.isdir(real), 'size': info.st_size,
+                'modified': str(info.st_mtime_ns), 'hash_info': None}
 
     def copy(self, srcDir, dstDir, name):
         tid = uuid.uuid4().hex[:12]
@@ -131,6 +133,16 @@ class FakeAlist:
                 except FileNotFoundError as exc:
                     self.fail(500, str(exc))
 
+        class FsGet(Base):
+            def post(self):
+                _, real = fake.resolve(self.body()['path'])
+                try:
+                    info = os.stat(real)
+                except FileNotFoundError as exc:
+                    self.fail(500, str(exc))
+                    return
+                self.ok(fake.metadata(real, info))
+
         class Mkdir(Base):
             def post(self):
                 _, real = fake.resolve(self.body()['path'])
@@ -192,7 +204,7 @@ class FakeAlist:
             try:
                 app = tornado.web.Application([
                     (r'/api/me', Me), (r'/api/fs/list', FsList), (r'/api/fs/mkdir', Mkdir),
-                    (r'/api/fs/remove', Remove), (r'/api/fs/copy', Copy),
+                    (r'/api/fs/remove', Remove), (r'/api/fs/copy', Copy), (r'/api/fs/get', FsGet),
                     (r'/api/admin/task/copy/info', TaskInfo), (r'/api/admin/task/copy/delete', TaskDrop),
                     (r'/api/admin/task/copy/cancel', TaskCancel), (r'/api/admin/storage/list', StorageList),
                 ])

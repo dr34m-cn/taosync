@@ -21,8 +21,11 @@ from service.storage.drivers.base import (
 from service.storage.factory import createDriver
 from service.storage.localAccess import LocalPathError
 from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
+from service.storage.localAccess import sync_listing
+from common.fileFingerprint import contentHashes
 from service.storage.drivers.aliyun import AliyunDriveDriver
 from service.storage.drivers.crypt import CryptDriver
+from service.storage.backupCipher import BackupNamespaceError
 from service.storage.mountConfig import getMountEncryptionKey
 from service.storage.drivers.scanState import ScanState
 
@@ -95,15 +98,17 @@ class _CopyTask:
                 self._succeed()
                 return
             if source_mount["id"] == destination_mount["id"]:
-                result = source_driver.copy(
-                    source_relative,
-                    destination_relative,
-                    size=size,
-                    progress=self._report,
-                    cancel=self.cancel_event,
-                    metadata=metadata,
-                )
-                self.client._invalidateScanPath(destination_mount, destination_relative)
+                with self.client._scanScope(destination_mount):
+                    result = source_driver.copy(
+                        source_relative,
+                        destination_relative,
+                        size=size,
+                        progress=self._report,
+                        cancel=self.cancel_event,
+                        metadata=metadata,
+                    )
+                if destination_mount['driverType'] != 'crypt':
+                    self.client._invalidateScanPath(destination_mount, destination_relative)
             else:
                 with self.client._scanScope(destination_mount):
                     result = stream_transfer(
@@ -116,8 +121,6 @@ class _CopyTask:
                         self.cancel_event,
                         metadata,
                     )
-                if destination_mount['driverType'] == 'crypt':
-                    self.client._invalidateScanPath(destination_mount, destination_relative)
                 self.client._rememberHash(source_mount, source_relative, metadata)
             self.client._invalidateMountCache(destination_mount["id"])
             if self.delete_source:
@@ -137,7 +140,7 @@ class _CopyTask:
         except Exception as exc:
             with self.lock:
                 self.state = 7
-                self.error = exc.args if isinstance(exc, LocalPathError) else str(exc)
+                self.error = exc.args if isinstance(exc, (LocalPathError, BackupNamespaceError)) else str(exc)
         finally:
             with self.lock:
                 delete_when_done = self.delete_when_done
@@ -217,7 +220,8 @@ class TaoSyncClient:
                     if target is None or target['driverType'] == 'crypt':
                         raise ValueError('encryption target directory is unavailable')
                     row['driver'] = CryptDriver(self.getDriver(target), config['target_path'],
-                                                getMountEncryptionKey(config), config['encrypt_dir_names'])
+                                                getMountEncryptionKey(config), config['encrypt_dir_names'],
+                                                namespace_id=(self.alistId, target['id']))
                     self.related_mounts.setdefault(target['id'], {target['id']}).add(mount_id)
                 else:
                     row['driver'] = createDriver(
@@ -249,6 +253,12 @@ class TaoSyncClient:
         return client
 
     def _scanScope(self, mount):
+        if mount['driverType'] == 'crypt':
+            backing = self.getDriver(mount).backing
+            state = getattr(self, 'scan_states', {}).get(mount['config']['target_mount_id'])
+            if state is not None:
+                return backing.scan_scope(state)
+            return nullcontext()
         state = getattr(self, 'scan_states', {}).get(mount['id'])
         if state is not None:
             return self.getDriver(mount).scan_scope(state)
@@ -329,7 +339,11 @@ class TaoSyncClient:
                 return [dict(item) for item in cached[1]]
         try:
             with self._scanScope(mount):
-                entries = self.getDriver(mount).list(relative, details=True)
+                token = sync_listing.set(hasattr(self, 'cache_owner'))
+                try:
+                    entries = self.getDriver(mount).list(relative, details=True)
+                finally:
+                    sync_listing.reset(token)
         except FileNotFoundError:
             raise FileNotFoundError("directory not found: " + normalized)
         with self.entry_cache_lock:
@@ -348,20 +362,23 @@ class TaoSyncClient:
     def fileDetail(self, directory, name):
         mount, relative = self.resolve(child_path(directory, name))
         try:
-            item = self.fileMetadata(mount, relative)
+            item = self.getDriver(mount).file_metadata(relative)
         except (FileNotFoundError, IsADirectoryError):
             return None
-        return {'isDir': 0, 'size': item['size'], 'fingerprint': item.get('fingerprint')}
+        return {'isDir': 0, 'size': item['size'], 'fingerprint': item.get('fingerprint'),
+                'contentHashes': contentHashes(item) if mount.get('driverType') == 'aliyun' else {}}
 
     def fileListDetailApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """Return driver metadata without changing fileListApi's legacy shape."""
         self.checkWait(path, scanInterval)
         entries = self._entries(path, useCache)
+        cloudHashes = bool(path.strip('/')) and self.resolve(path)[0].get('driverType') == 'aliyun'
         result = {
             item["name"] + "/" if item["is_dir"] else item["name"]: {
                 "isDir": 1 if item["is_dir"] else 0,
                 "size": None if item["is_dir"] else int(item.get("size") or 0),
                 "fingerprint": item.get("fingerprint"),
+                **({"contentHashes": item["contentHashes"]} if cloudHashes and item.get("contentHashes") else {}),
                 **{key: item[key] for key in ("sha1", "created_at", "modified_at") if item.get(key) is not None},
             }
             for item in entries
@@ -403,8 +420,6 @@ class TaoSyncClient:
         if relative != "/":
             with self._scanScope(mount):
                 self.getDriver(mount).mkdir(relative)
-            if mount['driverType'] == 'crypt':
-                self._invalidateScanPath(mount, relative)
             self._invalidateMountCache(mount["id"])
 
     def deleteFile(self, path, names, scanInterval=0):
@@ -421,8 +436,6 @@ class TaoSyncClient:
                 # Source-snapshot retries may repeat a delete that already
                 # succeeded for another target before a later operation failed.
                 pass
-            if mount['driverType'] == 'crypt':
-                self._invalidateScanPath(mount, relative)
             self._invalidateMountCache(mount["id"])
 
     def fileSize(self, mount, relative):

@@ -20,6 +20,7 @@ from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from common.config import getConfig
 from common.LNG import G
 from common.fileRetryReason import FileRetryError
+from common.fileFingerprint import contentHashes, contentHashesDiffer
 from service.storage.localAccess import LocalPathError
 from mapper import jobMapper
 from service.engine import engineService
@@ -115,6 +116,13 @@ def virtualPathsOverlap(firstPath, secondPath):
             or second.startswith(first.rstrip('/') + '/'))
 
 
+def validateJobPaths(source, destinations, overlaps):
+    if any(overlaps(source, target) for target in destinations):
+        raise FileRetryError('source_target_overlap')
+    if any(overlaps(a, b) for a, b in itertools.combinations(destinations, 2)):
+        raise FileRetryError('destination_paths_overlap')
+
+
 class CopyItem:
     def __init__(self, srcPath, dstPath, fileName, fileSize, method, jobTask, canVerify=False):
         self.jobTask = jobTask
@@ -176,7 +184,11 @@ class CopyItem:
         except Exception:
             return
         detail = details.get(self.fileName)
-        if detail is not None and not detail.get('isDir') and detail.get('size') == self.fileSize:
+        root = self.jobTask.normalizeRoot(self.jobTask.job['srcPath'])
+        relative = (self.srcPath + self.fileName)[len(root):]
+        source = self.jobTask.sourceSnapshot.get(relative, {})
+        if (detail is not None and not detail.get('isDir') and detail.get('size') == self.fileSize
+                and not contentHashesDiffer(source, detail)):
             logging.getLogger().warning(G('copy_verified_after_engine_error').format(self.errMsg))
             self.errMsg = G('copy_verified_after_engine_error').format(self.errMsg)
             self.status = 2
@@ -664,8 +676,6 @@ class JobTask:
         Files are decided one by one: a file that failed for any target keeps
         its source, but no longer blocks other files that were fully delivered.
         """
-        freshSourceDirectories = {}
-        targetDirectories = {}
         movedPaths = set()
         destinationRoots = {
             self.normalizeRoot(item) for item in self.job['dstPath'].split(':')
@@ -693,16 +703,12 @@ class JobTask:
                     matching, srcPath, fileName, entry['size'], G('move_delivery_incomplete')
                 )
                 continue
-            verifyError = self.verifyTargetCopies(sorted(expectedDestinations), fileName, entry['size'],
-                                                  targetDirectories)
+            verifyError = self.verifyTargetCopies(sorted(expectedDestinations), fileName, entry)
             if verifyError is not None:
                 self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], verifyError)
                 continue
             try:
-                if srcPath not in freshSourceDirectories:
-                    _entries, details = self.readDirectory(srcPath, 0, 0)
-                    freshSourceDirectories[srcPath] = details
-                freshEntry = freshSourceDirectories[srcPath].get(fileName)
+                freshEntry = self.freshFileDetail(srcPath, fileName)
                 freshSize = None if freshEntry is None else freshEntry.get('size')
             except Exception as e:
                 self.markMoveDeleteFailure(matching, srcPath, fileName, entry['size'], failure_reason(e))
@@ -740,20 +746,26 @@ class JobTask:
                     self.copyHook(srcPath, None, fileName, entry['size'], status=2, copyType=2)
         self.removeMovedDirectories(movedPaths)
 
-    def verifyTargetCopies(self, destinations, fileName, size, cache):
-        """Re-list each target directory and confirm the copy exists with the source size."""
+    def freshFileDetail(self, directory, fileName):
+        single = getattr(self.alistClient, 'fileDetail', None)
+        if callable(single):
+            return single(directory, fileName)
+        return self.readDirectory(directory, 0, 0)[1].get(fileName)
+
+    def verifyTargetCopies(self, destinations, fileName, source):
+        """Verify current size and any common whole-content hash supplied by the engines."""
+        size = source['size']
         for dstDir in destinations:
             try:
-                if dstDir not in cache:
-                    _entries, details = self.readDirectory(dstDir, 0, self.job['scanIntervalT'])
-                    cache[dstDir] = details
-                detail = cache[dstDir].get(fileName)
+                detail = self.freshFileDetail(dstDir, fileName)
             except Exception as e:
                 return e if isinstance(e, FileRetryError) else G('move_target_verify_failed').format(dstDir + fileName, str(e))
             if detail is None or detail.get('isDir') or detail.get('size') != size:
                 found = '-' if detail is None else ('dir' if detail.get('isDir') else detail.get('size'))
                 return G('move_target_verify_failed').format(
                     dstDir + fileName, G('move_target_size_mismatch').format(size, found))
+            if contentHashesDiffer(source, detail):
+                return FileRetryError('move_target_hash_mismatch', dstDir + fileName)
         return None
 
     def removeMovedDirectories(self, movedPaths):
@@ -919,8 +931,7 @@ class JobTask:
         dstPathList = [self.normalizeRoot(item) for item in self.job['dstPath'].split(':')]
         try:
             pathsOverlap = getattr(self.alistClient, 'pathsOverlap', virtualPathsOverlap)
-            if any(pathsOverlap(srcPath, dstPath) for dstPath in dstPathList):
-                raise ValueError(G('source_target_overlap'))
+            validateJobPaths(srcPath, dstPathList, pathsOverlap)
             storedSnapshot = jobMapper.getSourceSnapshot(self.job['id'])
             meta = storedSnapshot['meta']
             if meta['initialized'] == 1 or storedSnapshot['entries']:
@@ -1011,7 +1022,6 @@ class JobTask:
             if self.job['method'] == 2:
                 # A retained move entry was delivered before an interrupted
                 # source deletion. finalizeMove still verifies both ends.
-                targetDirectories = {}
                 for entry in current.values():
                     if self.breakFlag:
                         return
@@ -1019,7 +1029,7 @@ class JobTask:
                             and not self.sourceEntryChanged(previous.get(entry['path']), entry)):
                         srcPath, name = self.entryLocation(self.job['srcPath'], entry['path'])
                         dstPath, _ = self.entryLocation(dstRoot, entry['path'])
-                        error = self.verifyTargetCopies([dstPath], name, entry['size'], targetDirectories)
+                        error = self.verifyTargetCopies([dstPath], name, entry)
                         if error is None:
                             self.copyHook(srcPath, dstPath, name, entry['size'], status=2, copyType=2)
                         else:
@@ -1195,7 +1205,7 @@ class JobTask:
             errMsg = failure_reason(e)
         self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath, createTime)
 
-    def listDir(self, path, firstDst, spec, rootPath, isSrc=True, recordError=True):
+    def listDir(self, path, firstDst, spec, rootPath, isSrc=True, recordError=True, detailsOut=None):
         """
         列出目录
         self.job['useCacheT']: 扫描目标目录时，是否使用缓存，0-不使用，1-使用
@@ -1215,6 +1225,8 @@ class JobTask:
             entries, details = self.readDirectory(
                 path, useCache, scanInterval, spec, rootPath
             )
+            if detailsOut is not None:
+                detailsOut.update(details)
             if isSrc and firstDst:
                 self.recordSourceEntries(path, rootPath, entries, details)
             return entries
@@ -1249,6 +1261,9 @@ class JobTask:
                     'size': size,
                     'fingerprint': detail.get('fingerprint'),
                 }
+                hashes = contentHashes(detail)
+                if hashes:
+                    details[name]['contentHashes'] = hashes
                 entries[name] = {} if isDirectory else size
             return entries, details
 
@@ -1280,13 +1295,15 @@ class JobTask:
             fingerprint = (details or {}).get(name, {}).get('fingerprint')
             if fingerprint is not None:
                 entry['fingerprint'] = fingerprint
+            hashes = (details or {}).get(name, {}).get('contentHashes')
+            if hashes:
+                entry['contentHashes'] = hashes
             self.sourceSnapshot[relativePath] = entry
 
     def deleteTargetOnlyDir(self, dstPath, spec, dstRootPath, firstDst):
         """Delete only eligible files below a target-only directory.
 
-        Directory shells are retained so a whole-directory remove cannot bypass
-        the active file-size or path exclusion rules.
+        A filtered listing cannot establish that the directory is empty.
         """
         if self.breakFlag:
             return
@@ -1301,6 +1318,15 @@ class JobTask:
                 self.deleteTargetOnlyDir(dstPath + key, spec, dstRootPath, firstDst)
             elif self.fileSizeAllowed(size):
                 self.delFile(dstPath, key, size)
+        if spec and not self.hasFileSizeFilter() and not self.breakFlag:
+            try:
+                remaining, _ = self.readDirectory(dstPath, 0, self.job['scanIntervalT'])
+            except Exception as error:
+                self.delHook(dstPath, None, None, status=7, errMsg=failure_reason(error), isPath=1)
+                return
+            if not remaining:
+                parent, name = posixpath.split(dstPath.rstrip('/'))
+                self.delFile(self.normalizeRoot(parent), name + '/', None)
 
     def syncWithHave(self, srcPath, dstPath, spec, srcRootPath, dstRootPath, firstDst):
         """
@@ -1321,8 +1347,10 @@ class JobTask:
             # 已在listDir做出日志打印等操作，此处啥都不用做
             return
         isTargetRoot = dstPath == dstRootPath
+        targetDetails = {}
         try:
-            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, recordError=not isTargetRoot)
+            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, recordError=not isTargetRoot,
+                                    detailsOut=targetDetails)
         except Exception as e:
             if not isTargetRoot:
                 return
@@ -1340,7 +1368,7 @@ class JobTask:
                 if self.breakFlag:
                     return
                 if dstKey not in srcFiles:
-                    if dstKey.endswith('/') and self.hasFileSizeFilter():
+                    if dstKey.endswith('/') and (spec or self.hasFileSizeFilter()):
                         self.deleteTargetOnlyDir(dstPath + dstKey, spec, dstRootPath, firstDst)
                     elif dstKey.endswith('/') or self.fileSizeAllowed(dstFiles[dstKey]):
                         self.delFile(dstPath, dstKey, dstFiles[dstKey])
@@ -1360,6 +1388,8 @@ class JobTask:
                         or self.sourceFileChangedSinceSnapshot(
                             srcPath, srcRootPath, key
                         )
+                        or contentHashesDiffer(getattr(self, 'sourceSnapshot', {}).get(relativePath, {}),
+                                               targetDetails.get(key, {}))
                         or key not in dstFiles or dstFiles[key] != srcFiles[key]):
                     self.copyFile(srcPath, dstPath, key, srcFiles[key],
                                   canVerify=key not in dstFiles or dstFiles[key] != srcFiles[key])

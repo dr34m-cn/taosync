@@ -57,7 +57,7 @@ const pageChange = () => emit("pageChange", { pageNum: pageNum.value, pageSize: 
       <el-table-column prop="fileName" :label="$t('taskDetail.fileName')">
         <template #default="scope">
           {{ scope.row.fileName || scope.row.dstPath }}
-          <el-tag v-if="scope.row.rapidUpload" size="small" type="success">秒传</el-tag>
+          <el-tag v-if="scope.row.rapidUpload" size="small" type="success">{{ $t("taskDetail.instantUpload") }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="fileSize" :label="$t('taskDetail.fileSize')" width="120">

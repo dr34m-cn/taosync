@@ -167,16 +167,23 @@ class SmbConnectionTests(unittest.TestCase):
         name = '.taosync-' + 'a' * 32 + '.part'
         missing = SMBOSError(NtStatus.STATUS_OBJECT_NAME_NOT_FOUND, ntpath.join(self.driver.root, 'backup', name))
         # scandir returned the old name before another upload renamed it.
-        staged = SimpleNamespace(name=name, is_dir=lambda **kw: False, stat=Mock(side_effect=missing))
-        encrypted = SimpleNamespace(name=vault.cipher.encode_name('existing', False), is_dir=lambda **kw: False,
-                                    stat=lambda **kw: SimpleNamespace(st_size=vault.cipher.encrypted_size(3)))
-        with patch.object(self.client, 'scandir', side_effect=lambda *a, **kw: nullcontext([staged, encrypted])):
+        staged = SimpleNamespace(name=name, is_dir=lambda **kw: False)
+        encrypted = SimpleNamespace(name=vault.cipher.encode_name('existing', False), is_dir=lambda **kw: False)
+        staged_sizes = []
+
+        def stat_path(path, **kwargs):
+            if ntpath.basename(path) == name:
+                if not staged_sizes:
+                    raise missing
+                return SimpleNamespace(st_size=staged_sizes[0])
+            return SimpleNamespace(st_size=vault.cipher.encrypted_size(3))
+
+        with patch.object(self.client, 'scandir', side_effect=lambda *a, **kw: nullcontext([staged, encrypted])), \
+                patch.object(self.client, 'stat', side_effect=stat_path):
             for details in (False, True):
                 self.assertEqual([row['name'] for row in vault.list('/', details=details)], ['existing'])
-            staged.stat.assert_not_called()
             # A live staging file remains visible to a physical scan (used by recursive delete).
-            staged.stat.side_effect = None
-            staged.stat.return_value = SimpleNamespace(st_size=7)
+            staged_sizes.append(7)
             self.assertIn(name, [row['name'] for row in self.driver.list('/backup')])
 
     def test_failed_destination_probe_does_not_start_upload(self):

@@ -58,16 +58,12 @@ def getLatestJobTaskList(jobIds):
                               then item.fileSize end), 0) as failFileSize
         from job_task task
         left join job_task_item item on item.taskId = task.id
-        where task.jobId in ({placeholders})
-          and not exists (
-              select 1
-              from job_task newer
-              where newer.jobId = task.jobId
-                and (
-                    newer.createTime > task.createTime
-                    or (newer.createTime = task.createTime and newer.id > task.id)
-                )
-          )
+        where task.id in (
+            select (select recent.id from job_task recent
+                    where recent.jobId = job.id
+                    order by recent.createTime desc, recent.id desc limit 1)
+            from job where job.id in ({placeholders})
+        )
         group by task.id
     """
     return sqlBase.fetchall_to_table(query, tuple(jobIds))

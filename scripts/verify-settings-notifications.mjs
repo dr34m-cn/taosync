@@ -90,7 +90,7 @@ try {
       assert.ok(rows.every(top => top !== null));
       assert.equal(new Set(rows).size, 4);
 
-      for (const title of ['https-heading', 'api-key-title']) {
+      for (const title of ['https-heading', 'api-key-general', 'api-key-execute']) {
         const header = page.locator(`section[aria-labelledby="${title}"] header`);
         await header.locator('.el-switch').waitFor();
         const centers = await header.locator('h2, button, .el-switch, .controls > span').evaluateAll(items => items.map(item => {
@@ -142,7 +142,7 @@ try {
       assert.equal(rejected, false);
       assert.equal(settings.task_save, 0);
       assert.equal(await page.locator('.setting .el-input-number__increase, .setting .el-input-number__decrease').count(), 0);
-      const saveSettings = page.getByRole('button', { name: '保存并生效', exact: true });
+      const saveSettings = page.getByRole('region', { name: '同步配置' }).getByRole('button', { name: '保存并生效', exact: true });
       await saveSettings.click();
       await waitFor(() => rejected);
       await page.waitForFunction(() => !document.querySelector('.setting input').disabled);

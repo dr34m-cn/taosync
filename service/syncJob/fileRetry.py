@@ -8,7 +8,7 @@ from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from common.fileRetryReason import FileRetryError
 from mapper import jobMapper
-from service.syncJob.jobClient import JobTask, virtualPathsOverlap
+from service.syncJob.jobClient import JobTask, validateJobPaths, virtualPathsOverlap
 
 
 class FileRetryTask(JobTask):
@@ -123,8 +123,7 @@ class FileRetryTask(JobTask):
         srcRoot = self.normalizeRoot(self.job['srcPath'])
         dstRoots = [self.normalizeRoot(root) for root in self.job['dstPath'].split(':')]
         overlaps = getattr(self.alistClient, 'pathsOverlap', virtualPathsOverlap)
-        if any(overlaps(srcRoot, root) for root in dstRoots):
-            raise FileRetryError('source_target_overlap')
+        validateJobPaths(srcRoot, dstRoots, overlaps)
         if not name or name in ('.', '..') or '/' in name or '\\' in name:
             raise FileRetryError('file_retry_invalid_name')
 

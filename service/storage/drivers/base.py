@@ -98,6 +98,21 @@ class StorageDriver:
                 return dict(entry)
         raise FileNotFoundError(path)
 
+    def entry_kind(self, path):
+        """Probe one component, distinguishing a missing path from a failed query."""
+        try:
+            if type(self).file_metadata is not StorageDriver.file_metadata:
+                self.file_metadata(path)
+                return 'file'
+            parent, name = posixpath.split(normalize_path(path, allow_root=False))
+            for row in self.list_filtered(parent, lambda child, _: child == name):
+                return 'dir' if row['is_dir'] else 'file'
+        except IsADirectoryError:
+            return 'dir'
+        except FileNotFoundError:
+            pass
+        return None
+
     def move(self, source_path, destination_path, size=None, progress=None, cancel=None):
         raise NotImplementedError
 

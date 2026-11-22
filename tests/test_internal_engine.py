@@ -647,6 +647,35 @@ class AliyunDriveDriverTests(unittest.TestCase):
 
 
 class FtpDriverSafetyTests(unittest.TestCase):
+    def test_missing_directory_is_identified_without_masking_permission_failure(self):
+        driver = FtpDriver({'host': 'example.test'})
+        session = MagicMock()
+        def listing(path):
+            if path == '/':
+                return [('private', {'type': 'dir'})]
+            raise denied
+        session.mlsd.side_effect = listing
+        with patch.object(driver, '_connect', return_value=nullcontext(session)):
+            for status in ('501', '550'):
+                denied = ftplib.error_perm(status + ' Directory unavailable')
+                with self.subTest(status=status):
+                    with self.assertRaises(FileNotFoundError):
+                        driver.list('/missing/subdirectory')
+                    with self.assertRaises(ftplib.error_perm) as caught:
+                        driver.list('/private')
+                    self.assertIs(caught.exception, denied)
+
+    def test_interrupted_stor_uses_a_fresh_connection_to_cleanup(self):
+        driver = FtpDriver({'host': 'example.test'})
+        setup, transfer, cleanup = MagicMock(), MagicMock(), MagicMock()
+        transfer.storbinary.side_effect = OSError('upload interrupted')
+        sessions = [nullcontext(s) for s in (setup, transfer, cleanup)]
+        with patch.object(driver, '_connect', side_effect=sessions), self.assertRaisesRegex(OSError, 'upload interrupted'):
+            driver.upload('/file', io.BytesIO(b'new'), size=3)
+        temporary = transfer.storbinary.call_args.args[0].removeprefix('STOR ')
+        cleanup.delete.assert_called_once_with(temporary)
+        transfer.delete.assert_not_called()
+
     def test_long_name_overwrite_and_rollback_use_short_siblings(self):
         name = '文' * 82 + '.txt'
         target = '/nested/' + name

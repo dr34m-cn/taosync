@@ -118,6 +118,7 @@ jobLinks:
   confirmClear: "清空此关联的调度日志？"
   confirmClearAll: "清空所有关联的调度日志？"
 home:
+  changeDir: 更改目录
   jobId: 作业ID
   jobManagement: 作业管理
   mobileJobCount: 共 {count} 个作业
@@ -272,6 +273,11 @@ current:
   abortConfirm: 中止任务不影响已完成的同步项，进行中或等待中的同步项将被取消，确定吗？
   abortSent: 中止指令已发送，请等待中止完成
 taskDetail:
+  instantUpload: 秒传
+  processedFiles: "成功处理 {count} 个文件"
+  filesCount: "{count} 个文件"
+  endTime: 结束时间
+  unrecorded: 未记录
   retryAll: 重试所有失败项
   noRetries: 没有可加入重试的失败文件
   addedRetries: '已将 {count} 个失败文件加入重试'
@@ -581,6 +587,8 @@ https:
   contentSize: PEM 内容不能为空，且不能超过 256 KiB。
   readError: 无法读取所选文件，请重新选择。
 setting:
+  syncSettings: 同步配置
+  configKeys: 配置项名称
   title: 系统设置
   saveAndApply: 保存并生效
   saved: 配置已保存并生效

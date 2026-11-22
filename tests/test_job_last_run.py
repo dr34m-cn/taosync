@@ -21,7 +21,7 @@ class JobLastRunTests(unittest.TestCase):
                     conn.executescript('''
                         insert into job (id) values (1), (2), (3);
                         insert into job_task (id, jobId, createTime, taskNum) values
-                            (10, 1, 100, null), (11, 1, 101, '{"duration":12,"sumSize":1110}'),
+                            (10, 1, 101, null), (11, 1, 101, '{"duration":12,"sumSize":1110}'),
                             (20, 2, 100, null);
                         insert into job_task_item (taskId, status, type, isPath, fileSize) values
                             (10, 2, 0, 0, 10000),

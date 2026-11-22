@@ -25,6 +25,7 @@ from urllib3.util import connection as urllib3_connection
 from common.fileFingerprint import fileFingerprint
 
 from .base import RAPID_UPLOAD, StorageDriver, TransferCancelled, check_cancel, child_path, normalize_path
+from ..backupCipher import BackupNamespaceError
 
 
 _GLOBAL_RATE_LOCK = threading.Lock()
@@ -607,11 +608,42 @@ class AliyunDriveDriver(StorageDriver):
             entry["modified_at"] = item.get("local_modified_at") or item.get("updated_at")
             if str(item.get("content_hash_name") or "sha1").lower() == "sha1":
                 entry["sha1"] = _sha1(item.get("content_hash"))
+                if entry["sha1"] and str(item.get("content_hash_name")).lower() == "sha1":
+                    entry["contentHashes"] = {"sha1": entry["sha1"].lower()}
             entry["fingerprint"] = fileFingerprint(
                 "aliyun", item.get("file_id"), item.get("updated_at"),
                 item.get("content_hash") or item.get("crc64_hash"),
             )
         return entry
+
+    def _scanned_entry(self, state, parent, name):
+        if state is None:
+            return None
+        known = state.lookup(parent, name)
+        if known is None:
+            with self._destination_lock('directory:' + parent):
+                known = state.lookup(parent, name)
+                if known is None:
+                    self.list(parent)
+                    known = state.lookup(parent, name)
+        return known
+
+    def entry_kind(self, path):
+        self._ensure_drive()
+        parent, name = posixpath.split(normalize_path(path, allow_root=False))
+        known = self._scanned_entry(self.scan_state.get(), parent or '/', name)
+        if known is not None:
+            matches = known[1]
+            if len(matches) > 1:
+                raise BackupNamespaceError('crypt_name_conflict')
+            if not matches:
+                return None
+            return 'dir' if matches[0].get('type') == 'folder' else 'file'
+        try:
+            item = self._resolve(path, allow_root=False, targeted=True)
+        except FileNotFoundError:
+            return None
+        return 'dir' if item.get('type') == 'folder' else 'file'
 
     def file_metadata(self, path):
         # Match download/read_range's duplicate-name resolution exactly.
@@ -728,11 +760,14 @@ class AliyunDriveDriver(StorageDriver):
         finally:
             response.close()
 
-    def upload(self, path, source, size=None, progress=None, cancel=None):
+    def upload_new(self, path, source, size=None, progress=None, cancel=None):
+        return self.upload(path, source, size, progress, cancel, create_only=True)
+
+    def upload(self, path, source, size=None, progress=None, cancel=None, *, create_only=False):
         path = normalize_path(path, allow_root=False)
         with self._destination_lock(path):
             try:
-                return self._upload_impl(path, source, size, progress, cancel)
+                return self._upload_impl(path, source, size, progress, cancel, create_only=create_only)
             except Exception:
                 state = self.scan_state.get()
                 if state is not None:
@@ -855,7 +890,7 @@ class AliyunDriveDriver(StorageDriver):
             }
         return proof_data
 
-    def _upload_impl(self, path, source, size=None, progress=None, cancel=None):
+    def _upload_impl(self, path, source, size=None, progress=None, cancel=None, *, create_only=False):
         self.upload_context.file_id = None
         self.upload_context.upload_id = None
         self.upload_context.completed = False
@@ -863,15 +898,7 @@ class AliyunDriveDriver(StorageDriver):
         path = normalize_path(path, allow_root=False)
         parent_path, name = posixpath.split(path)
         state = self.scan_state.get()
-        known = state.lookup(parent_path or '/', name) if state is not None else None
-        if state is not None and known is None:
-            # Source-only runs and expired/conflicting scan state populate a
-            # directory once, shared by subsequent copies in this run.
-            with self._destination_lock('directory:' + (parent_path or '/')):
-                known = state.lookup(parent_path or '/', name)
-                if known is None:
-                    self.list(parent_path or '/')
-                    known = state.lookup(parent_path or '/', name)
+        known = self._scanned_entry(state, parent_path or '/', name)
         parent = known[0] if known is not None else self._resolve(parent_path or "/", targeted=True)
         self._ensure_drive()
         matches = [item for item in known[1] if item.get('name') == name] if known is not None else None
@@ -879,7 +906,7 @@ class AliyunDriveDriver(StorageDriver):
             self._assert_file_destination(parent["file_id"], name, path)
         elif any(item.get('type') == 'folder' for item in matches):
             raise IsADirectoryError(path)
-        new_file = matches == []
+        new_file = create_only or matches == []
         if size is None:
             current = source.tell()
             source.seek(0, 2)
@@ -907,6 +934,12 @@ class AliyunDriveDriver(StorageDriver):
                 # Refuse may return an existing ID. Never adopt or abort it.
                 raise FileExistsError(path)
         except (AliyunAPIError, FileExistsError) as exc:
+            if create_only:
+                # A stale negative in an encrypted view never authorizes an
+                # overwrite. The next attempt must authenticate the occupant.
+                if isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in {'AlreadyExist', 'AlreadyExist.File'}:
+                    raise BackupNamespaceError('crypt_name_conflict') from exc
+                raise
             recoverable = isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in {
                 'AlreadyExist', 'AlreadyExist.File', 'InvalidParentFileId',
                 'NotFound.File', 'NotFound.ParentFile', 'FileIdNotFound',

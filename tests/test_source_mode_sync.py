@@ -96,6 +96,48 @@ def makeTask(engine, method=0, dstPath='/dst/', sourceMode=1):
 
 
 class SourceModeSyncTest(unittest.TestCase):
+    def test_full_comparison_uses_only_matching_content_algorithms(self):
+        class HashEngine(FakeEngine):
+            def fileListDetailApi(inner, path, *args):
+                rows = super().fileListDetailApi(path, *args)
+                rows['sample']['contentHashes'] = hashes[path]
+                return rows
+
+            def copyFile(inner, src, dst, name):
+                hashes[dst] = hashes[src]
+                return super().copyFile(src, dst, name)
+
+        for destination_hashes, expected in (({'SHA-1': 'B'*40}, 1), ({'md5': 'b'*32}, 0),
+                                              ({'SHA1': 'A'*40}, 0), ({}, 0)):
+            with self.subTest(destination_hashes=destination_hashes):
+                hashes = {'/src/': {'sha1': 'a'*40}, '/dst/': destination_hashes}
+                engine = HashEngine({'/src/': {'sample': 3}, '/dst/': {'sample': 3}},
+                                    fingerprints={'/src/': {'sample': 'source'}, '/dst/': {'sample': 'target'}})
+                for _ in range(2):
+                    task = makeTask(engine, sourceMode=0)
+                    self.runTask(task, self.initialized([dict(path='sample', isDir=0, size=3, fingerprint='source')]))
+                self.assertEqual(len(engine.copyCalls), expected)
+
+    def test_move_recovery_retries_an_equal_size_target_with_wrong_digest(self):
+        class CorruptEngine(FakeEngine):
+            def fileListDetailApi(inner, path, *args):
+                rows = super().fileListDetailApi(path, *args)
+                rows['f']['contentHashes'] = {'sha1': ('a' if path=='/src/' else 'b') * 40}
+                return rows
+
+        for full_scan in (False, True):
+            with self.subTest(full_scan=full_scan):
+                engine = CorruptEngine({'/src/': {'f': 7}, '/dst/': {'f': 7}},
+                                       fingerprints={'/src/': {'f': 'same-source'}})
+                task = makeTask(engine, method=2)
+                previous = self.initialized([dict(path='f', isDir=0, size=7, fingerprint='same-source')])
+                if full_scan:
+                    previous['meta']['fullScanTime'] = 1
+                self.runTask(task, previous)
+                self.assertEqual(engine.copyCalls, [('/src/', '/dst/', 'f')])
+                self.assertEqual(engine.deleteCalls, [])
+                self.assertTrue(any(row['status']==7 for row in task.finish))
+
     def setUp(self):
         self.checkpointSnapshot = self.enterContext(mock.patch.object(
             jobClient.jobMapper, 'checkpointSourceFile'))

@@ -61,7 +61,7 @@ onMounted(load);
     </header>
 
     <section class="settings-section policy-section" aria-labelledby="policy-title" v-loading="loading" :aria-busy="loading">
-      <h2 id="policy-title" class="section-heading"><el-icon aria-hidden="true"><Operation /></el-icon>同步配置</h2>
+      <h2 id="policy-title" class="section-heading"><el-icon aria-hidden="true"><Operation /></el-icon>{{ $t("setting.syncSettings") }}</h2>
       <el-form v-if="ready" ref="formRef" :model="form" :rules="rules" label-position="left" hide-required-asterisk :disabled="saving" @submit.prevent="save">
         <div class="settings-fields">
           <el-form-item v-for="key in numericFields" :key="key" :prop="key" :label="$t(`setting.${key}`)" class="setting-row policy-field">
@@ -84,7 +84,7 @@ onMounted(load);
         </div>
         <div class="form-actions">
           <details class="field-reference">
-            <summary>配置项名称</summary>
+            <summary>{{ $t("setting.configKeys") }}</summary>
             <dl>
               <template v-for="key in [...numericFields, 'aliyun_auth_server']" :key="key">
                 <dt>{{ $t(`setting.${key}`) }}</dt><dd><code>{{ key }}</code></dd>

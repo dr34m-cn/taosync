@@ -133,3 +133,12 @@ update_not_trusted: 文件不可信，请仅在可信位置下载更新包
 local_path_protected: 此本地路径受保护，请选择程序目录以外的普通文件或目录
 update_wrong_arch: 架构错误，本系统架构为{system}，更新包架构为{package}，请上传正确架构的更新包
 update_already_running: 当前已在运行这个程序
+alist_incomplete_directory_page: "目录分页结果不完整：{}（第 {} 页）"
+destination_paths_overlap: "同一作业中的目标目录不能互相包含。"
+move_target_hash_mismatch: "移动目标的已有内容哈希不匹配：{}。"
+local_scan_incomplete: "无法确认本地目录项：{}。"
+crypt_name_too_long: "加密目录中的文件和文件夹名称最多支持 4096 个 UTF-8 字节。"
+crypt_name_record_invalid: "加密名称记录缺失、已损坏或与密钥不匹配。"
+crypt_path_busy: "该加密路径正在写入，请稍后重试。"
+crypt_name_conflict: "加密目录中已存在同名文件或文件夹。"
+alist_duplicate_directory_page: "目录分页结果重复：{}（第 {} 页）"

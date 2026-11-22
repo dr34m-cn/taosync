@@ -86,6 +86,8 @@ function paginate(list, params) {
 function mockData(url, body, tick) {
   const params = url.searchParams;
   if (url.pathname === '/svr/user') return user;
+  if (url.pathname === '/svr/settings') return { task_save: 0, timeout: 72, source_full_scan_days: 15, aliyun_auth_server: 'https://taoapi.dr34m.cn' };
+  if (url.pathname === '/svr/settings/update') return { supported: true, architecture: 'AMD64', target: 'windows-amd64', maxBytes: 256 * MiB, container: false, result: {} };
   if (url.pathname === '/svr/settings/api-key') return { enabled: false };
   if (url.pathname === '/svr/settings/https') return { enabled: false, configured: false, autoStart: false, port: 8025 };
   if (url.pathname === '/svr/alist') {
@@ -217,10 +219,10 @@ async function openJob(state, create = false) {
     await button(page, '新建作业').click();
     await selectField(page, dialog(page), '引擎', 'TaoSync');
     await dialog(page).getByPlaceholder('用来标识你的作业，选填').fill('家庭相册备份');
-    await button(dialog(page), '选择选择目录').first().click();
+    await button(dialog(page), '选择目录').first().click();
     await dialog(page).getByText('家庭相册', { exact: true }).click();
     await button(dialog(page), '确定').click();
-    await button(dialog(page), '选择选择目录').first().click();
+    await button(dialog(page), '选择目录').first().click();
     await dialog(page).getByText('家庭备份', { exact: true }).click();
     await button(dialog(page), '确定').click();
     if (mobile) await dialog(page).locator('.el-drawer__body').evaluate(x => { x.scrollTop = 0; });
@@ -261,9 +263,10 @@ export const scenes = [
   { id: 'job-edit', zh: '编辑作业', en: 'Edit Job', run: s => openJob(s) },
   { id: 'job-filters', zh: '扫描与过滤配置', en: 'Scanning and Filters', run: async s => { await openJob(s); await dialog(s.page).locator('.size-filter-form-item, .file-size-filter').last().scrollIntoViewIfNeeded(); } },
   { id: 'path-picker', zh: '选择同步目录', en: 'Select Sync Directory', run: async s => {
-    await openJob(s); await button(dialog(s.page), '更换选择目录').first().click();
-    await s.page.getByRole('treeitem').filter({ hasText: '家庭相册' }).locator('.el-tree-node__expand-icon').first().click();
-    await s.page.locator('.el-tree-node__label').getByText('桃桃成长', { exact: true }).first().click();
+    await openJob(s); await button(dialog(s.page), '更改目录').click();
+    const tree = dialog(s.page).getByRole('tree');
+    await tree.getByText('家庭相册', { exact: true }).click();
+    await tree.getByText('桃桃成长', { exact: true }).click();
   } },
   { id: 'job-live', zh: '实时同步进度', en: 'Live Sync Progress', run: s => go(s, '/home/task?jobId=1') },
   { id: 'job-history', zh: '任务历史', en: 'Task History', run: s => go(s, '/home/task?jobId=2') },

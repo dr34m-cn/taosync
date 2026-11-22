@@ -10,6 +10,7 @@ import requests
 from common.fileFingerprint import fileFingerprint
 from common.intervalGate import IntervalGate
 from common.LNG import G
+from common.fileRetryReason import FileRetryError
 
 
 # OpenList/AList 中不缓存目录列表的驱动（driver config NoCache）。对这些存储发送 refresh=true 没有
@@ -218,21 +219,24 @@ class AlistClient:
             if total != expected or (total is not None and (
                 received > total or (not entries and received < total)
             )):
-                raise ValueError(f'目录分页结果不完整：{path}（第 {page} 页）')
-            if page > 1 and any((item['name'], item['is_dir']) in seen for item in entries):
-                raise ValueError(f'目录分页结果重复：{path}（第 {page} 页）')
+                raise FileRetryError('alist_incomplete_directory_page', path, page)
+            for item in entries:
+                name = item['name']
+                if name in seen:
+                    raise FileRetryError('alist_duplicate_directory_page', path, page)
+                seen.add(name)
             yield from entries
             # Without a reported total, only an empty page proves the end:
             # some servers cap the requested per_page to a smaller value.
             if received == total or not entries:
                 return
-            seen.update((item['name'], item['is_dir']) for item in entries)
             page += 1
 
     def fileDetail(self, directory, name):
         item = self.post('/api/fs/get', data={'path': directory.rstrip('/') + '/' + name})
         if item['name'] != name or item['is_dir']:
             return None
+        # Provider-specific digests are same-path version markers, even when labelled SHA-1.
         return {'isDir': 0, 'size': item['size'], 'fingerprint': fileFingerprint(
             'alist', item.get('hash_info') or item.get('hash'), item.get('modified') or item.get('updated_at'))}
 

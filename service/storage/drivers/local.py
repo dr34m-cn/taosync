@@ -1,10 +1,12 @@
+import errno
 import os
 import stat
 from contextlib import contextmanager
 from pathlib import Path, PureWindowsPath
 
 from common.fileFingerprint import fileFingerprint
-from service.storage.localAccess import LocalBoundary, canonical, check_entry, denied, open_regular, copy_file_stat
+from service.storage.localAccess import LocalBoundary, canonical, check_entry, denied, open_regular, copy_file_stat, sync_listing
+from common.fileRetryReason import FileRetryError
 
 from .base import StorageDriver, check_cancel, normalize_path, transfer_temp_name
 
@@ -56,12 +58,17 @@ class LocalDriver(StorageDriver):
             for entry in entries:
                 try:
                     self.boundary.check(target / entry.name)
+                except ValueError:
+                    continue
+                try:
                     info = entry.stat(follow_symlinks=False)
                     # DirEntry on Windows omits the link count and inode.
                     check_entry(os.lstat(entry.path) if os.name == "nt" else info)
                     is_dir = stat.S_ISDIR(info.st_mode)
                     size = None if is_dir else info.st_size
-                except (OSError, ValueError):
+                except (OSError, ValueError) as exc:
+                    if sync_listing.get():
+                        raise FileRetryError('local_scan_incomplete', entry.name) from exc
                     continue
                 item = {
                     "name": entry.name,
@@ -80,6 +87,24 @@ class LocalDriver(StorageDriver):
                 result.append(item)
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
+
+    def entry_kind(self, path):
+        # A logical name may be valid in an encrypted backup yet impossible
+        # as the alternate clear directory spelling on this backing filesystem.
+        if os.name == "nt":
+            component = os.path.basename(path)
+            if len(component.encode("utf-16-le")) > 510:
+                return None
+            try:
+                self._validate_windows_component(component)
+            except ValueError:
+                return None
+        try:
+            return super().entry_kind(path)
+        except OSError as exc:
+            if exc.errno == errno.ENAMETOOLONG or getattr(exc, 'winerror', None) == 206:
+                return None
+            raise
 
     def file_metadata(self, path):
         target = self._resolve(path, allow_root=False)

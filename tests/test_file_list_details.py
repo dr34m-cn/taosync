@@ -4,7 +4,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from service.alist.alistClient import AlistClient
 from service.engine.taosyncClient import TaoSyncClient
@@ -76,6 +76,20 @@ class AlistFileListDetailTests(unittest.TestCase):
             with self.subTest(second=second), patch.object(client, 'post', side_effect=[first, second]), \
                     self.assertRaises(ValueError):
                 client.fileListApi('/source', useCache=1)
+
+    def test_duplicate_in_a_single_page_is_rejected_before_finishing(self):
+        client = self.client()
+        rows = [{'name': 'a', 'is_dir': False, 'size': 1}] * 2
+        for page in (1, 2):
+            responses = [{'content': [{'name': 'first', 'is_dir': False, 'size': 2}], 'total': 3}] if page == 2 else []
+            responses.append({'content': rows, 'total': page + 1})
+            with self.subTest(page=page), patch.object(client, 'post', side_effect=responses), self.assertRaises(ValueError) as caught:
+                client.fileListApi('/source', useCache=1)
+            self.assertEqual(caught.exception.args, ('alist_duplicate_directory_page', '/source', page))
+            with patch('common.LNG.get_context_lang', return_value='en'):
+                self.assertIn(f'page {page}', str(caught.exception))
+            with patch('common.LNG.get_context_lang', return_value='zh_CN'):
+                self.assertIn(f'第 {page} 页', str(caught.exception))
 
 
 class TaoSyncFileListDetailTests(unittest.TestCase):
@@ -159,20 +173,17 @@ class SmbFileListDetailTests(unittest.TestCase):
             smb_info=SimpleNamespace(file_attributes=0),
             is_symlink=lambda: False,
             is_dir=lambda follow_symlinks=False: False,
-            stat=lambda follow_symlinks=False: info,
         )
 
         @contextmanager
         def scan_entries(*_args, **_kwargs):
             yield [entry]
 
-        client = SimpleNamespace(scandir=scan_entries)
-        driver = SmbDriver({'host': 'server', 'share': 'share'})
+        client = SimpleNamespace(scandir=scan_entries, stat=Mock(return_value=info))
+        driver = SmbDriver({'host': 'server', 'share': 'share', 'port': 1445})
         self.addCleanup(driver.close)
         driver._client = lambda: client
-        driver._remote = lambda path: path
         driver._assert_no_reparse = lambda *_args, **_kwargs: None
-        driver._connection_kwargs = lambda: {}
 
         legacy = driver.list('/')
         detailed = driver.list('/', details=True)
@@ -181,6 +192,11 @@ class SmbFileListDetailTests(unittest.TestCase):
             legacy, [{'name': 'payload.bin', 'is_dir': False, 'size': 4}]
         )
         self.assertTrue(detailed[0]['fingerprint'].startswith('smb:sha256:'))
+        self.assertEqual(client.stat.call_count, 2)
+        for call in client.stat.call_args_list:
+            self.assertEqual(call.args, (r'\\server\share\payload.bin',))
+            self.assertEqual(call.kwargs['port'], 1445)
+            self.assertFalse(call.kwargs['follow_symlinks'])
 
 
 if __name__ == '__main__':

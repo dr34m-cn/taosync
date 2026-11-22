@@ -5,6 +5,7 @@ import posixpath
 import stat
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -712,6 +713,24 @@ class SftpDriverTests(unittest.TestCase):
         )
         parsed = driver._load_private_key(paramiko)
         self.assertEqual(parsed.get_fingerprint(), key.get_fingerprint())
+        with patch.object(driver, '_parse_private_key', side_effect=AssertionError('key parsed twice')):
+            self.assertIs(driver._load_private_key(paramiko), parsed)
+
+    def test_concurrent_connections_share_one_parse_but_mounted_keys_stay_separate(self):
+        driver = SftpDriver(_config(auth_type='private_key', private_key='fixture PEM'))
+        barrier = threading.Barrier(8)
+        def load(_):
+            barrier.wait(timeout=5)
+            return driver._load_private_key(None)
+
+        with patch.object(driver, '_parse_private_key', return_value=object()) as parse:
+            with ThreadPoolExecutor(max_workers=8) as workers:
+                keys = list(workers.map(load, range(8)))
+            self.assertTrue(all(key is parse.return_value for key in keys))
+            parse.assert_called_once_with(None)
+        other = SftpDriver(_config(auth_type='private_key', private_key='another fixture PEM'))
+        with patch.object(other, '_parse_private_key', return_value=object()):
+            self.assertIsNot(other._load_private_key(None), keys[0])
 
     def test_file_operations_and_streamed_copy(self):
         driver, fake, mounted = self._mounted()

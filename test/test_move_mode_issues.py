@@ -1,5 +1,6 @@
 """Move-mode and OpenList (external engine) regressions for issues #215, #218, #234 and #240."""
 import os
+import hashlib
 import sqlite3
 import time
 from pathlib import Path
@@ -9,12 +10,46 @@ from common import config
 from fake_alist import FakeAlist
 from service.alist import alistClient
 from service.storage.drivers.local import LocalDriver
+from service.syncJob import jobService
 from test_builtin_engine_sync import EngineTestBase, tree, write
 
 PARSE_TIME_ERROR = 'parsing time'
 
 
 class MoveAndOpenListIssueTest(EngineTestBase):
+    def test_openlist_full_comparison_across_mount_hash_algorithms(self):
+        fake, engineId = self._openList(src=(self.src, 'Local', 0), dst=(self.dst, 'Cloud', 0))
+        metadata = fake.metadata
+        target_algorithm = 'md5'
+
+        def provider_metadata(real, info):
+            row = metadata(real, info)
+            file = Path(real)
+            if not row['is_dir']:
+                is_source = file.is_relative_to(self.src)
+                algorithm = 'sha1' if is_source else target_algorithm
+                provider_prefix = b'source' if is_source else b'target'
+                row['hash_info'] = {algorithm: hashlib.new(algorithm, provider_prefix + file.read_bytes()).hexdigest()}
+            return row
+
+        fake.metadata = provider_metadata
+        job = self._job(method=0, src='/src/', dst='/dst/', engineId=engineId)
+        write(self.src, 'one', b'aaa')
+        self.assertEqual(self._run(job)[0], 2)
+        self.assertEqual(Path(self.dst, 'one').read_bytes(), b'aaa')
+        self.assertEqual(self._run(job)[2], [])
+        write(self.dst, 'one', b'bbb')
+        self.assertEqual(self._run(job)[2], [])
+        self.assertEqual(Path(self.dst, 'one').read_bytes(), b'bbb')
+        target_algorithm = 'sha1'
+        self.assertEqual(self._run(job)[2], [])
+        self.assertEqual(self._run(job)[2], [])
+        current = jobService.getJobClientById(job).job
+        jobService.editJobClient(dict(current, method=2))
+        self.assertEqual(self._run(job)[0], 2)
+        self.assertFalse(Path(self.src, 'one').exists())
+        self.assertEqual(Path(self.dst, 'one').read_bytes(), b'aaa')
+
     def _openList(self, **storages):
         fake = FakeAlist()
         self.addCleanup(fake.stop)

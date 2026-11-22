@@ -6,6 +6,7 @@ import math
 import posixpath
 import socket
 import stat
+import threading
 from contextlib import contextmanager
 
 from common.fileFingerprint import fileFingerprint
@@ -32,6 +33,8 @@ class SftpDriver(StorageDriver):
             config.get("host_key_fingerprint") or ""
         ).strip()
         self._connected_host_key_fingerprint = ""
+        self._parsed_key = None
+        self._key_lock = threading.Lock()
 
         if not self.host or self._has_control(self.host) or any(
             char in self.host for char in "/\\"
@@ -89,6 +92,12 @@ class SftpDriver(StorageDriver):
     def _load_private_key(self, paramiko):
         if self.auth_type != "private_key":
             return None
+        with self._key_lock:
+            if self._parsed_key is None:
+                self._parsed_key = self._parse_private_key(paramiko)
+            return self._parsed_key
+
+    def _parse_private_key(self, paramiko):
         last_error = None
         # PKey is abstract in released Paramiko versions even though it
         # exposes from_private_key. Concrete loaders support both PEM and the

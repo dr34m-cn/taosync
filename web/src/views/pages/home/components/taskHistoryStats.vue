@@ -16,22 +16,22 @@ const totals = computed(() => operations.reduce((sum, [key]) => {
 
 <template>
   <details class="history-stats">
-    <summary>成功处理 {{ totals.count }} 个文件 · {{ parseSize(totals.size) }}</summary>
+    <summary>{{ $t("taskDetail.processedFiles", totals.count) }} · {{ parseSize(totals.size) }}</summary>
     <dl>
-      <dt>{{ $t("current.startAt") }}</dt><dd>{{ parseTime(task.runTime || task.createTime) || "未记录" }}</dd>
-      <dt>结束时间</dt><dd>{{ parseTime(task.endTime) || "未记录" }}</dd>
-      <dt>{{ $t("home.duration") }}</dt><dd>{{ task.duration == null ? "未记录" : formatDuration(task.duration, $t) }}</dd>
+      <dt>{{ $t("current.startAt") }}</dt><dd>{{ parseTime(task.runTime || task.createTime) || $t("taskDetail.unrecorded") }}</dd>
+      <dt>{{ $t("taskDetail.endTime") }}</dt><dd>{{ parseTime(task.endTime) || $t("taskDetail.unrecorded") }}</dd>
+      <dt>{{ $t("home.duration") }}</dt><dd>{{ task.duration == null ? $t("taskDetail.unrecorded") : formatDuration(task.duration, $t) }}</dd>
       <template v-for="[key, label] in operations" :key="key">
         <dt>{{ $t(label) }}</dt>
-        <dd>{{ task.fileStats[key]?.count ?? 0 }} 个文件 · {{ parseSize(task.fileStats[key]?.size ?? 0) }}</dd>
+        <dd>{{ $t("taskDetail.filesCount", task.fileStats[key]?.count ?? 0) }} · {{ parseSize(task.fileStats[key]?.size ?? 0) }}</dd>
       </template>
       <template v-if="task.fileStats.rapidUpload?.count">
-        <dt>秒传</dt>
-        <dd>{{ task.fileStats.rapidUpload.count }} 个文件 · {{ (task.fileStats.rapidUpload.size / 1024 ** 3).toFixed(2) }} GB</dd>
+        <dt>{{ $t("taskDetail.instantUpload") }}</dt>
+        <dd>{{ $t("taskDetail.filesCount", task.fileStats.rapidUpload.count) }} · {{ (task.fileStats.rapidUpload.size / 1024 ** 3).toFixed(2) }} GB</dd>
       </template>
       <template v-if="task.fileStats.failed">
         <dt>{{ $t("task.fail") }}</dt>
-        <dd>{{ task.fileStats.failed.count }} 个文件 · {{ parseSize(task.fileStats.failed.size) }}</dd>
+        <dd>{{ $t("taskDetail.filesCount", task.fileStats.failed.count) }} · {{ parseSize(task.fileStats.failed.size) }}</dd>
       </template>
     </dl>
     <RetryAllButton v-if="task.status > 1 && task.failNum > 0" class="retry-all" :task-id="task.id" @submitted="$emit('submitted')" />

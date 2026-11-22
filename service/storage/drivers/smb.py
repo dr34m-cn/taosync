@@ -189,7 +189,8 @@ class SmbDriver(StorageDriver):
                 # renamed a staging file that the encrypted view never needs.
                 if include is not None and not include(entry.name, is_dir):
                     continue
-                info = entry.stat(follow_symlinks=False)
+                # SMBDirEntry.stat() reopens the path without the mount's port.
+                info = self._stat(client, ntpath.join(remote, entry.name))
                 size = None if is_dir else info.st_size
                 mtime_ns = getattr(info, "st_mtime_ns", None)
                 if mtime_ns is None and getattr(info, "st_mtime", None) is not None:

@@ -1,10 +1,13 @@
 import io
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
-from service.storage.backupCipher import InvalidBackupData, InvalidBackupName, ForeignBackupName
+from service.storage.backupCipher import (BackupNamespaceError, InvalidBackupData,
+                                         InvalidBackupName, ForeignBackupName)
 from service.storage.drivers.aliyun import AliyunDriveDriver
 from service.storage.drivers.base import stream_transfer
 from service.storage.drivers.crypt import CryptDriver
@@ -46,6 +49,108 @@ class CryptDriverTests(unittest.TestCase):
         self.view.delete('/folder')
         self.assertEqual(self.view.list('/'), [])
 
+    def test_small_file_uploads_do_not_enumerate_existing_siblings(self):
+        with patch.object(self.backing, 'list', wraps=self.backing.list) as listing:
+            for number in range(64):
+                self.view.upload(f'/f{number}.txt', io.BytesIO(b'x'), 1)
+            listing.assert_not_called()
+        self.assertEqual(len(self.view.list('/')), 64)
+
+    def test_long_unicode_names_restore_after_reopening_and_preserve_v1(self):
+        directory = '文' * 64
+        names = ['a' * 139, 'b' * 140, '备份' * 55 + '报告.txt', '文' * 250, 'a' * 300]
+        for encrypted in (False, True):
+            with self.subTest(encrypted=encrypted):
+                view = CryptDriver(self.backing, '/vault', 'test key', encrypted)
+                for index, name in enumerate(names):
+                    view.upload(f'/{directory}/{name}', io.BytesIO(bytes([index])), 1)
+                reopened = CryptDriver(self.backing, '/vault', 'test key', encrypted)
+                self.assertEqual([r['name'] for r in reopened.list('/')], [directory])
+                self.assertCountEqual([r['name'] for r in reopened.list('/' + directory)], names)
+                for index, name in enumerate(names):
+                    path = f'/{directory}/{name}'
+                    self.assertEqual(reopened.file_metadata(path)['size'], 1)
+                    restored = io.BytesIO()
+                    reopened.download(path, restored)
+                    self.assertEqual(restored.getvalue(), bytes([index]))
+                    reopened.delete(path)
+                reopened.delete('/' + directory)
+                self.assertEqual(list((self.root / 'vault').iterdir()), [])
+
+    def test_long_name_metadata_interruption_corruption_and_recovery(self):
+        name = '雨' * 100
+        real_upload = self.backing.upload
+
+        def interrupt(path, *args):
+            if '/tsb-2-' in path:
+                raise OSError('interrupted before publish')
+            return real_upload(path, *args)
+
+        with patch.object(self.backing, 'upload', side_effect=interrupt), self.assertRaises(OSError):
+            self.view.upload('/' + name, io.BytesIO(b'x'), 1)
+        self.assertEqual(self.view.list('/'), [])
+        self.view.upload('/' + name, io.BytesIO(b'x'), 1)
+        record, = (self.root / 'vault').glob('tsb-n-*')
+        good = record.read_bytes()
+        record.write_bytes(good[:-1] + bytes([good[-1] ^ 1]))
+        with self.assertRaises(BackupNamespaceError):
+            self.view.list('/')
+        with self.assertRaises(BackupNamespaceError):
+            self.view.delete('/' + name)
+        with self.assertRaises(BackupNamespaceError):
+            self.view.upload('/' + name, io.BytesIO(b'y'), 1)
+        record.unlink()
+        with self.assertRaises(BackupNamespaceError):
+            self.view.list('/')
+        with self.assertRaises(BackupNamespaceError):
+            self.view.upload('/' + name, io.BytesIO(b'z'), 1)
+        record.write_bytes(good)
+        restored = io.BytesIO()
+        self.view.download('/' + name, restored)
+        self.assertEqual(restored.getvalue(), b'x')
+
+    def test_existing_unowned_bytes_cannot_be_overwritten_or_removed(self):
+        self.view.mkdir('/child')
+        for name in ('small', '长' * 128):
+            logical = '/child/' + name
+            self.view.upload(logical, io.BytesIO(b'x'), 1)
+            physical = self.root / self.view._file(logical).lstrip('/')
+            valid = physical.read_bytes()
+            # Both correct-looking length and a copied magic prefix must fail.
+            foreign = valid[:5] + b'-' * (len(valid) - 5)
+            physical.write_bytes(foreign)
+            for operation in (lambda: self.view.upload(logical, io.BytesIO(b'y'), 1),
+                              lambda: self.view.delete(logical), lambda: self.view.delete('/child')):
+                with self.assertRaises(BackupNamespaceError):
+                    operation()
+                self.assertEqual(physical.read_bytes(), foreign)
+            physical.write_bytes(valid)
+            self.view.delete(logical)
+
+    def test_other_view_cannot_delete_while_long_file_upload_is_active(self):
+        second = CryptDriver(self.backing, '/vault', 'test key', False)
+        entered, resume = threading.Event(), threading.Event()
+        name = '明' * 80
+
+        class Source(io.BytesIO):
+            def read(self, size):
+                entered.set()
+                if not resume.wait(timeout=10):
+                    raise TimeoutError
+                return super().read(size)
+
+        with ThreadPoolExecutor(1) as executor:
+            task = executor.submit(self.view.upload, '/nested/' + name, Source(b'first'), 5)
+            try:
+                self.assertTrue(entered.wait(5))
+                for path in ('/nested', '/nested/' + name):
+                    with self.assertRaises(BackupNamespaceError):
+                        second.delete(path)
+            finally:
+                resume.set()
+            task.result()
+        self.assertEqual(second.list('/nested')[0]['name'], name)
+
     def test_restore_reencrypts_into_a_second_key_and_hides_ciphertext_hash(self):
         (self.root / 'second').mkdir()
         second = CryptDriver(self.backing, '/second', 'another key', True)
@@ -53,8 +158,11 @@ class CryptDriverTests(unittest.TestCase):
         self.view.upload('/nested/report', io.BytesIO(data), len(data))
         second.mkdir('/nested')
         meta = self.view.file_metadata('/nested/report')
-        physical_metadata = {**self.backing.file_metadata(self.view._file('/nested/report')), 'sha1': 'ciphertext'}
-        self.assertNotIn('sha1', self.view._entry(physical_metadata))
+        physical_metadata = {**self.backing.file_metadata(self.view._file('/nested/report')),
+                             'sha1': 'ciphertext', 'contentHashes': {'md5': 'ciphertext'}}
+        entry = self.view._entry(physical_metadata)
+        self.assertNotIn('sha1', entry)
+        self.assertNotIn('contentHashes', entry)
         stream_transfer(self.view, '/nested/report', second, '/nested/report', len(data), metadata=meta)
         restored = io.BytesIO()
         second.download('/nested/report', restored)
