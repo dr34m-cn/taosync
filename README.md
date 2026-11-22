@@ -41,182 +41,214 @@
 **如果好用，请Star！非常感谢！**  [GitHub](https://github.com/dr34m-cn/taosync) [Gitee](https://gitee.com/dr34m/taosync) [DockerHub](https://hub.docker.com/r/dr34m/tao-sync)
 
 <details>
-<summary>点击展开截图</summary>
+<summary>点击展开桌面端截图</summary>
 
-<table>
-  <thead>
-    <tr>
-      <th width="78%">PC</th>
-      <th width="22%">手机</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><th colspan="2" align="left">作业管理</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/jobs-desktop.png"><img src="./README/screenshots/jobs-desktop.png" alt="作业管理 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/jobs-mobile.png"><img src="./README/screenshots/jobs-mobile.png" alt="作业管理 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">深色模式</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/jobs-dark-desktop.png"><img src="./README/screenshots/jobs-dark-desktop.png" alt="深色模式 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/jobs-dark-mobile.png"><img src="./README/screenshots/jobs-dark-mobile.png" alt="深色模式 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">作业配置概览</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/job-options-desktop.png"><img src="./README/screenshots/job-options-desktop.png" alt="作业配置概览 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/job-options-mobile.png"><img src="./README/screenshots/job-options-mobile.png" alt="作业配置概览 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">新建作业</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/job-create-desktop.png"><img src="./README/screenshots/job-create-desktop.png" alt="新建作业 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/job-create-mobile.png"><img src="./README/screenshots/job-create-mobile.png" alt="新建作业 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">编辑作业</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/job-edit-desktop.png"><img src="./README/screenshots/job-edit-desktop.png" alt="编辑作业 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/job-edit-mobile.png"><img src="./README/screenshots/job-edit-mobile.png" alt="编辑作业 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">扫描与过滤配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/job-filters-desktop.png"><img src="./README/screenshots/job-filters-desktop.png" alt="扫描与过滤配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/job-filters-mobile.png"><img src="./README/screenshots/job-filters-mobile.png" alt="扫描与过滤配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">选择同步目录</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/path-picker-desktop.png"><img src="./README/screenshots/path-picker-desktop.png" alt="选择同步目录 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/path-picker-mobile.png"><img src="./README/screenshots/path-picker-mobile.png" alt="选择同步目录 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">实时同步进度</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/job-live-desktop.png"><img src="./README/screenshots/job-live-desktop.png" alt="实时同步进度 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/job-live-mobile.png"><img src="./README/screenshots/job-live-mobile.png" alt="实时同步进度 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">任务历史</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/job-history-desktop.png"><img src="./README/screenshots/job-history-desktop.png" alt="任务历史 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/job-history-mobile.png"><img src="./README/screenshots/job-history-mobile.png" alt="任务历史 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">任务文件明细</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/task-files-desktop.png"><img src="./README/screenshots/task-files-desktop.png" alt="任务文件明细 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/task-files-mobile.png"><img src="./README/screenshots/task-files-mobile.png" alt="任务文件明细 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">文件路径详情</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/task-paths-desktop.png"><img src="./README/screenshots/task-paths-desktop.png" alt="文件路径详情 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/task-paths-mobile.png"><img src="./README/screenshots/task-paths-mobile.png" alt="文件路径详情 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">筛选失败文件</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/task-filter-desktop.png"><img src="./README/screenshots/task-filter-desktop.png" alt="筛选失败文件 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/task-filter-mobile.png"><img src="./README/screenshots/task-filter-mobile.png" alt="筛选失败文件 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">引擎管理</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/engines-desktop.png"><img src="./README/screenshots/engines-desktop.png" alt="引擎管理 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/engines-mobile.png"><img src="./README/screenshots/engines-mobile.png" alt="引擎管理 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">新增引擎</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/engine-create-desktop.png"><img src="./README/screenshots/engine-create-desktop.png" alt="新增引擎 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/engine-create-mobile.png"><img src="./README/screenshots/engine-create-mobile.png" alt="新增引擎 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">编辑引擎</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/engine-edit-desktop.png"><img src="./README/screenshots/engine-edit-desktop.png" alt="编辑引擎 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/engine-edit-mobile.png"><img src="./README/screenshots/engine-edit-mobile.png" alt="编辑引擎 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">目录管理</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directories-desktop.png"><img src="./README/screenshots/directories-desktop.png" alt="目录管理 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directories-mobile.png"><img src="./README/screenshots/directories-mobile.png" alt="目录管理 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">新增目录</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directory-create-desktop.png"><img src="./README/screenshots/directory-create-desktop.png" alt="新增目录 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directory-create-mobile.png"><img src="./README/screenshots/directory-create-mobile.png" alt="新增目录 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">本地目录配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directory-local-desktop.png"><img src="./README/screenshots/directory-local-desktop.png" alt="本地目录配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directory-local-mobile.png"><img src="./README/screenshots/directory-local-mobile.png" alt="本地目录配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">浏览本地目录</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/local-browser-desktop.png"><img src="./README/screenshots/local-browser-desktop.png" alt="浏览本地目录 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/local-browser-mobile.png"><img src="./README/screenshots/local-browser-mobile.png" alt="浏览本地目录 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">SMB 目录配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directory-smb-desktop.png"><img src="./README/screenshots/directory-smb-desktop.png" alt="SMB 目录配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directory-smb-mobile.png"><img src="./README/screenshots/directory-smb-mobile.png" alt="SMB 目录配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">发现局域网设备</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/smb-devices-desktop.png"><img src="./README/screenshots/smb-devices-desktop.png" alt="发现局域网设备 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/smb-devices-mobile.png"><img src="./README/screenshots/smb-devices-mobile.png" alt="发现局域网设备 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">发现共享目录</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/smb-shares-desktop.png"><img src="./README/screenshots/smb-shares-desktop.png" alt="发现共享目录 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/smb-shares-mobile.png"><img src="./README/screenshots/smb-shares-mobile.png" alt="发现共享目录 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">FTP 目录配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directory-ftp-desktop.png"><img src="./README/screenshots/directory-ftp-desktop.png" alt="FTP 目录配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directory-ftp-mobile.png"><img src="./README/screenshots/directory-ftp-mobile.png" alt="FTP 目录配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">SFTP 目录配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directory-sftp-desktop.png"><img src="./README/screenshots/directory-sftp-desktop.png" alt="SFTP 目录配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directory-sftp-mobile.png"><img src="./README/screenshots/directory-sftp-mobile.png" alt="SFTP 目录配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">浏览 SFTP 目录</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/sftp-browser-desktop.png"><img src="./README/screenshots/sftp-browser-desktop.png" alt="浏览 SFTP 目录 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/sftp-browser-mobile.png"><img src="./README/screenshots/sftp-browser-mobile.png" alt="浏览 SFTP 目录 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">阿里云盘目录配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/directory-aliyun-desktop.png"><img src="./README/screenshots/directory-aliyun-desktop.png" alt="阿里云盘目录配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/directory-aliyun-mobile.png"><img src="./README/screenshots/directory-aliyun-mobile.png" alt="阿里云盘目录配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">通知配置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/notifications-desktop.png"><img src="./README/screenshots/notifications-desktop.png" alt="通知配置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/notifications-mobile.png"><img src="./README/screenshots/notifications-mobile.png" alt="通知配置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">编辑通知</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/notification-edit-desktop.png"><img src="./README/screenshots/notification-edit-desktop.png" alt="编辑通知 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/notification-edit-mobile.png"><img src="./README/screenshots/notification-edit-mobile.png" alt="编辑通知 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">自定义通知</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/notification-webhook-desktop.png"><img src="./README/screenshots/notification-webhook-desktop.png" alt="自定义通知 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/notification-webhook-mobile.png"><img src="./README/screenshots/notification-webhook-mobile.png" alt="自定义通知 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">系统设置</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/settings-desktop.png"><img src="./README/screenshots/settings-desktop.png" alt="系统设置 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/settings-mobile.png"><img src="./README/screenshots/settings-mobile.png" alt="系统设置 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">修改密码</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/change-password-desktop.png"><img src="./README/screenshots/change-password-desktop.png" alt="修改密码 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/change-password-mobile.png"><img src="./README/screenshots/change-password-mobile.png" alt="修改密码 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">登录</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/login-desktop.png"><img src="./README/screenshots/login-desktop.png" alt="登录 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/login-mobile.png"><img src="./README/screenshots/login-mobile.png" alt="登录 - 手机" width="100%" /></a></td>
-    </tr>
-    <tr><th colspan="2" align="left">重置密码</th></tr>
-    <tr>
-      <td valign="top"><a href="./README/screenshots/reset-password-desktop.png"><img src="./README/screenshots/reset-password-desktop.png" alt="重置密码 - PC" width="100%" /></a></td>
-      <td valign="top"><a href="./README/screenshots/reset-password-mobile.png"><img src="./README/screenshots/reset-password-mobile.png" alt="重置密码 - 手机" width="100%" /></a></td>
-    </tr>
-  </tbody>
+**作业管理**
+
+<img src="./README/screenshots/jobs-desktop.png" alt="作业管理 - PC" width="100%" />
+
+**深色模式**
+
+<img src="./README/screenshots/jobs-dark-desktop.png" alt="深色模式 - PC" width="100%" />
+
+**作业配置概览**
+
+<img src="./README/screenshots/job-options-desktop.png" alt="作业配置概览 - PC" width="100%" />
+
+**新建作业**
+
+<img src="./README/screenshots/job-create-desktop.png" alt="新建作业 - PC" width="100%" />
+
+**编辑作业**
+
+<img src="./README/screenshots/job-edit-desktop.png" alt="编辑作业 - PC" width="100%" />
+
+**扫描与过滤配置**
+
+<img src="./README/screenshots/job-filters-desktop.png" alt="扫描与过滤配置 - PC" width="100%" />
+
+**选择同步目录**
+
+<img src="./README/screenshots/path-picker-desktop.png" alt="选择同步目录 - PC" width="100%" />
+
+**实时同步进度**
+
+<img src="./README/screenshots/job-live-desktop.png" alt="实时同步进度 - PC" width="100%" />
+
+**任务历史**
+
+<img src="./README/screenshots/job-history-desktop.png" alt="任务历史 - PC" width="100%" />
+
+**任务文件明细**
+
+<img src="./README/screenshots/task-files-desktop.png" alt="任务文件明细 - PC" width="100%" />
+
+**文件路径详情**
+
+<img src="./README/screenshots/task-paths-desktop.png" alt="文件路径详情 - PC" width="100%" />
+
+**筛选失败文件**
+
+<img src="./README/screenshots/task-filter-desktop.png" alt="筛选失败文件 - PC" width="100%" />
+
+**引擎管理**
+
+<img src="./README/screenshots/engines-desktop.png" alt="引擎管理 - PC" width="100%" />
+
+**新增引擎**
+
+<img src="./README/screenshots/engine-create-desktop.png" alt="新增引擎 - PC" width="100%" />
+
+**编辑引擎**
+
+<img src="./README/screenshots/engine-edit-desktop.png" alt="编辑引擎 - PC" width="100%" />
+
+**目录管理**
+
+<img src="./README/screenshots/directories-desktop.png" alt="目录管理 - PC" width="100%" />
+
+**新增目录**
+
+<img src="./README/screenshots/directory-create-desktop.png" alt="新增目录 - PC" width="100%" />
+
+**本地目录配置**
+
+<img src="./README/screenshots/directory-local-desktop.png" alt="本地目录配置 - PC" width="100%" />
+
+**浏览本地目录**
+
+<img src="./README/screenshots/local-browser-desktop.png" alt="浏览本地目录 - PC" width="100%" />
+
+**SMB 目录配置**
+
+<img src="./README/screenshots/directory-smb-desktop.png" alt="SMB 目录配置 - PC" width="100%" />
+
+**发现局域网设备**
+
+<img src="./README/screenshots/smb-devices-desktop.png" alt="发现局域网设备 - PC" width="100%" />
+
+**发现共享目录**
+
+<img src="./README/screenshots/smb-shares-desktop.png" alt="发现共享目录 - PC" width="100%" />
+
+**FTP 目录配置**
+
+<img src="./README/screenshots/directory-ftp-desktop.png" alt="FTP 目录配置 - PC" width="100%" />
+
+**SFTP 目录配置**
+
+<img src="./README/screenshots/directory-sftp-desktop.png" alt="SFTP 目录配置 - PC" width="100%" />
+
+**浏览 SFTP 目录**
+
+<img src="./README/screenshots/sftp-browser-desktop.png" alt="浏览 SFTP 目录 - PC" width="100%" />
+
+**阿里云盘目录配置**
+
+<img src="./README/screenshots/directory-aliyun-desktop.png" alt="阿里云盘目录配置 - PC" width="100%" />
+
+**通知配置**
+
+<img src="./README/screenshots/notifications-desktop.png" alt="通知配置 - PC" width="100%" />
+
+**编辑通知**
+
+<img src="./README/screenshots/notification-edit-desktop.png" alt="编辑通知 - PC" width="100%" />
+
+**自定义通知**
+
+<img src="./README/screenshots/notification-webhook-desktop.png" alt="自定义通知 - PC" width="100%" />
+
+**系统设置**
+
+<img src="./README/screenshots/settings-desktop.png" alt="系统设置 - PC" width="100%" />
+
+**修改密码**
+
+<img src="./README/screenshots/change-password-desktop.png" alt="修改密码 - PC" width="100%" />
+
+**登录**
+
+<img src="./README/screenshots/login-desktop.png" alt="登录 - PC" width="100%" />
+
+**重置密码**
+
+<img src="./README/screenshots/reset-password-desktop.png" alt="重置密码 - PC" width="100%" />
+
+</details>
+
+<details>
+<summary>点击展开移动端截图</summary>
+
+<table width="100%">
+  <tr>
+    <td width="50%" valign="top"><strong>作业管理</strong><br /><img src="./README/screenshots/jobs-mobile.png" alt="作业管理 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>深色模式</strong><br /><img src="./README/screenshots/jobs-dark-mobile.png" alt="深色模式 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>作业配置概览</strong><br /><img src="./README/screenshots/job-options-mobile.png" alt="作业配置概览 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>新建作业</strong><br /><img src="./README/screenshots/job-create-mobile.png" alt="新建作业 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>编辑作业</strong><br /><img src="./README/screenshots/job-edit-mobile.png" alt="编辑作业 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>扫描与过滤配置</strong><br /><img src="./README/screenshots/job-filters-mobile.png" alt="扫描与过滤配置 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>选择同步目录</strong><br /><img src="./README/screenshots/path-picker-mobile.png" alt="选择同步目录 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>实时同步进度</strong><br /><img src="./README/screenshots/job-live-mobile.png" alt="实时同步进度 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>任务历史</strong><br /><img src="./README/screenshots/job-history-mobile.png" alt="任务历史 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>任务文件明细</strong><br /><img src="./README/screenshots/task-files-mobile.png" alt="任务文件明细 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>文件路径详情</strong><br /><img src="./README/screenshots/task-paths-mobile.png" alt="文件路径详情 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>筛选失败文件</strong><br /><img src="./README/screenshots/task-filter-mobile.png" alt="筛选失败文件 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>引擎管理</strong><br /><img src="./README/screenshots/engines-mobile.png" alt="引擎管理 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>新增引擎</strong><br /><img src="./README/screenshots/engine-create-mobile.png" alt="新增引擎 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>编辑引擎</strong><br /><img src="./README/screenshots/engine-edit-mobile.png" alt="编辑引擎 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>目录管理</strong><br /><img src="./README/screenshots/directories-mobile.png" alt="目录管理 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>新增目录</strong><br /><img src="./README/screenshots/directory-create-mobile.png" alt="新增目录 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>本地目录配置</strong><br /><img src="./README/screenshots/directory-local-mobile.png" alt="本地目录配置 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>浏览本地目录</strong><br /><img src="./README/screenshots/local-browser-mobile.png" alt="浏览本地目录 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>SMB 目录配置</strong><br /><img src="./README/screenshots/directory-smb-mobile.png" alt="SMB 目录配置 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>发现局域网设备</strong><br /><img src="./README/screenshots/smb-devices-mobile.png" alt="发现局域网设备 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>发现共享目录</strong><br /><img src="./README/screenshots/smb-shares-mobile.png" alt="发现共享目录 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>FTP 目录配置</strong><br /><img src="./README/screenshots/directory-ftp-mobile.png" alt="FTP 目录配置 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>SFTP 目录配置</strong><br /><img src="./README/screenshots/directory-sftp-mobile.png" alt="SFTP 目录配置 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>浏览 SFTP 目录</strong><br /><img src="./README/screenshots/sftp-browser-mobile.png" alt="浏览 SFTP 目录 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>阿里云盘目录配置</strong><br /><img src="./README/screenshots/directory-aliyun-mobile.png" alt="阿里云盘目录配置 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>通知配置</strong><br /><img src="./README/screenshots/notifications-mobile.png" alt="通知配置 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>编辑通知</strong><br /><img src="./README/screenshots/notification-edit-mobile.png" alt="编辑通知 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>自定义通知</strong><br /><img src="./README/screenshots/notification-webhook-mobile.png" alt="自定义通知 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>系统设置</strong><br /><img src="./README/screenshots/settings-mobile.png" alt="系统设置 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>修改密码</strong><br /><img src="./README/screenshots/change-password-mobile.png" alt="修改密码 - 手机" width="100%" /></td>
+    <td width="50%" valign="top"><strong>登录</strong><br /><img src="./README/screenshots/login-mobile.png" alt="登录 - 手机" width="100%" /></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><strong>重置密码</strong><br /><img src="./README/screenshots/reset-password-mobile.png" alt="重置密码 - 手机" width="100%" /></td>
+    <td width="50%"></td>
+  </tr>
 </table>
 
 </details>
@@ -229,7 +261,7 @@
 > [!WARNING]
 > **警告！不要在外网暴露本系统，否则后果自负！**
 >
-> 本系统已经做了一定的安全方面的工作，但仍不能保证绝对安全。如确实需要，请务必使用强密码，并使用`SSL`
+> 如确需远程访问，请使用强密码，并在系统设置或反向代理中启用 HTTPS。
 
 ## 用途举例
 
@@ -237,7 +269,7 @@
 
 把本地文件备份到多个网盘或FTP之类的存储，或者在多个网盘之间同步文件等；
 
-可以定时扫描指定目录下的文件差异。仅新增模式会复制目标中缺失或大小不同的文件，保留目标端多余内容；全同步模式还会按排除和文件大小过滤规则清理目标端多余内容。
+可以定时扫描指定目录。仅新增模式会补齐目标缺少的文件、更新检测到变化的文件，并保留目标端多余内容。全同步还会按照排除和文件大小过滤规则清理目标端多余内容。
 
 #### 2. 定时下载
 
@@ -267,16 +299,17 @@
 * 完善的错误处理，稳定可靠，逻辑自洽；可能出错，但永不崩溃（我猜的）
 * 完善的日志，所有错误都会被记录
 * 内置 TaoSync 引擎支持本地目录、SMB、FTP、SFTP 和阿里云盘，也可管理外部 `OpenList/AList` 引擎
-* 作业管理支持新增、删除、启用、禁用、编辑和手动执行；提供上次执行摘要及桌面端批量操作
+* 作业列表显示上次执行结果和传输量，支持新增、删除、启用、禁用、编辑和手动执行。已启用的作业空闲时可直接编辑。桌面端支持批量操作
 * 支持排除项规则，可以排除指定目录或文件不同步
 * 支持按文件大小过滤，可分别设置最小和最大值
 * 仅新增、全同步、移动三种模式
 * 源目录模式通过快照减少目标扫描，逐文件保存完成进度，支持中止或重启后继续同步
 * 支持设置并行复制数，按目标存储目录或外部引擎共享额度
-* 定时同步支持间隔、`cron`、手动调用
+* 支持按间隔或 `cron` 定时执行，也可手动或通过 API 触发。通过「作业关联」可在作业完成或全部成功后，立即或延迟执行一个或多个后续作业
 * 同步进度、总体进度、同步速度、实时同步文件、预估时间等实时可视化查看
+* 任务历史显示每次执行的耗时，以及复制、移动、删除和失败的数量与大小。可在任务详情单独重试失败文件，也可从详情或历史统计一次重试全部失败项。重试跳过目录扫描，保留原始失败记录，且不会发送通知或触发关联作业
 * 存储可控，合理配置任务记录与日志保留天数，可以控制本程序所占用存储在可控范围内
-* 支持钉钉群机器人、Server酱、企业微信应用消息、Lark 群机器人、Bark、pushPlus、PushDeer 和自定义通知；高级自定义通知支持请求头、请求体及 `$title`、`$content` 变量
+* 支持钉钉群机器人、Server酱、企业微信应用消息、Lark 群机器人、Bark、pushPlus、PushDeer 和自定义通知。各渠道可设置「仅失败通知」和接收方备注。高级自定义通知支持请求头、请求体及 `$title`、`$content` 变量
 
 ## 使用方法
 
@@ -356,25 +389,45 @@ services:
 > [!NOTE]
 > 如果没有显示这个日志，可以到同级目录的`data/log/sys_xxx.log`文件查看，通常在第一行
 
-进入系统后，在`引擎管理`中选择内置 TaoSync 引擎，打开目录管理并添加存储目录；也可添加外部 OpenList/AList 引擎。随后前往`作业管理`创建同步作业。一个作业的源目录与所有目标目录须属于同一引擎。
+登录后，在「引擎管理」中选择内置 TaoSync 引擎，通过「目录管理」添加存储目录，或添加外部 OpenList/AList 引擎。随后在「作业管理」创建作业。源目录和所有目标须属于同一引擎，各路径不能相同或互相包含。旧作业的目标若有重叠，需先调整才能执行或重试。
+
+在源或目标目录选择器中可直接新建子目录，引擎根目录除外。如需在目标端保留源目录名，请在目标端新建并选中同名目录。
 
 ### 内置存储与并发设置
 
-* 本地目录选择 TaoSync 进程可访问的路径；SMB 支持发现设备、选择共享或手动填写；SFTP 支持密码和密钥认证。
-* 阿里云盘默认通过公共授权服务扫码登录，也可使用 **[自建授权服务](./apiServer/README.md)（更推荐，安全性更高）** 或自行配置应用凭据。支持目录选择、云端重命名和移动；小于 100 MiB 的文件直接上传，较大文件尝试哈希秒传。
+* 本地目录选择 TaoSync 进程可访问的路径，程序目录和运行数据目录受保护。SMB 支持发现设备、选择共享或手动填写。SFTP 支持密码和密钥认证。
+* 阿里云盘默认通过公共授权服务扫码登录，也可使用 **[自建授权服务](./apiServer/README.md)（更推荐，安全性更高）** 或自行配置应用凭据。支持目录选择、云端重命名和移动。开启秒传后，仅对大于 10 MiB 的文件尝试秒传。任务详情可筛选秒传成功的文件，任务历史单列其数量和大小。
 * 并行复制数默认 5，范围 1～100。内置引擎在目录管理中按目标存储目录设置，外部 OpenList/AList 在引擎设置中配置；多个作业共享对应额度。
+
+### 加密备份与恢复
+
+在内置引擎的「目录管理」添加「加密目录」，选择已有存储上的专用备份目录，设置密钥，并选择是否加密目录名。保存后，将这个加密目录选为作业目标。写入的文件内容和文件名会加密，已有明文文件不会自动转换。恢复时，将同一加密目录作为作业源，复制到普通目录即可得到原名和明文内容。
+
+**单独备份加密密钥。密钥和 TaoSync 数据库同时丢失时，备份将无法解密。** 保存后密钥、底层路径和目录名加密选项会锁定。迁移底层备份时，请复制整个目录，包括长文件名和长目录名配套的名称记录。
 
 ### 同步行为
 
 源目录模式首次运行完整比对目标，此后通过源快照判断变化，并默认每 15 天在作业执行时重新完整比对。变化检测依赖存储提供的哈希、修改时间等元数据，不保证识别元数据未变化的同大小文件修改。每个文件在所有目标完成后保存进度，失败文件在后续执行中继续重试。
 
+比对源和目标的同名文件时，若双方已提供可信、同算法的整文件哈希（如内置阿里云盘的 SHA-1），会用它识别等长文件的差异。缺少可比哈希时仍按大小判断，不额外读取文件计算哈希。OpenList/AList 的哈希仅用于识别同一源路径的变化，避免因不同存储返回不同哈希而反复同步。
+
 若希望目标端手动删除的文件不再补传，可使用“仅新增 + 源目录模式”，完成首次同步后将完整比对周期设为 0。此行为适用于源文件未变化的情况；源文件变化仍会触发同步，修改作业导致快照重建时也会重新比对。
 
-移动模式会在所有目标复制成功、重新确认大小一致且源文件未变化后删除源文件，并清理本次移空的源子目录。全同步遇到源根目录为空而目标仍有内容，或源快照从非空变为空时，会触发空源保护并记为失败；如需清空目标，请手动处理。定时作业编辑前须先禁用，并等待正在执行的任务结束。
+移动模式删除每个源文件前，会逐一复核所有目标副本，再确认源文件自扫描后未变化。校验失败会保留源文件。移动完成后会清理本次移空的源子目录。
+
+全同步会保留目标端命中排除规则的文件，即使其所在目录仅存在于目标端。若源根目录为空而目标仍有内容，或源快照从非空变为空，会触发空源保护并记为失败。如需清空目标，请手动处理。
+
+### HTTPS 与 API 密钥
+
+在「系统设置」上传或粘贴 PEM 证书链和未加密的 PEM 私钥，即可启用 HTTPS 或换证。HTTPS 默认端口为 `8025`，可改为当前 HTTP 端口和保留端口 `8024` 以外的端口。Docker 使用默认 HTTPS 端口时，在 `docker run` 中添加 `-p 8025:8025`，或在 Compose 的 `ports` 下添加 `"8025:8025"`。访问证书对应的 HTTPS 地址后需单独登录。关闭 HTTPS 会保留证书和私钥，下次可直接启用。
+
+从脚本触发同步，可在「系统设置」生成执行作业专用密钥，通过 `Authorization` 请求头立即执行指定作业或全部作业。作业 ID 可在作业列表查看。通用 API 密钥具有管理员权限。两种密钥默认关闭，仅在生成时显示，重置或禁用后对应的旧密钥立即失效。[curl 调用示例](./web/src/views/pages/setting/api-key.md)
 
 ### 从旧版升级
 
-升级前备份完整 `data` 目录。升级后需重新登录；旧密码在成功登录时自动升级为 PBKDF2 散列，升级后的数据库不支持直接降级到旧版。如需回退，请同时恢复升级前的程序和数据备份。
+升级前备份完整 `data` 目录。**从 v0.5.0 或更早版本首次升级到 v0.5.1，请沿用原安装方式**：Docker 拉取新镜像并用原数据卷重建容器，独立部署则停止服务并替换可执行文件。从 v0.5.0 之前的版本升级后需重新登录，旧密码在成功登录时自动升级为 PBKDF2 散列。如需降级，请同时恢复旧程序和升级前的数据备份。
+
+从 v0.5.1 起，Docker 和可执行文件部署可在「系统设置 → 程序更新」查看发布平台，从 GitHub Releases 下载对应的可执行文件、ZIP 或 tar.gz 发布包。等同步作业结束后，将文件拖入页面并确认。TaoSync 按平台和程序的 SHA-256 核对官方授信清单，校验通过后重启。新程序启动失败会回退到上一版本。页面更新在容器重启后保留，重建容器则使用所选镜像的版本。源码和移动端部署请沿用原安装方式更新。
 
 ## 配置项
 
@@ -391,7 +444,7 @@ services:
 [tao]
 # 初始管理员密码，仅首次创建数据库时生效；RANDOM或空值表示随机生成
 password=RANDOM
-# 运行端口号
+# HTTP 监听端口
 port=8023
 # 登录有效期，单位天
 expires=2
@@ -420,7 +473,7 @@ aliyun_auth_server=https://taoapi.dr34m.cn
 | config.ini    | Docker环境变量    | 描述                                                         | 默认值           |
 | ------------- | ----------------- | ------------------------------------------------------------ |---------------|
 | password      | TAO_PASSWORD      | 初始管理员密码，仅首次创建数据库时生效；`RANDOM`或空值表示随机生成；兼容旧变量`TAO_PASSWD` | RANDOM        |
-| port          | TAO_PORT          | 运行端口号                                                   | 8023          |
+| port          | TAO_PORT          | HTTP 监听端口                                                | 8023          |
 | expires       | TAO_EXPIRES       | 登录有效期，单位天                                           | 2             |
 | log_level     | TAO_LOG_LEVEL     | 日志等级：0-DEBUG，1-INFO，2-WARNING，3-ERROR，4-CRITICAL；数值越大，产生的日志越少，推荐1或2 | 1             |
 | console_level | TAO_CONSOLE_LEVEL | 控制台日志等级：适用于v0.2.3及之后版本；与上同               | 2             |
@@ -435,7 +488,7 @@ aliyun_auth_server=https://taoapi.dr34m.cn
 
 ## 研发状态
 
-历史记录在[这里](https://github.com/dr34m-cn/taosync/tree/main/doc/changelog)；
+[v0.5.1 更新说明](./doc/changelog/v0.5.1.md) · [全部更新日志](./doc/changelog/)
 
 如想体验研发中的版本(可能存在明显错误或严重bug，不建议小白尝试)，可以尝试到[DockerHub](https://hub.docker.com/r/dr34m/tao-sync)或[Release](https://github.com/dr34m-cn/taosync/releases)找最新的含`dev`或`pre`的tag，例如`v0.1.0-dev-build0`
 
@@ -443,7 +496,6 @@ aliyun_auth_server=https://taoapi.dr34m.cn
 
 * windows版本优化（开机自启，隐藏页面，启动停止等）[#13](https://github.com/dr34m-cn/taosync/issues/13)
 * OpenList支持加密同步 [#18](https://github.com/dr34m-cn/taosync/issues/18)
-* 本地引擎支持加密同步
 * 保留历史N个版本（N可自定义，可无限）
 * 配置导入导出
 * linux一键安装、更新与卸载脚本

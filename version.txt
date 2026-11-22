@@ -1,4 +1,4 @@
-v0.5.1-dev-build8
+v0.5.1,latest
 
 v0.5.1-dev-test-build7
 该文件仅第一行有效，表示打包的版本。
