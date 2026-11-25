@@ -119,22 +119,8 @@ export function storageSftpTest(data) {
   });
 }
 
-export function storageSftpBrowse(data) {
-  return request({
-    url: "/storage",
-    headers: { isMask: false },
-    method: "post",
-    data,
-  });
-}
-
-export function storageAliyunBrowse(data) {
-  return request({
-    url: "/storage",
-    headers: { isMask: false },
-    method: "post",
-    data: { ...data, action: "aliyunBrowse" },
-  });
+export function storageFolder(data) {
+  return request({ url: '/storage', method: 'post', headers: { isMask: false }, data });
 }
 
 export function storageAliyunAuthStart(engineId) {

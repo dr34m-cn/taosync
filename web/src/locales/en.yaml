@@ -546,6 +546,7 @@ pathSelect:
   title: Select Directory
   selectFirst: Select a path first
 apiKey:
+  groupTitle: API keys
   title: General API key
   executeTitle: Job execution key
   warning: Treat this key like your account password. Never share it!
@@ -592,6 +593,8 @@ setting:
   title: Settings
   saveAndApply: Save and Apply
   saved: Settings saved and applied
+  anonymous_stats: Anonymous statistics
+  statsHint: Only the number and total size of files successfully synced in this run are sent. No historical data, contents, names, paths, drive details or personal information are sent. The service stores only aggregate totals, records no personal information and cannot link statistics to individuals.
   task_save: Task Record Retention
   task_saveHint: 0 keeps all records
   timeout: Task Timeout

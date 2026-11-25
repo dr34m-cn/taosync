@@ -24,9 +24,13 @@ try {
   const reply = (route, data) => route.fulfill({ json: { code: 200, data } });
   await context.route('**/svr/alist*', route => {
     const params = new URL(route.request().url()).searchParams;
+    if (route.request().method() === 'POST') {
+      assert.deepEqual(route.request().postDataJSON(), { action: 'mkdir', alistId: 1, parent: '/Archive/备份/', name: '2026' });
+      return reply(route, '/Archive/备份/2026/');
+    }
     if (!params.has('path')) return reply(route, [engine]);
     browses.push(Object.fromEntries(params));
-    return reply(route, params.get('path') === '/Archive/' ? [{ path: '备份' }] : [{ path: '2026' }]);
+    return reply(route, params.get('path') === '/Archive/' ? [{ path: '备份' }] : []);
   });
   await context.route('**/svr/storage*', route => {
     if (route.request().method() === 'GET') return reply(route, mounts);
@@ -63,12 +67,15 @@ try {
     await list.getByRole('option', { name, exact: true }).click();
   }
   async function selectNestedFolder() {
-    await field('目标文件夹').locator('.el-select').click();
-    const tree = page.locator('.el-select-dropdown:visible');
-    const row = text => tree.locator('.el-tree-node__content').filter({ has: page.getByText(text, { exact: true }) });
-    await row('/').locator('.el-tree-node__expand-icon').click();
-    await row('/备份').locator('.el-tree-node__expand-icon').click();
-    await row('/备份/2026').click();
+    await button(field('目标文件夹'), '选择目录').click();
+    const tree = page.getByRole('dialog', { name: '选择目录', exact: true });
+    const row = tree.locator('.el-tree-node__content').filter({ has: page.getByText('备份', { exact: true }) });
+    await button(row, '新建目录').click();
+    const create = page.getByRole('dialog', { name: '新建目录', exact: true });
+    await create.getByRole('textbox').fill('2026');
+    await button(create, '确定').click();
+    await create.waitFor({ state: 'hidden' });
+    await button(tree, '确定').click();
     await tree.waitFor({ state: 'hidden' });
   }
 

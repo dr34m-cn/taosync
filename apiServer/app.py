@@ -19,8 +19,10 @@ import tornado.web
 import yaml
 
 if __package__:
+    from .sync_stats import PublicApplication, StatsHandler, SyncTotals
     from .trust import PublicManifest, TrustIndex, TrustPush
 else:
+    from sync_stats import PublicApplication, StatsHandler, SyncTotals
     from trust import PublicManifest, TrustIndex, TrustPush
 
 try:
@@ -580,12 +582,14 @@ def make_app(config, oauth=None, store=None):
     )
     args = {"oauth": oauth, "store": store}
     trust = config.get('trust', {})
-    return tornado.web.Application(
+    database = Path(trust.get('database', 'data/trust.db')).with_name('sync-stats.db')
+    return PublicApplication(
         [
             (r"/(?:index\.html)?", TrustIndex),
             (r"/(logo\.ico)", tornado.web.StaticFileHandler, {"path": str(Path(__file__).parent)}),
             (r"/auth\.json", PublicManifest),
             (r"/v1/trust/manifest", TrustPush),
+            (r"/v1/stats", StatsHandler),
             (r"/health", HealthHandler, args),
             (r"/v1/aliyun/sessions", SessionCreateHandler, args),
             (r"/v1/aliyun/sessions/([^/]+)", SessionStatusHandler, args),
@@ -593,6 +597,7 @@ def make_app(config, oauth=None, store=None):
             (r"/v1/aliyun/callback", CallbackHandler, args),
             (r"/v1/aliyun/token/refresh", RefreshHandler, args),
         ],
+        sync_totals=SyncTotals(database),
         debug=False,
         trust_database=trust.get('database', 'data/trust.db'),
         trust_api_key=trust.get('api_key', ''),
@@ -616,7 +621,14 @@ def main():
         config["server"]["host"],
         config["server"]["port"],
     )
-    tornado.ioloop.IOLoop.current().start()
+    totals = app.settings['sync_totals']
+    ticker = tornado.ioloop.PeriodicCallback(totals.checkpoint, 60_000)
+    ticker.start()
+    try:
+        tornado.ioloop.IOLoop.current().start()
+    finally:
+        ticker.stop()
+        totals.flush()
 
 
 if __name__ == "__main__":

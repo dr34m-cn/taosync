@@ -86,7 +86,7 @@ function paginate(list, params) {
 function mockData(url, body, tick) {
   const params = url.searchParams;
   if (url.pathname === '/svr/user') return user;
-  if (url.pathname === '/svr/settings') return { task_save: 0, timeout: 72, source_full_scan_days: 15, aliyun_auth_server: 'https://taoapi.dr34m.cn' };
+  if (url.pathname === '/svr/settings') return { task_save: 0, timeout: 72, source_full_scan_days: 15, anonymous_stats: true, aliyun_auth_server: 'https://taoapi.dr34m.cn' };
   if (url.pathname === '/svr/settings/update') return { supported: true, architecture: 'AMD64', target: 'windows-amd64', maxBytes: 256 * MiB, container: false, result: {} };
   if (url.pathname === '/svr/settings/api-key') return { enabled: false };
   if (url.pathname === '/svr/settings/https') return { enabled: false, configured: false, autoStart: false, port: 8025 };

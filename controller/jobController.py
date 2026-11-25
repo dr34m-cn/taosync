@@ -107,8 +107,10 @@ class Storage(BaseHandler):
             return storageService.testSftp(req)
         if action == 'sftpBrowse':
             return storageService.browseSftp(req)
-        if action == 'aliyunBrowse':
-            return storageService.browseAliyun(req)
+        if action in ('aliyunBrowse', 'aliyunMkdir'):
+            return storageService.browseAliyun(req, create=action == 'aliyunMkdir')
+        if action in ('remoteBrowse', 'remoteMkdir'):
+            return storageService.remoteFolder(req, create=action == 'remoteMkdir')
         if action in ('fileList', 'fileMove', 'fileRename', 'fileTask', 'fileCancel'):
             return storageService.cloudFileOperation(req)
         if action == 'smbShares':

@@ -1,4 +1,9 @@
+import asyncio
 import json
+import tempfile
+from pathlib import Path
+from contextlib import closing
+import sqlite3
 import time
 import unittest
 from unittest import mock
@@ -6,7 +11,7 @@ from unittest import mock
 import tornado.testing
 
 try:
-    from .app import AliyunOAuthClient, SessionStore, make_app
+    from .app import AliyunOAuthClient, SessionStore, SyncTotals, make_app
 except ImportError:  # pragma: no cover - unittest discovery may import this as a script module
     from app import AliyunOAuthClient, SessionStore, make_app
 
@@ -102,7 +107,8 @@ class SessionCreateNonBlockingTest(tornado.testing.AsyncHTTPTestCase):
 
         oauth.create_qr_session.side_effect = slow_qr_session
         self.store = SessionStore(ttl=300, max_sessions_per_ip=10)
-        return make_app({"server": {}}, oauth=oauth, store=self.store)
+        db = Path(self.enterContext(tempfile.TemporaryDirectory())) / 'trust.db'
+        return make_app({"server": {}, 'trust': {'database': db}}, oauth=oauth, store=self.store)
 
     @tornado.testing.gen_test(timeout=10)
     async def test_other_requests_are_served_while_upstream_qr_request_is_slow(self):
@@ -119,6 +125,40 @@ class SessionCreateNonBlockingTest(tornado.testing.AsyncHTTPTestCase):
         self.assertTrue(data["qr_code"].startswith("data:image/png;base64,"))
         item = self.store.sessions[data["session_id"]]
         self.assertEqual("sid-value", item.provider_sid)
+
+
+class AnonymousStatsTest(tornado.testing.AsyncHTTPTestCase):
+    def get_app(self):
+        db = Path(self.enterContext(tempfile.TemporaryDirectory())) / 'trust.db'
+        return make_app({'server': {}, 'trust': {'database': db}}, oauth=object(), store=object())
+
+    @tornado.testing.gen_test
+    async def test_concurrent_reports_are_visible_without_sql_until_checkpoint(self):
+        totals = self._app.settings['sync_totals']
+        url = self.get_url('/v1/stats')
+        size = 2**60 + 1
+        with mock.patch.object(sqlite3, 'connect', side_effect=AssertionError('unexpected DB access')):
+            responses = await asyncio.gather(*(self.http_client.fetch(url, method='POST',
+                headers={'Content-Type': 'application/json'}, body=json.dumps({'files': 3, 'bytes': size}))
+                for _ in range(40)))
+            self.assertTrue(all(r.code == 204 for r in responses))
+            read = await self.http_client.fetch(url)
+            self.assertEqual(read.headers['Access-Control-Allow-Origin'], '*')
+            self.assertEqual(json.loads(read.body), {'files': '120', 'bytes': str(size * 40)})
+        with closing(sqlite3.connect(totals.database)) as db:
+            self.assertEqual(db.execute('SELECT files, bytes FROM totals').fetchone(), ('0', '0'))
+        await totals.checkpoint()
+        self.assertEqual(SyncTotals(totals.database).snapshot(), (120, 40 * size))
+
+    def test_invalid_reports_do_not_change_totals(self):
+        for body in ({}, [], {'files': True, 'bytes': 0}, {'files': -1, 'bytes': 0},
+                     {'files': 1, 'bytes': '1'}, {'files': 1, 'bytes': 1, 'name': 'extra'},
+                     {'files': 1, 'bytes': -1}, {'files': 1, 'bytes': 2**63}):
+            with self.subTest(body=body):
+                response = self.fetch('/v1/stats', method='POST', headers={'Content-Type': 'application/json'},
+                                      body=json.dumps(body))
+                self.assertEqual(response.code, 400)
+        self.assertEqual(self._app.settings['sync_totals'].snapshot(), (0, 0))
 
 
 if __name__ == "__main__":

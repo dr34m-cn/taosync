@@ -142,3 +142,6 @@ crypt_name_record_invalid: "加密名称记录缺失、已损坏或与密钥不�
 crypt_path_busy: "该加密路径正在写入，请稍后重试。"
 crypt_name_conflict: "加密目录中已存在同名文件或文件夹。"
 alist_duplicate_directory_page: "目录分页结果重复：{}（第 {} 页）"
+picker_mount_type_mismatch: "所选挂载与目录类型不符。"
+picker_invalid_parent: "请选择有效的父目录。"
+invalid_stats_setting: "统计信息开关必须为布尔值。"

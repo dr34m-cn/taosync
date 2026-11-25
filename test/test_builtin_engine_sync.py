@@ -45,6 +45,7 @@ class EngineTestBase(unittest.TestCase):
         self.enterContext(mock.patch.object(jobService, 'jobClientList', {}))
         locales.initLang()
         self.originalCwd = os.getcwd()
+        self.enterContext(mock.patch('service.syncJob.taskService.syncStats.report'))
         self.originalConfig = config.sysConfig
         self.originalLanguage = LNG.sysLanguage
         self.originalUsers = userMapper.users

@@ -546,6 +546,7 @@ pathSelect:
   title: 选择目录
   selectFirst: 请先选择路径
 apiKey:
+  groupTitle: API秘钥
   title: 通用API秘钥
   executeTitle: 执行作业专用秘钥
   warning: 秘钥等同于账号密码，切勿泄露！
@@ -592,6 +593,8 @@ setting:
   title: 系统设置
   saveAndApply: 保存并生效
   saved: 配置已保存并生效
+  anonymous_stats: 匿名统计
+  statsHint: 仅上报本次同步成功的文件数和总大小，不追溯历史数据。不会发送文件内容、文件名、路径、网盘信息或任何个人信息。统计服务仅保存累计值，不记录个人信息，无法将统计与个人关联。
   task_save: 任务记录保留时间
   task_saveHint: 0 表示不自动清理
   timeout: 任务执行超时

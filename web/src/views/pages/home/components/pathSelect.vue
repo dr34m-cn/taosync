@@ -6,6 +6,11 @@ import { useI18n } from "vue-i18n";
 
 const props = defineProps({
   alistId: Number,
+  // A physical root is selectable and writable; the virtual job root is neither.
+  physicalRoot: Boolean,
+  rootNode: Object,
+  listFolders: Function,
+  makeFolder: Function,
 });
 const emit = defineEmits(["submit"]);
 const { t } = useI18n();
@@ -26,11 +31,12 @@ function show() {
 
 async function loadNode(node, resolve, reject) {
   if (node.level === 0) {
-    resolve([{ label: t("engine.rootPath"), path: "/" }]);
+    resolve([props.rootNode || { label: t("engine.rootPath"), path: "/", id: "root" }]);
     return;
   }
   const path = node.data.path;
   try {
+    if (props.listFolders) return resolve(await props.listFolders(node.data));
     const { data } = await alistGetPath(props.alistId, path);
     const children = data.map(item => ({ label: item.path, path: `${path}${item.path}/` }));
     resolve(children);
@@ -64,11 +70,14 @@ async function createFolder() {
   }
   saving.value = true;
   try {
-    const { data: path } = await alistCreateDirectory(props.alistId, parent.data.path, name);
-    if (!tree.value.getNode(path)) tree.value.append({ label: name, path }, parent.data);
+    const directory = props.makeFolder ? await props.makeFolder(parent.data, name)
+      : { label: name, path: (await alistCreateDirectory(props.alistId, parent.data.path, name)).data };
+    if (!tree.value) return;
+    const { path } = directory;
+    if (!tree.value.getNode(path)) tree.value.append(directory, parent.data);
     parent.expand(null, true);
     tree.value.setCurrentKey(path);
-    selected.value = path;
+    selected.value = directory;
     createShow.value = false;
     await nextTick();
     tree.value.$el.querySelector(".is-current > .el-tree-node__content")?.scrollIntoView({ block: "nearest" });
@@ -80,7 +89,7 @@ async function createFolder() {
 }
 
 function submit() {
-  emit("submit", selected.value);
+  emit("submit", selected.value.path, selected.value);
   dialogShow.value = false;
 }
 
@@ -90,11 +99,11 @@ defineExpose({ show });
 <template>
   <el-dialog v-model="dialogShow" top="8vh" :close-on-click-modal="false" :title="t('pathSelect.title')" width="min(520px, 94vw)" append-to-body>
     <el-tree v-if="dialogShow" ref="tree" node-key="path" :load="loadNode" lazy highlight-current
-      :default-expanded-keys="['/']" @node-click="data => selected = data.path === '/' ? null : data.path">
+      :default-expanded-keys="['/']" @node-click="data => selected = physicalRoot || data.path !== '/' ? data : null">
       <template #default="{ node, data }">
         <span class="directory-row">
           <span class="directory-label" :title="data.path">{{ data.label }}</span>
-          <el-button v-if="data.path !== '/'" link type="primary" :icon="FolderAdd" :title="t('pathSelect.newFolder')" :aria-label="t('pathSelect.newFolder')"
+          <el-button v-if="physicalRoot || data.path !== '/'" link type="primary" :icon="FolderAdd" :title="t('pathSelect.newFolder')" :aria-label="t('pathSelect.newFolder')"
             :disabled="node.loading" @click.stop="openCreate(node)" />
         </span>
       </template>

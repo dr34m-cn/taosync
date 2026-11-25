@@ -142,3 +142,6 @@ crypt_name_record_invalid: "The encrypted name record is missing, damaged, or do
 crypt_path_busy: "This encrypted path is being written. Try again later."
 crypt_name_conflict: "An encrypted file or folder with the same name already exists."
 alist_duplicate_directory_page: "Duplicate directory entry in {} (page {})."
+picker_mount_type_mismatch: "The selected mount does not match this storage type."
+picker_invalid_parent: "Select a valid parent directory."
+invalid_stats_setting: "The statistics setting must be a boolean."

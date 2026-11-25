@@ -6,12 +6,14 @@ import tempfile
 import threading
 from urllib.parse import urlsplit
 
+from common.LNG import get_context_lang
+from common.locales import t
 from common.commonUtils import generatePasswd, readOrSet
 
 sysConfig = None
 DEFAULT_PASSWORD = 'RANDOM'
 CONFIG_LOCK = threading.RLock()
-EDITABLE_SETTINGS = ('task_save', 'timeout', 'aliyun_auth_server', 'source_full_scan_days')
+EDITABLE_SETTINGS = ('task_save', 'timeout', 'aliyun_auth_server', 'source_full_scan_days', 'anonymous_stats')
 
 
 def getPasswordStr():
@@ -37,6 +39,7 @@ def getConfig():
             'log_save': 7,
             'task_save': 0,
             'timeout': 72,
+            'anonymous_stats': True,
             'source_full_scan_days': 15,
             'aliyun_auth_server': 'https://taoapi.dr34m.cn'
         }
@@ -45,6 +48,11 @@ def getConfig():
             password = os.getenv('TAO_PASSWD', DEFAULT_PASSWORD)
 
         def readValue(key, value):
+            if key == 'anonymous_stats':
+                try:
+                    return configparser.ConfigParser.BOOLEAN_STATES[value.strip().lower()]
+                except KeyError:
+                    raise ValueError('invalid boolean') from None
             if key == 'source_full_scan_days':
                 return float(value)
             if isinstance(sCfg[key], int):
@@ -112,7 +120,10 @@ def updateSettings(values):
         raise ValueError('Unsupported settings')
     normalized = {}
     for key, value in values.items():
-        if key == 'aliyun_auth_server':
+        if key == 'anonymous_stats':
+            if type(value) is not bool:
+                raise ValueError(t('invalid_stats_setting', get_context_lang()))
+        elif key == 'aliyun_auth_server':
             if not isinstance(value, str):
                 raise ValueError('aliyun_auth_server must be an HTTP(S) URL')
             value = value.strip().rstrip('/')

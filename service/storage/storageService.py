@@ -1,5 +1,8 @@
 import re
 
+from common.LNG import get_context_lang
+from common.locales import t
+from service.storage.drivers.base import child_path, normalize_path
 from mapper import storageMapper
 from mapper.alistMapper import getEngineById
 from service.storage import discoveryService
@@ -349,7 +352,14 @@ def browseSftp(data):
     return createDriver("sftp", _sftpRequestConfig(data)).browse(data["path"])
 
 
-def browseAliyun(data):
+def _folderName(name):
+    if (not isinstance(name, str) or not name.strip() or name in ('.', '..')
+            or '/' in name or '\\' in name or any(ord(c) < 32 or ord(c) == 127 for c in name)):
+        raise ValueError(t('invalid_directory_name', get_context_lang()))
+    return name
+
+
+def browseAliyun(data, create=False):
     engineId = int(data["engineId"])
     _requireTaoSync(engineId)
     raw = data.get("config") or {}
@@ -399,11 +409,17 @@ def browseAliyun(data):
     driver = createDriver("aliyun", config, **callbacks)
     try:
         parentId = str(data.get("parentId") or "root")
-        directories = [
-            {"id": item["file_id"], "name": item.get("name") or item.get("file_name")}
-            for item in driver._list_id(parentId) if item.get("type") == "folder"
-        ]
-        result = {"directories": directories}
+        if create:
+            name = _folderName(data.get('name'))
+            folder = driver.create_folder(parentId, name)
+            if folder.get('exist'):
+                raise FileExistsError(t('directory_name_exists', get_context_lang()))
+            result = {'directory': {'id': folder['file_id'], 'name': name}}
+        else:
+            result = {'directories': [
+                {'id': item['file_id'], 'name': item.get('name') or item.get('file_name')}
+                for item in driver._list_id(parentId) if item.get('type') == 'folder'
+            ]}
         if not sameAuth:
             result["authorization"] = {
                 key: getattr(driver, key)
@@ -414,7 +430,7 @@ def browseAliyun(data):
         driver.session.close()
 
 
-def _smbRequestConfig(data):
+def _networkRequestConfig(data, driverType):
     engineId = int(data["engineId"])
     _requireTaoSync(engineId)
     rawConfig = data.get("config")
@@ -429,25 +445,55 @@ def _smbRequestConfig(data):
         old = storageMapper.getMountById(int(mountId))
         if int(old["engineId"]) != engineId:
             raise ValueError("storage directory does not belong to the selected engine")
-        if old["driverType"] != "smb":
-            raise ValueError("storage directory is not an SMB mount")
+        if old["driverType"] != driverType:
+            raise ValueError(t('picker_mount_type_mismatch', get_context_lang()))
 
     config = {**dict((old or {}).get("config") or {}), **dict(rawConfig)}
     # Passwords are masked by the frontend when an existing mount is edited.
     # Reuse the stored value only for the same host/port/user; a changed
     # target must never receive the saved password.
     if not rawConfig.get("password") and old is not None:
-        if _networkIdentity("smb", config) == _networkIdentity("smb", old["config"]):
+        if (_networkIdentity(driverType, config) == _networkIdentity(driverType, old["config"])
+                and bool(config.get("tls")) == bool(old["config"].get("tls"))):
             config["password"] = old["config"].get("password", "")
         else:
             config["password"] = ""
-    mountConfig.checkDriverFields("smb", rawConfig)
+    mountConfig.checkDriverFields(driverType, rawConfig)
+    if driverType == 'smb' and config.get('share'):
+        visible = discoveryService.list_smb_shares(config)
+        if not any(str(item.get('name') or '').casefold() == str(config['share']).casefold() for item in visible):
+            raise ValueError(t('picker_smb_share_unavailable', get_context_lang()))
     return config
 
 
 def discoverSmbShares(data):
     """List shares on an SMB host without creating or updating a mount."""
-    return discoveryService.list_smb_shares(_smbRequestConfig(data))
+    return discoveryService.list_smb_shares(_networkRequestConfig(data, 'smb'))
+
+
+def remoteFolder(data, create=False):
+    kind = data.get('driverType')
+    if kind not in ('smb', 'ftp', 'sftp'):
+        raise ValueError(t('picker_mount_type_mismatch', get_context_lang()))
+    parent = data.get('path')
+    if not isinstance(parent, str) or not parent.startswith('/') or normalize_path(parent) != parent:
+        raise ValueError(t('picker_invalid_parent', get_context_lang()))
+    name = _folderName(data.get('name')) if create else None
+    config = _sftpRequestConfig(data) if kind == 'sftp' else _networkRequestConfig(data, kind)
+    driver = createDriver(kind, config)
+    try:
+        entries = driver.list_filtered(parent, lambda child, is_dir: is_dir or child == name)
+        if create:
+            if any(entry['name'] == name for entry in entries):
+                raise FileExistsError(t('directory_name_exists', get_context_lang()))
+            path = child_path(parent, name)
+            driver.mkdir(path)
+            return {'directory': {'name': name, 'path': path}}
+        return {'directories': [{'name': entry['name'], 'path': child_path(parent, entry['name'])}
+                                for entry in entries if entry['is_dir']]}
+    finally:
+        if kind == 'smb':
+            driver.close()
 
 
 def addMount(data):

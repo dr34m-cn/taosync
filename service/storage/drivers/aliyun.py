@@ -652,6 +652,13 @@ class AliyunDriveDriver(StorageDriver):
             raise IsADirectoryError(path)
         return self._entry(item, True)
 
+    def create_folder(self, parent_id, name):
+        self._ensure_drive()
+        return self._request('/adrive/v1.0/openFile/create', {
+            'drive_id': self.drive_id, 'parent_file_id': parent_id, 'name': name,
+            'type': 'folder', 'check_name_mode': 'refuse',
+        })
+
     def mkdir(self, path):
         path = normalize_path(path)
         self._ensure_drive()
@@ -669,16 +676,7 @@ class AliyunDriveDriver(StorageDriver):
                     raise FileExistsError(path)
                 current_id = folder["file_id"]
                 continue
-            created = self._request(
-                "/adrive/v1.0/openFile/create",
-                {
-                    "drive_id": self.drive_id,
-                    "parent_file_id": current_id,
-                    "name": part,
-                    "type": "folder",
-                    "check_name_mode": "refuse",
-                },
-            )
+            created = self.create_folder(current_id, part)
             current_id = created["file_id"]
             if state is not None:
                 folder = dict(created, name=part, type='folder')

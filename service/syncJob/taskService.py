@@ -9,6 +9,7 @@ from common.fileRetryReason import renderReason
 from mapper import jobLinkMapper, jobMapper
 from service.syncJob import jobLinks
 from service.notify import notifyService
+from service.system import syncStats
 
 
 def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=None, triggersLinks=False, notify=True):
@@ -55,6 +56,12 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
         'taskId': taskId,
         'taskNum': json.dumps(taskNum)
     }])
+    if taskList is not None:
+        try:
+            syncStats.report(taskList[2])
+        except Exception:
+            # A stopped executor or unavailable telemetry must not change a completed task.
+            logging.getLogger().debug('Could not enqueue anonymous sync statistics')
     statusName = G('task_status')[status]
     if notifyList:
         job = jobMapper.getJobByTaskId(taskId)

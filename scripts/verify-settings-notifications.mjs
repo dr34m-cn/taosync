@@ -14,7 +14,7 @@ await mkdir(output, { recursive: true });
 try {
   for (const mobile of [false, true]) {
     const { context, page, errors } = await preparePage(browser, frontendUrl, mobile);
-    const settings = { task_save: 0, timeout: 72, source_full_scan_days: 15, aliyun_auth_server: 'https://auth.example' };
+    const settings = { task_save: 0, timeout: 72, source_full_scan_days: 15, anonymous_stats: true, aliyun_auth_server: 'https://auth.example' };
     const writes = [];
     const uploads = [];
     const notices = [];
@@ -82,18 +82,23 @@ try {
       const retention = page.getByRole('spinbutton', { name: '任务记录保留时间' });
       const rows = await page.locator('.settings-fields .el-form-item').evaluateAll((items, mobile) => items.map(item => {
         const label = item.querySelector('label').getBoundingClientRect();
-        const input = item.querySelector('input').getBoundingClientRect();
+        const input = (item.querySelector('.el-switch') || item.querySelector('input')).getBoundingClientRect();
         if (mobile ? label.bottom > input.top : label.right > input.left) return null;
         return Math.round(input.top);
       }), mobile);
-      assert.equal(rows.length, 4);
+      assert.equal(rows.length, 5);
       assert.ok(rows.every(top => top !== null));
-      assert.equal(new Set(rows).size, 4);
+      assert.equal(new Set(rows).size, 5);
 
+      const keys = page.getByRole('region', {name: 'API秘钥', exact: true});
+      assert.equal(await keys.getByRole('button', {name: '使用说明'}).count(), 1);
+      const stats = page.getByRole('switch', {name:'匿名统计', exact:true});
+      assert.equal(await stats.getAttribute('aria-checked'), 'true');
+      await stats.locator('..').click();
       for (const title of ['https-heading', 'api-key-general', 'api-key-execute']) {
-        const header = page.locator(`section[aria-labelledby="${title}"] header`);
+        const header = page.locator(`header:has(#${title})`);
         await header.locator('.el-switch').waitFor();
-        const centers = await header.locator('h2, button, .el-switch, .controls > span').evaluateAll(items => items.map(item => {
+        const centers = await header.locator('h2, strong, button, .el-switch, .controls > span').evaluateAll(items => items.map(item => {
           const box = item.getBoundingClientRect();
           return box.top + box.height / 2;
         }));
@@ -154,11 +159,12 @@ try {
       await page.getByRole('textbox', { name: '阿里云盘授权服务地址' }).fill('https://settings.example');
       await saveSettings.click();
       await waitFor(() => writes.length === 1);
-      assert.deepEqual(writes[0], { task_save: 7, timeout: 24, source_full_scan_days: 16, aliyun_auth_server: 'https://settings.example' });
+      assert.deepEqual(writes[0], { task_save: 7, timeout: 24, source_full_scan_days: 16, anonymous_stats: false, aliyun_auth_server: 'https://settings.example' });
       await page.reload();
       await page.getByRole('spinbutton', { name: '任务记录保留时间' }).waitFor();
       assert.equal(await retention.inputValue(), '7');
       assert.equal(await timeout.inputValue(), '24');
+      assert.equal(await stats.getAttribute('aria-checked'), 'false');
       assert.equal(await page.getByRole('spinbutton', { name: '源目录完整比对周期' }).inputValue(), '16');
       assert.equal(await page.getByRole('textbox', { name: '阿里云盘授权服务地址' }).inputValue(), 'https://settings.example');
       await noOverflow();

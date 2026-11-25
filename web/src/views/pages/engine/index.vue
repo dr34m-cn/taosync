@@ -8,13 +8,14 @@ import {
   storageDelete,
   storageAliyunAuthPoll,
   storageAliyunAuthStart,
-  storageAliyunBrowse,
+  alistCreateDirectory,
+  alistGetPath,
   storageGet,
   storageLocalBrowse,
   storagePost,
   storageSmbDiscover,
   storageSmbShares,
-  storageSftpBrowse,
+  storageFolder,
   storageSftpTest,
   storagePut,
 } from "@/api/job";
@@ -36,7 +37,7 @@ import {
 } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import CloudFiles from "./CloudFiles.vue";
-import CryptTargetFolder from "./CryptTargetFolder.vue";
+import PathSelect from '../home/components/pathSelect.vue';
 
 const { t } = useI18n();
 const alistList = ref([]);
@@ -79,18 +80,13 @@ const sftpTestSignature = ref("");
 const sftpTestRootPath = ref("");
 const sftpDirectoryOptions = ref([]);
 const sftpOriginalCredentialIdentity = ref("");
-const sftpRootBrowserShow = ref(false);
-const sftpRootBrowserBase = ref("/");
-const sftpRootBrowserSelection = ref(null);
-const sftpRootTreeKey = ref(0);
+const folderPicker = ref();
 const aliyunAuthLoading = ref(false);
 const aliyunAuthHandle = ref("");
 const aliyunAuthQrCode = ref("");
 const aliyunAuthorizationUrl = ref("");
 const aliyunAuthStatus = ref("idle");
 const aliyunAuthExpiresIn = ref(0);
-const aliyunTreeKey = ref(0);
-const aliyunRootCache = ref([]);
 let aliyunBrowseEpoch = 0;
 let aliyunApplyingBrowseResult = false;
 let aliyunAuthPollTimer = null;
@@ -98,14 +94,7 @@ let localBrowseRequestId = 0;
 let smbDiscoverRequestId = 0;
 let smbShareDiscoverRequestId = 0;
 let sftpTestRequestId = 0;
-let sftpRootBrowseEpoch = 0;
 let sftpApplyingTestResult = false;
-
-const sftpTreeProps = {
-  label: "name",
-  children: "children",
-  isLeaf: "leaf",
-};
 
 const driverTypes = ["local", "smb", "ftp", "sftp", "aliyun", "crypt"];
 const driverConfigKeys = {
@@ -269,16 +258,6 @@ function selectCryptTarget(id) {
   mountData.value.config.target_path = "/";
 }
 
-const resetAliyunRoot = () => {
-  aliyunBrowseEpoch += 1;
-  aliyunTreeKey.value += 1;
-  const config = mountData.value?.config || {};
-  aliyunRootCache.value = [{
-    id: config.root_folder_id || "root",
-    name: config.root_folder_id === "root" ? "/" : config.root_folder_path || t("engine.rootFolder"),
-  }];
-};
-
 watch(
   () => {
     const config = mountData.value?.config || {};
@@ -291,52 +270,75 @@ watch(
       mountData.value.config.root_folder_id = "root";
       mountData.value.config.root_folder_path = "/";
     }
-    resetAliyunRoot();
+    aliyunBrowseEpoch++;
   },
   { flush: "sync" }
 );
 
-const loadAliyunRootNode = async (node, resolve, reject) => {
-  if (mountData.value?.driverType !== "aliyun") return reject();
-  if (node.level === 0) {
-    resolve([{ id: "root", name: "/", path: "/" }]);
-    return;
+const folderRoot = computed(() => {
+  const { driverType, config } = mountData.value || {};
+  if (driverType === 'crypt' || driverType === 'aliyun') return { path: '/', id: 'root', label: '/' };
+  const base = driverType === 'sftp' ? sftpTestRootPath.value : config?.root_path;
+  const path = String(base || '/').replaceAll('\\', '/');
+  const label = driverType === 'smb' && config.share ? config.share + ':' + (path.startsWith('/') ? path : '/' + path) : path;
+  return { path: '/', id: 'root', label };
+});
+
+const folderReady = computed(() => {
+  const { driverType, config } = mountData.value || {};
+  if (driverType === 'aliyun') return aliyunAuthorized.value && (config.auth_mode !== 'direct'
+    || !!(config.client_id?.trim() && (config.client_secret || hasStoredAliyunSecret('client_secret'))));
+  if (driverType === 'crypt') return !!cryptTarget.value && !cryptLocked.value;
+  if (driverType === 'sftp') return sftpTestReady.value && !sftpTestLoading.value;
+  return ['ftp', 'smb'].includes(driverType) && !!config.host?.trim() && Number.isInteger(config.port)
+    && config.port > 0 && config.port <= 65535 && (driverType !== 'smb' || !!config.share?.trim());
+});
+
+async function folderOperation(parent, name) {
+  const mount = mountData.value, kind = mount.driverType;
+  const childPath = label => (parent.path === '/' ? '' : parent.path) + '/' + label;
+  if (kind === 'crypt') {
+    const target = cryptTarget.value;
+    const prefix = '/' + target.name + (parent.path === '/' ? '/' : parent.path + '/');
+    if (name !== undefined) {
+      await alistCreateDirectory(mount.engineId, prefix, name);
+      return { label: name, path: childPath(name) };
+    }
+    const { data } = await alistGetPath(mount.engineId, prefix);
+    return data.filter(({path}) => path && path !== '.' && path !== '..' && !/[/\\]/.test(path))
+      .map(({ path }) => ({ label: path, path: childPath(path) }));
   }
   const epoch = aliyunBrowseEpoch;
-  const config = mountData.value.config;
-  try {
-    const res = await storageAliyunBrowse({
-      engineId: mountData.value.engineId,
-      ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
-      parentId: node.data.id,
-      config: pickDriverConfig("aliyun", config),
-    });
-    if (epoch !== aliyunBrowseEpoch || !mountShow.value || config !== mountData.value?.config) {
-      reject();
-      return;
-    }
-    if (res.data?.authorization) {
-      aliyunApplyingBrowseResult = true;
-      try {
-        Object.assign(mountData.value.config, res.data.authorization);
-      } finally {
-        aliyunApplyingBrowseResult = false;
-      }
-    }
-    const directories = (res.data?.directories || []).map((item) => ({
-      ...item, path: (node.data.path === "/" ? "" : node.data.path) + "/" + item.name,
-    }));
-    aliyunRootCache.value.push(...directories);
-    resolve(directories);
-  } catch {
-    reject();
+  const action = (kind === 'aliyun' ? 'aliyun' : 'remote') + (name === undefined ? 'Browse' : 'Mkdir');
+  const { data } = await storageFolder({ action, driverType: kind, engineId: mount.engineId,
+    ...(mount.id ? { mountId: mount.id } : {}), config: { ...pickDriverConfig(kind, mount.config), ...(kind === 'sftp' ? { root_path: sftpTestRootPath.value } : {}) },
+    ...(kind === 'aliyun' ? { parentId: parent.id } : { path: parent.path }), name });
+  if (mount !== mountData.value || !mountShow.value || epoch !== aliyunBrowseEpoch) throw new Error('stale');
+  if (data.authorization) {
+    aliyunApplyingBrowseResult = true;
+    try { Object.assign(mount.config, data.authorization); } finally { aliyunApplyingBrowseResult = false; }
   }
-};
+  const node = item => ({ label: item.name, path: item.path || childPath(item.name), id: item.id });
+  return name === undefined ? data.directories.map(node) : node(data.directory);
+}
 
-const selectAliyunRoot = (id) => {
-  const node = aliyunRootCache.value.find((item) => item.id === id);
-  mountData.value.config.root_folder_path = id === "root" ? "/" : node?.path || node?.name || "";
-};
+async function openFolderPicker() {
+  if (!folderReady.value) return;
+  if (mountData.value.driverType === 'sftp' && !sftpConnectionTestSucceeded.value
+      && !await testSftpConnection()) return;
+  folderPicker.value?.show();
+}
+
+function selectFolder(path, node) {
+  const { driverType, config } = mountData.value;
+  if (driverType === 'aliyun') Object.assign(config, { root_folder_path: path, root_folder_id: node.id });
+  else if (driverType === 'crypt') config.target_path = path;
+  else {
+    const base = String((driverType === 'sftp' ? sftpTestRootPath.value : config.root_path) || '/').replaceAll('\\', '/').replace(/\/+$/, '');
+    config.root_path = (base + (path === '/' ? '' : path)) || '/';
+    if (driverType === 'sftp' && sftpConnectionTestSucceeded.value) sftpDirectoryOptions.value.push({ value: config.root_path });
+  }
+}
 
 const addRule = computed(() => ({
   url: [requiredRule("engine.addressRule")],
@@ -467,11 +469,6 @@ const sftpTestSucceeded = computed(
   () => sftpConnectionTestSucceeded.value && sftpDirectoryOptions.value.some((option) => option.value === sftpRootPath.value)
 );
 
-const resetSftpRootBrowser = () => {
-  sftpRootBrowseEpoch += 1;
-  sftpRootBrowserSelection.value = null;
-};
-
 const resetAliyunAuth = ({ keepStatus = false } = {}) => {
   if (aliyunAuthPollTimer) {
     window.clearTimeout(aliyunAuthPollTimer);
@@ -563,10 +560,6 @@ const handleAliyunAuthModeChange = () => {
   nextTick(() => mountFormRef.value?.clearValidate());
 };
 
-const closeSftpRootBrowser = () => {
-  sftpRootBrowserShow.value = false;
-};
-
 const cancelActiveSftpTest = () => {
   if (!sftpTestLoading.value) return;
   sftpTestRequestId += 1;
@@ -579,10 +572,7 @@ watch(
     if (sftpApplyingTestResult || signature === previousSignature) return;
     cancelActiveSftpTest();
     sftpTestSignature.value = "";
-    sftpTestRootPath.value = "";
     sftpDirectoryOptions.value = [];
-    sftpRootBrowserShow.value = false;
-    resetSftpRootBrowser();
   },
   { flush: "sync" }
 );
@@ -741,8 +731,6 @@ const resetSftpTest = () => {
   sftpTestRootPath.value = "";
   sftpDirectoryOptions.value = [];
   sftpOriginalCredentialIdentity.value = "";
-  sftpRootBrowserShow.value = false;
-  resetSftpRootBrowser();
 };
 
 const addMount = () => {
@@ -841,99 +829,8 @@ const normalizeSftpDirectories = (data, currentRoot) => {
   return options;
 };
 
-const mergeSftpDirectoryOptions = (data, currentRoot) => {
-  const byPath = new Map(sftpDirectoryOptions.value.map((option) => [option.value, option]));
-  for (const option of normalizeSftpDirectories(data, currentRoot)) {
-    byPath.set(option.value, option);
-  }
-  sftpDirectoryOptions.value = [...byPath.values()];
-};
-
-const sftpBrowsePayload = (path) => ({
-  action: "sftpBrowse",
-  engineId: mountData.value.engineId,
-  ...(mountEditFlag.value ? { mountId: mountData.value.id } : {}),
-  path,
-  config: {
-    ...pickDriverConfig("sftp", mountData.value.config),
-    root_path: sftpTestRootPath.value,
-  },
-});
-
-const normalizeSftpTreeNodes = (data, requestedPath) => {
-  const currentPath = String(data?.path || requestedPath || "").trim();
-  const seen = new Set();
-  return (Array.isArray(data?.directories) ? data.directories : []).reduce((nodes, directory) => {
-    const path = String(typeof directory === "string" ? directory : directory?.path || "").trim();
-    if (!path || path === currentPath || seen.has(path)) return nodes;
-    seen.add(path);
-    const fallbackName = path.split("/").filter(Boolean).pop() || "/";
-    nodes.push({
-      name: String(typeof directory === "string" ? fallbackName : directory?.name || fallbackName),
-      path,
-      leaf: Boolean(typeof directory === "object" && directory?.leaf),
-    });
-    return nodes;
-  }, []);
-};
-
-const loadSftpRootNode = async (node, resolve) => {
-  const requestEpoch = sftpRootBrowseEpoch;
-  const requestTestId = sftpTestRequestId;
-  const requestSignature = sftpConnectionSignature.value;
-  const requestTestRootPath = sftpTestRootPath.value;
-  const requestBrowseBase = sftpRootBrowserBase.value;
-  const requestRootPath = sftpRootPath.value;
-  const path = node.level === 0 ? sftpRootBrowserBase.value : String(node.data?.path || "").trim();
-  if (!path || !sftpConnectionTestSucceeded.value) {
-    resolve([]);
-    return;
-  }
-
-  try {
-    const res = await storageSftpBrowse(sftpBrowsePayload(path));
-    if (
-      requestEpoch !== sftpRootBrowseEpoch ||
-      requestTestId !== sftpTestRequestId ||
-      requestSignature !== sftpConnectionSignature.value ||
-      requestTestRootPath !== sftpTestRootPath.value ||
-      requestBrowseBase !== sftpRootBrowserBase.value ||
-      requestRootPath !== sftpRootPath.value ||
-      !sftpRootBrowserShow.value
-    ) {
-      resolve([]);
-      return;
-    }
-    const data = res.data || {};
-    mergeSftpDirectoryOptions({ rootPath: data.path || path, directories: data.directories }, path);
-    resolve(normalizeSftpTreeNodes(data, path));
-  } catch {
-    resolve([]);
-  }
-};
-
-const openSftpRootBrowser = () => {
-  if (!sftpConnectionTestSucceeded.value || !sftpTestRootPath.value) return;
-  resetSftpRootBrowser();
-  sftpRootBrowserBase.value = sftpTestRootPath.value;
-  sftpRootTreeKey.value += 1;
-  sftpRootBrowserShow.value = true;
-};
-
-const selectSftpRootNode = (directory) => {
-  sftpRootBrowserSelection.value = directory?.path || null;
-};
-
-const confirmSftpRootDirectory = () => {
-  if (!sftpRootBrowserSelection.value || !mountData.value) return;
-  const selectedPath = sftpRootBrowserSelection.value;
-  closeSftpRootBrowser();
-  mountData.value.config.root_path = selectedPath;
-  nextTick(() => mountFormRef.value?.clearValidate("config.root_path"));
-};
-
 const testSftpConnection = async () => {
-  if (!sftpTestReady.value || sftpTestLoading.value) return;
+  if (!sftpTestReady.value || sftpTestLoading.value) return false;
   const authType = mountData.value.config.auth_type === "private_key" ? "private_key" : "password";
   const secretField = authType === "private_key" ? "private_key" : "password";
   try {
@@ -944,7 +841,7 @@ const testSftpConnection = async () => {
       "config.host_key_fingerprint",
     ]);
   } catch {
-    return;
+    return false;
   }
 
   const requestId = ++sftpTestRequestId;
@@ -975,21 +872,21 @@ const testSftpConnection = async () => {
       }
       const rootPath = String(data.rootPath || "").trim();
       if (rootPath) mountData.value.config.root_path = rootPath;
-      sftpTestRootPath.value = rootPath || sftpRootPath.value || "/";
-      sftpDirectoryOptions.value = normalizeSftpDirectories(data, mountData.value.config.root_path);
+      sftpTestRootPath.value = rootPath || mountData.value.config.root_path || "/";
+      sftpDirectoryOptions.value = normalizeSftpDirectories(data, sftpTestRootPath.value);
       sftpTestSignature.value = sftpConnectionSignature.value;
     } finally {
       sftpApplyingTestResult = false;
     }
     nextTick(() => mountFormRef.value?.clearValidate(["config.root_path", "config.host_key_fingerprint"]));
     ElMessage.success(t("engine.sftpTestSuccess"));
+    return true;
   } catch {
     if (requestId === sftpTestRequestId) {
       sftpTestSignature.value = "";
       sftpTestRootPath.value = "";
       sftpDirectoryOptions.value = [];
-      sftpRootBrowserShow.value = false;
-      resetSftpRootBrowser();
+      return false;
     }
   } finally {
     if (requestId === sftpTestRequestId) sftpTestLoading.value = false;
@@ -1068,6 +965,7 @@ const smbShareConfig = () => {
     domain: config.domain,
     username: config.username,
     password: config.password,
+    share: "",
   };
 };
 
@@ -1118,6 +1016,7 @@ const openSmbShareDiscovery = async () => {
 
 const selectSmbShare = (share) => {
   if (!mountData.value || !share?.name) return;
+  if (mountData.value.config.share !== share.name) mountData.value.config.root_path = "";
   mountData.value.config.share = share.name;
   smbShareDiscoverShow.value = false;
   nextTick(() => mountFormRef.value?.clearValidate("config.share"));
@@ -1412,8 +1311,10 @@ onBeforeUnmount(() => {
                 </el-form-item>
                 <el-form-item prop="config.target_path" :label="$t('engine.cryptFolder')">
                   <el-input v-if="cryptLocked" :model-value="mountData.config.target_path || '—'" disabled />
-                  <CryptTargetFolder v-else :key="mountData.config.target_mount_id" :mount="cryptTarget"
-                    :engine-id="mountData.engineId" v-model="mountData.config.target_path" />
+                  <el-input v-else :disabled="!folderReady" :model-value="mountData.config.target_path" readonly @click="openFolderPicker">
+                  <template #append><el-button :icon="Search" :disabled="!folderReady" :title="$t('pathSelect.title')"
+                    :aria-label="$t('pathSelect.title')" @click.stop="openFolderPicker" /></template>
+                </el-input>
                 </el-form-item>
                 <el-form-item prop="config.encryption_key" :label="$t('engine.cryptKey')">
                   <el-input v-if="cryptLocked" type="password" :placeholder="$t('engine.cryptKeySaved')" disabled />
@@ -1476,7 +1377,12 @@ onBeforeUnmount(() => {
               </el-input>
             </el-form-item>
             <el-form-item prop="config.root_path" :label="$t('engine.rootPath')">
-              <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')" />
+              <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')">
+                <template #append>
+                  <el-button :icon="Search" :disabled="!folderReady" :title="$t('pathSelect.title')"
+                    :aria-label="$t('pathSelect.title')" @click="openFolderPicker" />
+                </template>
+              </el-input>
             </el-form-item>
             <el-form-item prop="config.domain" :label="$t('engine.domain')">
               <el-input v-model="mountData.config.domain" :placeholder="$t('engine.optional')" />
@@ -1502,7 +1408,12 @@ onBeforeUnmount(() => {
               <el-input-number v-model="mountData.config.port" :min="1" :max="65535" :controls="false" />
             </el-form-item>
             <el-form-item prop="config.root_path" :label="$t('engine.rootPath')">
-              <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')" />
+              <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')">
+                <template #append>
+                  <el-button :icon="Search" :disabled="!folderReady" :title="$t('pathSelect.title')"
+                    :aria-label="$t('pathSelect.title')" @click="openFolderPicker" />
+                </template>
+              </el-input>
             </el-form-item>
             <el-form-item prop="config.username" :label="$t('engine.username')">
               <el-input v-model="mountData.config.username" :placeholder="$t('engine.anonymousPlaceholder')" autocomplete="username" />
@@ -1534,15 +1445,10 @@ onBeforeUnmount(() => {
               <el-input v-model="mountData.config.username" :placeholder="$t('engine.usernamePlaceholder')" autocomplete="username" />
             </el-form-item>
             <el-form-item prop="config.root_path" :label="$t('engine.rootPath')">
-              <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.sftpRootSelectPlaceholder')">
-                <template v-if="sftpConnectionTestSucceeded" #append>
-                  <el-tooltip :content="$t('pathSelect.title')" placement="top">
-                    <el-button
-                      :icon="FolderOpened"
-                      :aria-label="$t('pathSelect.title')"
-                      @click="openSftpRootBrowser"
-                    />
-                  </el-tooltip>
+              <el-input v-model="mountData.config.root_path" :placeholder="$t('engine.remoteRootPlaceholder')">
+                <template #append>
+                  <el-button :icon="Search" :disabled="!folderReady" :title="$t('pathSelect.title')"
+                    :aria-label="$t('pathSelect.title')" @click="openFolderPicker" />
                 </template>
               </el-input>
             </el-form-item>
@@ -1712,20 +1618,10 @@ onBeforeUnmount(() => {
               </el-select>
             </el-form-item>
             <el-form-item prop="config.root_folder_id" :label="$t('engine.rootFolder')">
-              <el-tree-select
-                :key="aliyunTreeKey"
-                v-model="mountData.config.root_folder_id"
-                :disabled="!aliyunAuthorized"
-                :props="{ value: 'id', label: 'name', children: 'children' }"
-                node-key="id"
-                :cache-data="aliyunRootCache"
-                :load="loadAliyunRootNode"
-                lazy
-                check-strictly
-                :render-after-expand="false"
-                :placeholder="$t('engine.rootFolder')"
-                @change="selectAliyunRoot"
-              />
+              <el-input :disabled="!folderReady" :model-value="mountData.config.root_folder_path || mountData.config.root_folder_id" readonly @click="openFolderPicker">
+                  <template #append><el-button :icon="Search" :disabled="!folderReady" :title="$t('pathSelect.title')"
+                    :aria-label="$t('pathSelect.title')" @click.stop="openFolderPicker" /></template>
+                </el-input>
             </el-form-item>
             <el-form-item prop="config.rapid_upload" :label="$t('engine.rapidUpload')">
               <el-switch v-model="mountData.config.rapid_upload" :aria-label="$t('engine.rapidUpload')" />
@@ -1754,33 +1650,8 @@ onBeforeUnmount(() => {
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="sftpRootBrowserShow"
-      class="sftp-root-browser-dialog"
-      top="8vh"
-      width="min(520px, calc(100vw - 24px))"
-      :title="$t('pathSelect.title')"
-      :append-to-body="true"
-      :close-on-click-modal="false"
-      @close="resetSftpRootBrowser"
-    >
-      <el-tree
-        v-if="sftpRootBrowserShow"
-        :key="sftpRootTreeKey"
-        :props="sftpTreeProps"
-        :load="loadSftpRootNode"
-        lazy
-        highlight-current
-        check-on-click-node
-        @node-click="selectSftpRootNode"
-      />
-      <template #footer>
-        <el-button @click="closeSftpRootBrowser">{{ $t("common.cancel") }}</el-button>
-        <el-button type="primary" :disabled="sftpRootBrowserSelection == null" @click="confirmSftpRootDirectory">
-          {{ sftpRootBrowserSelection == null ? $t("pathSelect.selectFirst") : $t("common.confirm") }}
-        </el-button>
-      </template>
-    </el-dialog>
+    <PathSelect v-if="mountShow" :key="mountData.driverType + ':' + (mountData.config.target_mount_id || '')" ref="folderPicker"
+      physical-root :root-node="folderRoot" :list-folders="folderOperation" :make-folder="folderOperation" @submit="selectFolder" />
 
     <el-dialog
       v-model="localBrowseShow"

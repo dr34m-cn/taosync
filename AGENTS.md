@@ -26,6 +26,8 @@ Write the complete Simplified Chinese changelog first, then append the complete 
 
 # Frontend Preferences
 
+When adding or updating an engine with a directory selector, allow users to create and select a child directory in place, as in the job editor. Preserve read-only mount settings and never create directories at a synthetic engine root.
+
 Prefer Element Plus components and theme styles for new or updated controls. For file uploads, use the Element Plus drag-and-drop picker with click-to-select support instead of a visible native file input.
 
 Every new or changed feature must support all project locales (currently Simplified Chinese and English). Localize user-facing UI, accessibility labels, validation, notifications and backend messages in the same change. Keep locale keys and placeholders in sync. Store stable codes for new built-in log messages and translate them for the viewer; preserve user content and external diagnostics verbatim.

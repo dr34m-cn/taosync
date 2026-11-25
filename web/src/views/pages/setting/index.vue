@@ -4,7 +4,7 @@ import { getSettings, updateSettings } from "@/api/settings";
 import { parseTime } from "@/utils/utils";
 import { useAppStore } from "@/store/useAppStore";
 import { ElMessage } from "element-plus";
-import { Check, Link, Operation, Refresh, User } from "@element-plus/icons-vue";
+import { Check, Link, Operation, QuestionFilled, Refresh, User } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 import ProgramUpdate from './ProgramUpdate.vue';
 import ApiKey from './ApiKey.vue';
@@ -75,6 +75,16 @@ onMounted(load);
               <span class="field-unit">{{ $t(key === 'timeout' ? 'setting.hours' : 'setting.days') }}</span>
             </div>
           </el-form-item>
+          <el-form-item class="setting-row" :label="$t('setting.anonymous_stats')">
+            <template #label>
+              <span class="field-label">{{ $t('setting.anonymous_stats') }}
+                <el-tooltip :content="$t('setting.statsHint')" placement="top" :popper-style="{ maxWidth: 'min(360px, 85vw)' }">
+                  <el-button link :icon="QuestionFilled" :aria-label="$t('setting.statsHint')" />
+                </el-tooltip>
+              </span>
+            </template>
+            <el-switch v-model="form.anonymous_stats" :aria-label="$t('setting.anonymous_stats')" />
+          </el-form-item>
           <el-form-item class="setting-row auth-server" :label="$t('setting.aliyun_auth_server')">
             <template #label>
               <span class="field-label">{{ $t('setting.aliyun_auth_server') }}</span>
@@ -86,7 +96,7 @@ onMounted(load);
           <details class="field-reference">
             <summary>{{ $t("setting.configKeys") }}</summary>
             <dl>
-              <template v-for="key in [...numericFields, 'aliyun_auth_server']" :key="key">
+              <template v-for="key in [...numericFields, 'anonymous_stats', 'aliyun_auth_server']" :key="key">
                 <dt>{{ $t(`setting.${key}`) }}</dt><dd><code>{{ key }}</code></dd>
               </template>
             </dl>
@@ -99,7 +109,6 @@ onMounted(load);
 
     <HttpsSettings class="settings-section" />
     <ApiKey class="settings-section" />
-    <ApiKey class="settings-section" scope="execute" />
     <ProgramUpdate class="settings-section" />
     <footer class="setting-footer">
       <span>{{ $t('setting.version') }}</span>

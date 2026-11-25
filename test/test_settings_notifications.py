@@ -106,14 +106,14 @@ class SettingsTest(unittest.TestCase):
         Path('data/config.ini').write_text('[tao]\ntask_save=0\n', encoding='utf-8')
         with mock.patch.dict(os.environ, {'TAO_TASK_SAVE': '9', 'TAO_TASK_TIMEOUT': '8',
                                          'TAO_ALIYUN_AUTH_SERVER': 'https://env.example'}):
-            self.assertEqual(config.getSettings(), {'task_save': 0, 'timeout': 8,
+            self.assertEqual(config.getSettings(), {'task_save': 0, 'timeout': 8, 'anonymous_stats': True,
                              'aliyun_auth_server': 'https://env.example', 'source_full_scan_days': 15})
 
     def test_file_values_override_environment_after_save_and_restart(self):
         Path('data/config.ini').write_text('[tao]\nport=9000\n', encoding='utf-8')
         env = {'TAO_TASK_SAVE': '9', 'TAO_TASK_TIMEOUT': '8', 'TAO_SOURCE_FULL_SCAN_DAYS': '2',
                'TAO_ALIYUN_AUTH_SERVER': 'https://env.example'}
-        expected = {'task_save': 3, 'timeout': 4, 'source_full_scan_days': 15,
+        expected = {'task_save': 3, 'timeout': 4, 'anonymous_stats': False, 'source_full_scan_days': 15,
                     'aliyun_auth_server': 'https://file.example'}
         with mock.patch.dict(os.environ, env):
             self.assertEqual(config.updateSettings(expected), expected)
@@ -177,7 +177,7 @@ class SettingsTest(unittest.TestCase):
 
     def test_invalid_values_leave_config_untouched(self):
         for values in ({'timeout': -1}, {'timeout': 1.5}, {'task_save': True}, {'source_full_scan_days': float('nan')},
-                       {'port': 5}, {'aliyun_auth_server': 'file:///tmp'}, {'aliyun_auth_server': ''}):
+                       {'anonymous_stats': 'false'}, {'anonymous_stats': 1}, {'port': 5}, {'aliyun_auth_server': 'file:///tmp'}, {'aliyun_auth_server': ''}):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 config.updateSettings(values)
         self.assertFalse(Path('data/config.ini').exists())

@@ -622,7 +622,7 @@ class LoginHttpTest(tornado.testing.AsyncHTTPTestCase):
         config.sysConfig = {
             'db': {'dbname': str(Path(self.temp_dir.name) / 'data' / 'taoSync.db')},
             'server': {'password': 'admin-pass', 'passwdStr': 'test-secret', 'expires': 2,
-                       'task_save': 0, 'timeout': 72, 'source_full_scan_days': 15,
+                       'task_save': 0, 'timeout': 72, 'source_full_scan_days': 15, 'anonymous_stats': False,
                        'aliyun_auth_server': 'https://taoapi.dr34m.cn'},
         }
         LNG.sysLanguage = None
@@ -915,10 +915,10 @@ class MountSecretReuseTest(unittest.TestCase):
                'config': {'host': 'nas.local', 'username': 'u', 'password': 'pw'}}
         with mock.patch.object(storageService.storageMapper, 'getMountById', return_value=old), \
                 mock.patch.object(storageService, '_requireTaoSync'):
-            same = storageService._smbRequestConfig(
-                {'engineId': 1, 'mountId': 3, 'config': {'host': 'nas.local', 'username': 'u'}})
-            other = storageService._smbRequestConfig(
-                {'engineId': 1, 'mountId': 3, 'config': {'host': 'evil.example', 'username': 'u'}})
+            same = storageService._networkRequestConfig(
+                {'engineId': 1, 'mountId': 3, 'config': {'host': 'nas.local', 'username': 'u'}}, 'smb')
+            other = storageService._networkRequestConfig(
+                {'engineId': 1, 'mountId': 3, 'config': {'host': 'evil.example', 'username': 'u'}}, 'smb')
         self.assertEqual(same['password'], 'pw')
         self.assertEqual(other['password'], '')
 
