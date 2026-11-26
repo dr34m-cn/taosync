@@ -631,15 +631,20 @@ def updateMount(data):
         from service.engine import engineService
         engineService.invalidateClient(old['engineId'])
         return
+    # Upload preferences do not change the backing storage or the directory contents.
+    changedFields = {key for key in old['config'].keys() | config.keys() if old['config'].get(key) != config.get(key)}
+    uploadPolicyOnly = (driverType == 'aliyun' and enabled == old.get('enabled', 1) and changedFields
+                        and changedFields <= {'rapid_upload', 'rapid_upload_min_mb'})
+    storageChanged = old['config'] != config and not uploadPolicyOnly
     mount = {
         "id": mountId,
         "expectedVersion": expectedVersion,
         "expectedConcurrency": old.get("copyConcurrency", 5),
         "changesBackingLocation": movesBacking,
         "cacheDays": days,
-        "resetCache": (days == 0 or old.get('cacheDays', 30) == 0 or old['config'] != config
+        "resetCache": (days == 0 or old.get('cacheDays', 30) == 0 or storageChanged
                        or enabled != old.get('enabled', 1)),
-        "resetDependents": old['config'] != config,
+        "resetDependents": storageChanged,
         "name": name,
         "driverType": driverType,
         "config": config,
@@ -650,7 +655,11 @@ def updateMount(data):
         ),
     }
     updateMountCopyConcurrency(mountId, concurrency, persist=lambda: storageMapper.updateMount(mount))
-    _invalidateEngine(old["engineId"])
+    if uploadPolicyOnly:
+        from service.engine import engineService
+        engineService.invalidateClient(old['engineId'])
+    else:
+        _invalidateEngine(old["engineId"])
 
 
 def updateMountConfig(mountId, expectedAuthVersion, config, expectedTokens=None):

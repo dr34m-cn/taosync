@@ -183,7 +183,7 @@ class CryptDriverTests(unittest.TestCase):
         destination.upload.assert_not_called()
 
     def test_cloud_upload_does_not_probe_or_spool_encrypted_or_decrypting_streams(self):
-        cloud = Mock(rapid_upload=True, RAPID_UPLOAD_THRESHOLD=1)
+        cloud = Mock(rapid_upload=True, rapid_upload_min_bytes=1)
         cloud._request.return_value = {}
         source = Mock(allow_rapid_upload=False)
         _, actual, consumed = AliyunDriveDriver._create_upload(cloud, {}, source, 20 * 1024 * 1024, None)

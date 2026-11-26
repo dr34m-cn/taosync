@@ -174,8 +174,14 @@ class CryptMountConfigTests(unittest.TestCase):
                 storage.updateMount({"id": cloud, "config": delta})
         self.assertTrue(storage.updateMountConfig(cloud, 1, {"refresh_token": "rotated"}))
         self.assertTrue(storage.updateMountConfig(cloud, 1, {"drive_id": "other"})["conflict"])
-        storage.updateMount({"id": cloud, "config": {"rapid_upload": False}})
+        epoch = mapper.getMountById(cloud)['cacheEpoch']
+        with patch('mapper.jobMapper.clearSourceSnapshotsByEngine') as clear_snapshots:
+            storage.updateMount({"id": cloud, "config": {"rapid_upload_min_mb": 32}})
+            storage.updateMount({"id": cloud, "config": {"rapid_upload": False}})
+        clear_snapshots.assert_not_called()
+        self.assertEqual(mapper.getMountById(cloud)['cacheEpoch'], epoch)
         cloud_config = mapper.getMountById(cloud)["config"]
+        self.assertEqual(cloud_config['rapid_upload_min_mb'], 32)
         self.assertEqual(cloud_config["drive_id"], driver.drive_id)
         self.assertEqual(cloud_config["refresh_token"], "rotated")
         self.assertFalse(cloud_config["rapid_upload"])

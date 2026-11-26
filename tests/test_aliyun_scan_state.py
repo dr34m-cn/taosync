@@ -345,7 +345,7 @@ class ScannedUploadTests(unittest.TestCase):
 
     def test_rapid_commit_updates_scan_without_complete_or_duplicate_query(self):
         self.scan()
-        self.driver.RAPID_UPLOAD_THRESHOLD = 1
+        self.driver.rapid_upload_min_bytes = 0
         source = Source()
         source.supports_random_read = True
         source.file_metadata = Mock(return_value={'size': 3, 'sha1': 'A' * 40})

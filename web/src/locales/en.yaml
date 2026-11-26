@@ -422,6 +422,8 @@ engine:
   directoryCopyConcurrency: "Concurrent copies: {name}"
   copyConcurrencyValue: "Concurrency {count}"
   rapidUpload: Hash-based Rapid Upload
+  rapidUploadLargerThan: Files larger than
+  rapidUploadMinMb: Rapid upload threshold in MB (exclusive)
   removeWay: Delete Method
   secretPlaceholderEdit: Leave blank to keep the current value
   mountNameRule: Please enter a directory name

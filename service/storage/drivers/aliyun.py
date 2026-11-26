@@ -24,6 +24,8 @@ from urllib3.util import connection as urllib3_connection
 
 from common.fileFingerprint import fileFingerprint
 from common.directoryCache import cloud_listing
+from common.LNG import get_context_lang
+from common.locales import t
 
 from .base import RAPID_UPLOAD, StorageDriver, TransferCancelled, check_cancel, child_path, normalize_path
 from .scanState import scanning_child
@@ -206,7 +208,7 @@ class AliyunDriveDriver(StorageDriver):
     driver_type = "aliyun"
     API_URL = "https://openapi.alipan.com"
     PART_SIZE = 20 * 1024 * 1024
-    RAPID_UPLOAD_THRESHOLD = 10 * 1024 * 1024
+    DEFAULT_RAPID_UPLOAD_MIN_MB = 10
     MAX_PARTS = 10000
 
     def __init__(
@@ -251,6 +253,10 @@ class AliyunDriveDriver(StorageDriver):
         self.rapid_upload = self.config.get("rapid_upload", True)
         if not isinstance(self.rapid_upload, bool):
             raise ValueError("Aliyun rapid_upload must be a boolean")
+        min_mb = self.config.get('rapid_upload_min_mb', self.DEFAULT_RAPID_UPLOAD_MIN_MB)
+        if type(min_mb) is not int or not 0 <= min_mb <= 2147483647:
+            raise ValueError(t('aliyun_rapid_upload_min_mb_invalid', get_context_lang()))
+        self.rapid_upload_min_bytes = min_mb * 1024 ** 2
         self.save_config = save_config
         self.load_config = load_config
         self.auth_version = int(auth_version) if auth_version is not None else None
@@ -831,7 +837,7 @@ class AliyunDriveDriver(StorageDriver):
         endpoint = "/adrive/v1.0/openFile/create"
         check_cancel(cancel)
         # Small files should start streaming without hash/proof reads over SMB.
-        if (not self.rapid_upload or size <= self.RAPID_UPLOAD_THRESHOLD
+        if (not self.rapid_upload or size <= self.rapid_upload_min_bytes
                 or getattr(source, 'allow_rapid_upload', True) is False):
             return self._request(endpoint, data), source, False
         metadata = getattr(source, "metadata", {})
@@ -854,7 +860,7 @@ class AliyunDriveDriver(StorageDriver):
             created = self._request(endpoint, self._proof_data(data, content_hash, range_read, size, cancel))
             return created, source, bool(created.get("rapid_upload"))
 
-        prefix = self._read_exact(source, 1024, cancel)
+        prefix = self._read_exact(source, min(1024, size), cancel)
         source = _PrefixReader(prefix, source)
         try:
             created = self._request(endpoint, {
@@ -962,7 +968,7 @@ class AliyunDriveDriver(StorageDriver):
                            _MISSING_PARENT_CODES | {'AlreadyExist', 'AlreadyExist.File'})
             # At or below the threshold create has not read the source at all.
             # Re-resolve once; never replay a consumed large-file stream.
-            if known is None or not recoverable or size > self.RAPID_UPLOAD_THRESHOLD:
+            if known is None or not recoverable or size > self.rapid_upload_min_bytes:
                 raise
             state.invalidate(parent_path or '/')
             parent = self._resolve(parent_path or '/', targeted=True)

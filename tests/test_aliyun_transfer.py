@@ -19,10 +19,10 @@ from service.storage import storageService
 from service.engine import engineService
 
 
-def make_driver():
+def make_driver(**settings):
     driver = AliyunDriveDriver({
         'client_id': 'test-client', 'client_secret': 'test-secret',
-        'refresh_token': 'test-refresh', 'drive_id': 'drive',
+        'refresh_token': 'test-refresh', 'drive_id': 'drive', **settings,
     })
     driver._resolve = Mock(return_value={'file_id': 'parent'})
     driver._assert_file_destination = Mock()
@@ -527,10 +527,8 @@ class RapidUploadTests(unittest.TestCase):
         self.assertFalse(any(url.endswith('/complete') for url, *_ in self.requests))
 
     def setUp(self):
-        self.driver = make_driver()
+        self.driver = make_driver(rapid_upload_min_mb=0)
         self.addCleanup(self.driver.session.close)
-        # Keep algorithm fixtures small; production boundaries are tested separately.
-        self.driver.RAPID_UPLOAD_THRESHOLD = 100 * 1024
         self.payload = bytes(range(256)) * 513
         self.driver.access_token = 'first-access-token'
         self.driver._wait_rate = Mock()
@@ -651,7 +649,7 @@ class RapidUploadTests(unittest.TestCase):
         self.assertEqual(self.uploaded, [self.payload])
 
     def test_small_streams_skip_rapid_upload_even_with_existing_hash(self):
-        self.driver.RAPID_UPLOAD_THRESHOLD = AliyunDriveDriver.RAPID_UPLOAD_THRESHOLD
+        self.driver.rapid_upload_min_bytes = 10 * 1024 ** 2
         for hashed in (False, True):
             with self.subTest(hashed=hashed):
                 self.requests.clear()
@@ -673,11 +671,13 @@ class RapidUploadTests(unittest.TestCase):
                 self.assertEqual(len(creates), 1)
                 self.assertFalse({'pre_hash', 'content_hash', 'proof_code'} & creates[0].keys())
 
-    def test_production_size_boundary_for_both_rapid_paths(self):
-        driver = make_driver()
-        self.addCleanup(driver.session.close)
-        threshold = 10 * 1024 ** 2
-        self.assertEqual(driver.RAPID_UPLOAD_THRESHOLD, threshold)
+    def test_configured_boundary_for_both_rapid_paths(self):
+        for settings, min_mb in (({}, 10), ({'rapid_upload_min_mb': 1}, 1), ({'rapid_upload_min_mb': 50}, 50)):
+            driver = make_driver(**settings)
+            self.addCleanup(driver.session.close)
+            self.check_size_boundary(driver, min_mb * 1024 ** 2)
+
+    def check_size_boundary(self, driver, threshold):
         for size in (0, threshold - 1, threshold, threshold + 1):
             for hashed in (False, True):
                 with self.subTest(size=size, hashed=hashed):
@@ -697,6 +697,20 @@ class RapidUploadTests(unittest.TestCase):
                         self.assertTrue(callable(body))
                     else:
                         self.assertIn('pre_hash', body)
+
+    def test_zero_threshold_tiny_file_prehash_miss_preserves_all_bytes(self):
+        self.prehash_match = False
+        self.driver.upload('/tiny', io.BytesIO(b'x'), 1)
+        self.assertEqual(self.requests[0][1]['pre_hash'], hashlib.sha1(b'x').hexdigest().upper())
+        self.assertEqual(self.uploaded, [b'x'])
+        self.requests.clear()
+        self.driver.upload('/empty', io.BytesIO(b''), 0)
+        self.assertFalse({'pre_hash', 'content_hash', 'proof_code'} & self.requests[0][1].keys())
+
+    def test_invalid_rapid_upload_threshold(self):
+        for value in (-1, 1.5, '1', None, True, 2**31):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                make_driver(rapid_upload_min_mb=value)
 
     def test_existing_sha1_recalculates_range_proof_after_token_refresh(self):
         self.expire_proof_token = True
@@ -777,6 +791,7 @@ class RapidUploadTests(unittest.TestCase):
         self.assertNotEqual(proofs[0][1]['proof_code'], proofs[1][1]['proof_code'])
 
     def test_small_empty_and_disabled_uploads_skip_hash_preflight(self):
+        self.driver.rapid_upload_min_bytes = 1024
         for payload, enabled in ((b'', True), (b'small', True), (self.payload, False)):
             with self.subTest(size=len(payload), enabled=enabled):
                 self.requests.clear()

@@ -129,6 +129,7 @@ const driverConfigKeys = {
     "root_folder_path",
     "remove_way",
     "rapid_upload",
+    "rapid_upload_min_mb",
   ],
 };
 
@@ -182,6 +183,7 @@ const driverDefaults = (driverType) => {
       root_folder_path: "/",
       remove_way: "trash",
       rapid_upload: true,
+      rapid_upload_min_mb: 10,
     },
   };
   return { ...defaults[driverType] };
@@ -1635,8 +1637,14 @@ onBeforeUnmount(() => {
                     :aria-label="$t('pathSelect.title')" @click.stop="openFolderPicker" /></template>
                 </el-input>
             </el-form-item>
-            <el-form-item prop="config.rapid_upload" :label="$t('engine.rapidUpload')">
+            <el-form-item class="form-span-2" prop="config.rapid_upload" :label="$t('engine.rapidUpload')">
               <el-switch v-model="mountData.config.rapid_upload" :aria-label="$t('engine.rapidUpload')" />
+              <label v-if="mountData.config.rapid_upload" class="rapid-upload-condition">
+                {{ $t('engine.rapidUploadLargerThan') }}
+                <el-input-number v-model="mountData.config.rapid_upload_min_mb" :min="0" :max="2147483647"
+                  :precision="0" :value-on-clear="10" :controls="false" :aria-label="$t('engine.rapidUploadMinMb')" />
+                MB
+              </label>
             </el-form-item>
             <el-form-item class="form-span-2" prop="config.remove_way" :label="$t('engine.removeWay')">
               <el-radio-group v-model="mountData.config.remove_way">
@@ -2055,6 +2063,17 @@ onBeforeUnmount(() => {
 
 :global(.mount-editor-dialog .form-span-2) {
   grid-column: 1 / -1;
+}
+
+:global(.mount-editor-dialog .rapid-upload-condition) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: 16px;
+}
+
+:global(.mount-editor-dialog .rapid-upload-condition .el-input-number) {
+  width: 7em;
 }
 
 :global(.mount-editor-dialog .crypt-locked-control) {

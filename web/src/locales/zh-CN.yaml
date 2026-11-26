@@ -422,6 +422,8 @@ engine:
   directoryCopyConcurrency: "并行复制数：{name}"
   copyConcurrencyValue: "并行 {count}"
   rapidUpload: 哈希秒传
+  rapidUploadLargerThan: 文件大于
+  rapidUploadMinMb: 秒传条件（文件大小严格大于此 MB 数）
   removeWay: 删除方式
   secretPlaceholderEdit: 留空表示保留现有值
   mountNameRule: 请输入目录名称
