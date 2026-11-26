@@ -1,4 +1,5 @@
 import posixpath
+import logging
 import threading
 import time
 import uuid
@@ -7,6 +8,7 @@ from contextlib import nullcontext
 from collections import OrderedDict
 
 from common.intervalGate import IntervalGate
+from common.directoryCache import DirectoryCache, cloud_listing, source_listing
 from mapper import storageMapper
 from service.alist.alistClient import checkExs
 from service.storage import storageService
@@ -20,7 +22,7 @@ from service.storage.drivers.base import (
 )
 from service.storage.factory import createDriver
 from service.storage.localAccess import LocalPathError
-from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap
+from service.storage.pathIdentity import mount_paths_overlap, virtual_paths_overlap, alias_path
 from service.storage.localAccess import sync_listing
 from common.fileFingerprint import contentHashes
 from service.storage.drivers.aliyun import AliyunDriveDriver
@@ -77,6 +79,7 @@ class _CopyTask:
     def _run(self):
         with self.lock:
             self.state = 1
+        uncertain = []
         try:
             source_mount, source_relative = self.client.resolve(self.source_path)
             destination_mount, destination_relative = self.client.resolve(self.destination_path)
@@ -84,12 +87,15 @@ class _CopyTask:
             destination_driver = self.client.getDriver(destination_mount)
             native_move = getattr(source_driver, "can_move_to", None)
             if self.delete_source and callable(native_move) and native_move(destination_driver):
-                source_driver.move_to(source_relative, destination_driver, destination_relative,
-                                      self._report, self.cancel_event)
+                uncertain.extend(((source_mount, source_relative), (destination_mount, destination_relative)))
+                moved = source_driver.move_to(source_relative, destination_driver, destination_relative,
+                                              self._report, self.cancel_event)
                 self.client._invalidateScanPath(source_mount, source_relative)
                 self.client._invalidateScanPath(destination_mount, destination_relative)
-                self.client._invalidateMountCache(source_mount["id"])
-                self.client._invalidateMountCache(destination_mount["id"])
+                self.client._listingChange(source_mount, source_relative, 'delete')
+                kind = ('directory' if moved['is_dir'] else 'file') if moved else 'unknown'
+                self.client._listingChange(destination_mount, destination_relative, kind, moved.get('size') if moved else None)
+                uncertain.clear()
                 self._succeed()
                 return
             metadata = self.client.fileMetadata(source_mount, source_relative)
@@ -97,6 +103,7 @@ class _CopyTask:
             if self.source_path == self.destination_path:
                 self._succeed()
                 return
+            uncertain.append((destination_mount, destination_relative))
             if source_mount["id"] == destination_mount["id"]:
                 with self.client._scanScope(destination_mount):
                     result = source_driver.copy(
@@ -122,16 +129,19 @@ class _CopyTask:
                         metadata,
                     )
                 self.client._rememberHash(source_mount, source_relative, metadata)
-            self.client._invalidateMountCache(destination_mount["id"])
+            self.client._listingChange(destination_mount, destination_relative, 'file', size)
+            uncertain.clear()
             if self.delete_source:
                 # The destination commit is complete. A late cancellation
                 # must not relabel it or remove its source.
                 if self.cancel_event.is_set():
                     self._succeed(result)
                     return
+                uncertain.append((source_mount, source_relative))
                 source_driver.delete(source_relative)
                 self.client._invalidateScanPath(source_mount, source_relative)
-                self.client._invalidateMountCache(source_mount["id"])
+                self.client._listingChange(source_mount, source_relative, 'delete')
+                uncertain.clear()
             self._succeed(result)
         except TransferCancelled:
             with self.lock:
@@ -142,6 +152,11 @@ class _CopyTask:
                 self.state = 7
                 self.error = exc.args if isinstance(exc, (LocalPathError, BackupNamespaceError)) else str(exc)
         finally:
+            for mount, path in uncertain:
+                try:
+                    self.client._listingChange(mount, path, 'unknown')
+                except Exception:
+                    logging.getLogger(__name__).exception('Could not invalidate directory listing after transfer')
             with self.lock:
                 delete_when_done = self.delete_when_done
             self.finished.set()
@@ -175,21 +190,18 @@ class _CopyTask:
 class TaoSyncClient:
     """AList-compatible facade over TaoSync's internal storage drivers."""
 
-    def __init__(self, engineId):
+    def __init__(self, engineId, listingCache=None):
         self.alistId = int(engineId)
         self.user = "TaoSync"
         self.waitGate = IntervalGate()
         self.tasks = {}
         self.tasks_lock = threading.Lock()
         self.mounts = {}
-        self.entry_cache = {}
-        self.entry_cache_lock = threading.Lock()
-        self.cache_ttl = 15.0
+        self.listings = listingCache if listingCache is not None else DirectoryCache()
         self.hash_cache = OrderedDict()
         self.hash_cache_lock = threading.Lock()
         rows = storageMapper.getMountList(self.alistId)
         by_id = {}
-        self.related_mounts = {}
         # Load the physical drivers first. A filter shares its backing driver's
         # credentials, connections and locks regardless of database row order.
         for row in sorted(rows, key=lambda row: row['driverType'] == 'crypt'):
@@ -222,7 +234,6 @@ class TaoSyncClient:
                     row['driver'] = CryptDriver(self.getDriver(target), config['target_path'],
                                                 getMountEncryptionKey(config), config['encrypt_dir_names'],
                                                 namespace_id=(self.alistId, target['id']))
-                    self.related_mounts.setdefault(target['id'], {target['id']}).add(mount_id)
                 else:
                     row['driver'] = createDriver(
                         row['driverType'], config, save_config=save_config, load_config=load_config,
@@ -236,19 +247,16 @@ class TaoSyncClient:
                 row["driverError"] = exc.args if isinstance(exc, LocalPathError) else str(exc)
             self.mounts[row["name"]] = row
             by_id[mount_id] = row
-        self.related_mounts = {mount_id: group for group in self.related_mounts.values() for mount_id in group}
 
     def updateAlistId(self, alistId):
         self.alistId = int(alistId)
 
     def forSync(self):
         # Keep credentials, connections, task registry and driver locks shared,
-        # while scan identities and entry caches belong to this run alone.
+        # Directory listings are shared; cloud identities belong to this run alone.
         client = copy(self)
         client.scan_states = {mount['id']: ScanState() for mount in self.mounts.values()
                               if isinstance(mount.get('driver'), AliyunDriveDriver)}
-        client.entry_cache = {}
-        client.entry_cache_lock = threading.Lock()
         client.cache_owner = self
         return client
 
@@ -314,40 +322,70 @@ class TaoSyncClient:
             )
         return driver
 
-    def _invalidateMountCache(self, mount_id=None):
-        with self.entry_cache_lock:
-            if mount_id is None:
-                self.entry_cache.clear()
-            else:
-                related = self.related_mounts.get(mount_id, {mount_id})
-                for key in [key for key in self.entry_cache if key[0] in related]:
-                    self.entry_cache.pop(key, None)
-        owner = getattr(self, 'cache_owner', None)
-        if owner is not None:
-            owner._invalidateMountCache(mount_id)
+    def _listingChange(self, mount, path, kind, size=None):
+        for other in self.mounts.values():
+            if mount.get('id') == other['id']:
+                continue
+            if 'crypt' in (mount['driverType'], other['driverType']):
+                # A plaintext name is not a ciphertext name. Invalidate only the backing
+                # subtree or the encrypted view whose backing subtree actually overlaps.
+                physical, physical_path = mount, path
+                if mount['driverType'] == 'crypt':
+                    cfg = mount['config']
+                    physical = next((m for m in self.mounts.values() if m['id'] == cfg['target_mount_id']), None)
+                    if physical is None:
+                        continue
+                    physical_path = cfg['target_path']
+                backing, base = other, '/'
+                if other['driverType'] == 'crypt':
+                    cfg = other['config']
+                    backing = next((m for m in self.mounts.values() if m['id'] == cfg['target_mount_id']), None)
+                    if backing is None:
+                        continue
+                    base = cfg['target_path']
+                mapped = alias_path(physical, physical_path, backing)
+                if mapped is not None and virtual_paths_overlap(mapped, base, case_sensitive=False):
+                    self.listings.change(other, '/' if other['driverType'] == 'crypt' else mapped, 'unknown')
+                continue
+            mapped = alias_path(mount, path, other)
+            if mapped == '/' and mount['driverType'] == 'aliyun' and mount.get('id') is not None:
+                mapped = self.listings.cloudAliasPath(mount, path, other)
+            if mapped is not None:
+                self.listings.change(other, mapped, kind if mapped != '/' else 'unknown', size)
+        if mount.get('id') is not None:
+            self.listings.change(mount, path, kind, size)
 
-    def _entries(self, path, useCache=0):
+    def _entries(self, path, useCache=0, scanInterval=0):
         normalized = normalize_path(path)
         if normalized == "/":
             return [{"name": name, "is_dir": True, "size": None} for name in sorted(self.mounts)]
         mount, relative = self.resolve(normalized)
-        cache_key = (mount["id"], relative)
+        strict = hasattr(self, 'cache_owner')
+        driver = self.getDriver(mount)
         if int(useCache or 0) == 1:
-            with self.entry_cache_lock:
-                cached = self.entry_cache.get(cache_key)
-            if cached and time.monotonic() - cached[0] < self.cache_ttl:
-                return [dict(item) for item in cached[1]]
+            cached = self.listings.read(mount, relative, strict, source_listing.get())
+            if cached is not None:
+                return cached
+        self.checkWait(normalized, scanInterval)
+        revision = self.listings.revision
+        cloud = {}
+        identity_token = cloud_listing.set(cloud)
         try:
             with self._scanScope(mount):
-                token = sync_listing.set(hasattr(self, 'cache_owner'))
+                token = sync_listing.set(strict)
                 try:
-                    entries = self.getDriver(mount).list(relative, details=True)
+                    entries = driver.list(relative, details=True)
                 finally:
                     sync_listing.reset(token)
+                identity = cloud.get('identity') if mount['driverType'] == 'aliyun' else None
         except FileNotFoundError:
+            self.listings.change(mount, relative, 'unknown')
             raise FileNotFoundError("directory not found: " + normalized)
-        with self.entry_cache_lock:
-            self.entry_cache[cache_key] = (time.monotonic(), [dict(item) for item in entries])
+        finally:
+            cloud_listing.reset(identity_token)
+        # A local browser listing may omit unreadable/unsafe entries; a sync scan must not.
+        browser_safe = mount['driverType'] not in ('local', 'crypt')
+        self.listings.record(mount, relative, entries, strict or browser_safe, revision, identity)
         return entries
 
     def fileListApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
@@ -370,8 +408,7 @@ class TaoSyncClient:
 
     def fileListDetailApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         """Return driver metadata without changing fileListApi's legacy shape."""
-        self.checkWait(path, scanInterval)
-        entries = self._entries(path, useCache)
+        entries = self._entries(path, useCache, scanInterval)
         cloudHashes = bool(path.strip('/')) and self.resolve(path)[0].get('driverType') == 'aliyun'
         result = {
             item["name"] + "/" if item["is_dir"] else item["name"]: {
@@ -418,9 +455,13 @@ class TaoSyncClient:
         normalized = normalize_path(path)
         mount, relative = self.resolve(normalized)
         if relative != "/":
-            with self._scanScope(mount):
-                self.getDriver(mount).mkdir(relative)
-            self._invalidateMountCache(mount["id"])
+            try:
+                with self._scanScope(mount):
+                    self.getDriver(mount).mkdir(relative)
+            except Exception:
+                self._listingChange(mount, relative, 'unknown')
+                raise
+            self._listingChange(mount, relative, 'directory')
 
     def deleteFile(self, path, names, scanInterval=0):
         self.checkWait(path, scanInterval)
@@ -436,7 +477,10 @@ class TaoSyncClient:
                 # Source-snapshot retries may repeat a delete that already
                 # succeeded for another target before a later operation failed.
                 pass
-            self._invalidateMountCache(mount["id"])
+            except Exception:
+                self._listingChange(mount, relative, 'unknown')
+                raise
+            self._listingChange(mount, relative, 'delete')
 
     def fileSize(self, mount, relative):
         return int(self.fileMetadata(mount, relative).get("size") or 0)

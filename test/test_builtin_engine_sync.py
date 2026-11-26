@@ -144,6 +144,34 @@ class EngineTestBase(unittest.TestCase):
 
 
 
+class DirectoryListingPolicyTest(EngineTestBase):
+    def test_two_syncs_patch_cached_destinations_across_client_reload(self):
+        Path(self.dst, 'sibling').mkdir()
+        Path(self.src, 'sibling').mkdir()
+        job = self._job(method=0)
+        jobService.getJobClientById(job).job['useCacheT'] = 1
+        write(self.src, 'one', '1')
+        self.assertEqual(self._run(job)[0], 2)
+        engineService.invalidateClient(self.engineId)
+        client = engineService.getClientById(self.engineId)
+        driver = client.mounts['D']['driver']
+        write(self.src, 'two', '22')
+        with mock.patch.object(driver, 'list', side_effect=AssertionError('unexpected target scan')) as listed:
+            self.assertEqual(self._run(job)[0], 2)
+            client.mkdir('/D/new')
+            client.deleteFile('/D', ['one'])
+            with mock.patch.object(client, 'checkWait', side_effect=AssertionError('cached scan waited')):
+                self.assertEqual(client.fileListApi('/D', 1, 30), {'sibling/': {}, 'new/': {}, 'two': 2})
+                self.assertEqual(client.fileListApi('/D/sibling', 1, 30), {})
+            listed.assert_not_called()
+        write(self.dst, 'external', 'x')
+        self.assertNotIn('external', client.fileListApi('/D', 1))
+        storageService.updateMount({'id': client.mounts['D']['id'], 'cacheDays': 0})
+        self.assertIn('external', client.fileListApi('/D', 1))
+        Path(self.dst, 'external').unlink()
+        self.assertNotIn('external', client.fileListApi('/D', 1))
+
+
 class JobLinksTest(EngineTestBase):
     def link(self, source, targets, condition='finished', minutes=0):
         return jobLinks.create(dict(source=source, targets=targets, condition=condition, minutes=minutes))

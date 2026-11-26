@@ -10,6 +10,7 @@ class FolderPickerTest(unittest.TestCase):
         self.create = self.enterContext(patch.object(storage, 'createDriver'))
         self.enterContext(patch.object(storage.discoveryService, 'list_smb_shares', return_value=[{'name': 'Share'}]))
         self.driver = self.create.return_value
+        self.client = self.enterContext(patch('service.engine.engineService.getClientById')).return_value
 
     def test_each_network_picker_lists_and_creates_under_configured_root(self):
         for kind in ('smb', 'ftp', 'sftp'):
@@ -23,6 +24,7 @@ class FolderPickerTest(unittest.TestCase):
                 self.assertEqual(storage.remoteFolder(dict(req, name='new'), create=True),
                                  {'directory': {'name': 'new', 'path': '/parent/new'}})
                 self.driver.mkdir.assert_called_with('/parent/new')
+                self.assertEqual(self.client._listingChange.call_args.args[1:], ('/parent/new', 'directory'))
                 with self.assertRaises(FileExistsError):
                     storage.remoteFolder(dict(req, name='child'), create=True)
         self.assertEqual(self.driver.close.call_count, 3)

@@ -417,6 +417,8 @@ engine:
   driveType: Drive Space
   rootFolder: Root folder
   copyConcurrency: Concurrent copies
+  cacheDays: Directory scan cache (days)
+  cacheDaysHint: 0 disables caching; -1 never expires. External changes require a fresh scan.
   directoryCopyConcurrency: "Concurrent copies: {name}"
   copyConcurrencyValue: "Concurrency {count}"
   rapidUpload: Hash-based Rapid Upload

@@ -32,11 +32,12 @@ def getMountById(mountId):
 
 def addMount(mount, target=None):
     query = (
-        "insert into storage_mount (engineId, name, driverType, config, enabled, copyConcurrency) "
-        "select :engineId, :name, :driverType, :config, :enabled, :copyConcurrency"
+        "insert into storage_mount (engineId, name, driverType, config, enabled, copyConcurrency, cacheDays) "
+        "select :engineId, :name, :driverType, :config, :enabled, :copyConcurrency, :cacheDays"
     )
     values = {**mount, "config": json.dumps(mount["config"], ensure_ascii=False),
-              "enabled": mount.get("enabled", 1), "copyConcurrency": mount.get("copyConcurrency", 5)}
+              "enabled": mount.get("enabled", 1), "copyConcurrency": mount.get("copyConcurrency", 5),
+              "cacheDays": mount.get('cacheDays', 30)}
     if mount["driverType"] != "crypt":
         return sqlBase.execute_insert(query, values)
     # Check the exact backing row that was probed, atomically with the insert.
@@ -69,17 +70,26 @@ def updateMount(conn, mount):
         raise ValueError("cannot disable or relocate a mount referenced by a crypt mount")
     cursor = conn.execute(
         "update storage_mount set name=:name, driverType=:driverType, config=:config, enabled=:enabled, "
-        "configVersion=configVersion + 1, authVersion=:authVersion, copyConcurrency=:copyConcurrency "
+        "configVersion=configVersion + 1, authVersion=:authVersion, copyConcurrency=:copyConcurrency, "
+        "cacheDays=:cacheDays, cacheEpoch=cacheEpoch+:resetCache "
         "where id=:id and configVersion=:expectedVersion and copyConcurrency=:expectedConcurrency",
         {
             **mount,
             "config": json.dumps(mount["config"], ensure_ascii=False),
             "enabled": mount.get("enabled", 1),
             "copyConcurrency": mount.get("copyConcurrency", 5),
+            "cacheDays": mount.get('cacheDays', 30), "resetCache": int(mount.get('resetCache', True)),
         },
     )
     if cursor.rowcount != 1:
         raise ValueError("storage configuration changed; reload and retry")
+    if mount.get('resetCache', True):
+        conn.execute('delete from storage_directory_cache where mountId=?', (mount['id'],))
+        if mount.get('resetDependents'):
+            dependents = "driverType='crypt' and json_extract(config,'$.target_mount_id')=?"
+            conn.execute('delete from storage_directory_cache where mountId in '
+                         '(select id from storage_mount where ' + dependents + ')', (mount['id'],))
+            conn.execute('update storage_mount set cacheEpoch=cacheEpoch+1 where ' + dependents, (mount['id'],))
     conn.commit()
 
 
@@ -109,9 +119,19 @@ def updateCopyConcurrency(mountId, value):
 
 
 @sqlBase.connect_sql
+def updateCachePolicy(conn, mountId, concurrency, days):
+    with conn:
+        conn.execute('update storage_mount set copyConcurrency=?, cacheDays=?, configVersion=configVersion+1, '
+                     'cacheEpoch=cacheEpoch+((cacheDays=0)!=(?=0)) where id=?', (concurrency, days, days, mountId))
+        if days == 0:
+            conn.execute('delete from storage_directory_cache where mountId=?', (mountId,))
+
+
+@sqlBase.connect_sql
 def removeMount(conn, mountId):
     conn.execute("begin immediate")
     if _isReferenced(conn, mountId):
         raise ValueError("remove the referencing crypt mount first")
     conn.execute("delete from storage_mount where id=?", (mountId,))
+    conn.execute('delete from storage_directory_cache where mountId=?', (mountId,))
     conn.commit()

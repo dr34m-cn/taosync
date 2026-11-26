@@ -119,11 +119,13 @@ class CloudMoveTests(unittest.TestCase):
             'service.engine.taosyncClient.createDriver', side_effect=[self.driver, destination]
         ):
             client = TaoSyncClient(1)
-        client.entry_cache = {(1, '/'): (0, []), (2, '/'): (0, [])}
+        for path in ('/Cloud', '/Archive/archive'):
+            client.fileListApi(path)
         task_id = client.relocateFile('/Cloud/old.txt', '/Archive/archive/new.txt')
         client.waitTask(task_id, 2)
         self.assertEqual(client.taskInfo(task_id)['state'], 2)
-        self.assertEqual(client.entry_cache, {})
+        self.assertNotIn('old.txt', client.fileListApi('/Cloud', useCache=1))
+        self.assertIn('new.txt', client.fileListApi('/Archive/archive', useCache=1))
         self.assertTrue(self.driver._request.call_args.args[0].endswith('/move'))
         self.driver.download.assert_not_called()
         destination.upload.assert_not_called()

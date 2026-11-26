@@ -417,6 +417,8 @@ engine:
   driveType: 网盘空间
   rootFolder: 根文件夹
   copyConcurrency: 并行复制数
+  cacheDays: 扫描缓存保留天数
+  cacheDaysHint: 0 不缓存；-1 永不过期。外部修改需重新扫描才能发现。
   directoryCopyConcurrency: "并行复制数：{name}"
   copyConcurrencyValue: "并行 {count}"
   rapidUpload: 哈希秒传

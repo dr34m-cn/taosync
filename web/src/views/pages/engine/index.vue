@@ -30,6 +30,7 @@ import {
   Link,
   Monitor,
   Plus,
+  QuestionFilled,
   RefreshRight,
   Search,
   Setting,
@@ -743,6 +744,7 @@ const addMount = () => {
     name: "",
     driverType: "local",
     copyConcurrency: 5,
+    cacheDays: 30,
     config: driverDefaults("local"),
   };
   mountShow.value = true;
@@ -759,6 +761,7 @@ const editMount = (mount) => {
     name: mount.name,
     driverType: mount.driverType,
     copyConcurrency: mount.copyConcurrency || 5,
+    cacheDays: mount.cacheDays ?? 30,
     secretState: { ...(mount.secretState || {}) },
     config: {
       ...driverDefaults(mount.driverType),
@@ -1023,14 +1026,14 @@ const selectSmbShare = (share) => {
 };
 
 const mountPayload = () => {
-  // The only editable setting on a saved crypt mount has its own update contract.
-  if (cryptLocked.value) return { id: mountData.value.id, copyConcurrency: mountData.value.copyConcurrency };
+  const policy = { copyConcurrency: mountData.value.copyConcurrency, cacheDays: mountData.value.cacheDays };
+  if (cryptLocked.value) return { id: mountData.value.id, ...policy };
   return {
     ...(mountEditFlag.value ? { id: mountData.value.id } : {}),
     engineId: mountData.value.engineId,
     name: mountData.value.name.trim(),
     driverType: mountData.value.driverType,
-    copyConcurrency: mountData.value.copyConcurrency,
+    ...policy,
     config: pickDriverConfig(mountData.value.driverType, mountData.value.config),
   };
 };
@@ -1297,6 +1300,15 @@ onBeforeUnmount(() => {
 
           <el-form-item prop="copyConcurrency" :label="$t('engine.copyConcurrency')">
             <el-input-number v-model="mountData.copyConcurrency" :min="1" :max="100" :precision="0" :value-on-clear="5" :controls="false" />
+          </el-form-item>
+          <el-form-item prop="cacheDays" :label="$t('engine.cacheDays')">
+            <template #label>
+              {{ $t('engine.cacheDays') }}
+              <el-tooltip :content="$t('engine.cacheDaysHint')" placement="top">
+                <el-button link :icon="QuestionFilled" :aria-label="$t('engine.cacheDaysHint')" />
+              </el-tooltip>
+            </template>
+            <el-input-number v-model="mountData.cacheDays" :min="-1" :max="2147483647" :precision="0" :value-on-clear="30" :controls="false" :aria-label="$t('engine.cacheDays')" />
           </el-form-item>
 
           <template v-if="mountData.driverType === 'crypt'">

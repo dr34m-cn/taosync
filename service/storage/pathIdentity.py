@@ -174,6 +174,58 @@ def _aliyun_paths_overlap(first_config, first_relative, second_config, second_re
     return _path_overlaps(first_path, second_path)
 
 
+def alias_path(source, path, other):
+    """Map a mutation to another mount; '/' means its root may be affected."""
+    kind = source['driverType']
+    if kind != other['driverType']:
+        return None
+    a, b = source['config'], other['config']
+    if source.get('id') is not None and source.get('id') == other.get('id'):
+        return path
+    if kind == 'aliyun':
+        if not _aliyun_same_backend(a, b):
+            return None
+        return path if (a.get('root_folder_id') or 'root') == (b.get('root_folder_id') or 'root') else '/'
+    if kind == 'local':
+        p, base = _local_path(a, path), _local_path(b, '/')
+        if p is None or base is None:
+            return None
+        try:
+            common = os.path.commonpath([p, base])
+        except ValueError:
+            return None
+        if common == p:
+            return '/'
+        if common != base:
+            return None
+        rel = os.path.relpath(p, base).split(os.sep)
+        parts = normalize_path(path).strip('/').split('/') if path != '/' else []
+        count = min(len(parts), len(rel))
+        if count:
+            rel[-count:] = parts[-count:]
+        return '/' + '/'.join(rel)
+    if kind not in ('smb', 'sftp', 'ftp'):
+        return None
+    descriptor = _smb_descriptor if kind == 'smb' else lambda cfg, rel: _remote_descriptor(kind, cfg, rel)
+    left, right = descriptor(a, path), descriptor(b, '/')
+    if not left or not right or left[0] != right[0]:
+        return None
+    p, base = (x[1].replace('\\', '/').rstrip('/') for x in (left, right))
+    if p == base or base.startswith(p + '/'):
+        return '/'
+    if p.startswith(base + '/'):
+        # Preserve display case when the roots coincide (SMB descriptors are folded).
+        if descriptor(a, '/') == right:
+            return path
+        parts = p[len(base) + 1:].split('/')
+        display = path.strip('/').split('/') if path != '/' else []
+        count = min(len(parts), len(display))
+        if count:
+            parts[-count:] = display[-count:]
+        return '/' + '/'.join(parts)
+    return None
+
+
 def mount_paths_overlap(mounts, first_path, second_path):
     """Return whether two TaoSync paths may address overlapping backend data."""
     lookup = _mount_lookup(mounts)

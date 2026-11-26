@@ -92,6 +92,7 @@ class SqlInitializationTests(unittest.TestCase):
             self._initialize(database)
             with closing(sqlite3.connect(database)) as connection:
                 self.assertEqual(connection.execute('select copyConcurrency from storage_mount').fetchone()[0], 5)
+                self.assertEqual(connection.execute('select cacheDays from storage_mount').fetchone()[0], 30)
                 connection.execute('update storage_mount set copyConcurrency=8')
                 connection.commit()
             self._initialize(database)
@@ -310,7 +311,7 @@ class TaoSyncClientTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "broken"):
                 client.fileListApi("/broken")
 
-    def test_use_cache_reuses_entries_until_a_write_invalidates_it(self):
+    def test_mkdir_updates_cached_parent_without_relisting(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "root"
             root.mkdir()
@@ -335,8 +336,8 @@ class TaoSyncClientTests(unittest.TestCase):
                 client.fileListApi("/cache", useCache=1)
                 self.assertEqual(listed.call_count, 1)
                 client.mkdir("/cache/new")
-                client.fileListApi("/cache", useCache=1)
-                self.assertEqual(listed.call_count, 2)
+                self.assertEqual(client.fileListApi("/cache", useCache=1), {'new/': {}})
+                self.assertEqual(listed.call_count, 1)
 
     def test_exclude_paths_are_relative_to_the_engine_root(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -1,6 +1,7 @@
 import re
 
 from common.LNG import get_context_lang
+from common.directoryCache import storedListings
 from common.locales import t
 from service.storage.drivers.base import child_path, normalize_path
 from mapper import storageMapper
@@ -26,6 +27,12 @@ def _cleanName(name):
     if not name or name in (".", "..") or not MOUNT_NAME_PATTERN.match(name):
         raise ValueError("invalid storage directory name")
     return name
+
+
+def _cacheDays(value):
+    if type(value) is not int or not -1 <= value <= 2147483647:
+        raise ValueError(t('directory_cache_days_invalid', get_context_lang()))
+    return value
 
 
 def _sanitized(row):
@@ -414,6 +421,7 @@ def browseAliyun(data, create=False):
             folder = driver.create_folder(parentId, name)
             if folder.get('exist'):
                 raise FileExistsError(t('directory_name_exists', get_context_lang()))
+            storedListings.cloudMkdir(driver.cache_scope(), parentId, name)
             result = {'directory': {'id': folder['file_id'], 'name': name}}
         else:
             result = {'directories': [
@@ -488,6 +496,9 @@ def remoteFolder(data, create=False):
                 raise FileExistsError(t('directory_name_exists', get_context_lang()))
             path = child_path(parent, name)
             driver.mkdir(path)
+            from service.engine import engineService
+            engineService.getClientById(data['engineId'])._listingChange(
+                {'driverType': kind, 'config': config}, path, 'directory')
             return {'directory': {'name': name, 'path': path}}
         return {'directories': [{'name': entry['name'], 'path': child_path(parent, entry['name'])}
                                 for entry in entries if entry['is_dir']]}
@@ -525,6 +536,7 @@ def addMount(data):
         "config": config if target else _normalizeDriverConfig(driverType, config),
         "enabled": 1,
         "copyConcurrency": validateCopyConcurrency(data.get("copyConcurrency", 5)),
+        "cacheDays": _cacheDays(data.get('cacheDays', 30)),
     }
     mountId = storageMapper.addMount(mount, target=target) if target else storageMapper.addMount(mount)
     _invalidateEngine(engineId)
@@ -538,6 +550,13 @@ def updateMount(data):
     old = storageMapper.getMountById(mountId)
     _requireTaoSync(old["engineId"])
     concurrency = validateCopyConcurrency(data.get("copyConcurrency", old.get("copyConcurrency", 5)))
+    days = _cacheDays(data.get('cacheDays', old.get('cacheDays', 30)))
+    if 'cacheDays' in data and set(data) - {'__user', '__lang'} <= {'id', 'cacheDays', 'copyConcurrency'}:
+        updateMountCopyConcurrency(mountId, concurrency,
+                                   persist=lambda: storageMapper.updateCachePolicy(mountId, concurrency, days))
+        from service.engine import engineService
+        engineService.invalidateClient(old['engineId'])
+        return
     if set(data) - {"__user", "__lang"} <= {"id", "copyConcurrency"}:
         updateMountCopyConcurrency(
             mountId, concurrency,
@@ -606,11 +625,21 @@ def updateMount(data):
         (config.get(key) or "") != (old["config"].get(key) or "")
         for key in ("drive_id", "access_token", "refresh_proof")
     )
+    if days != old.get('cacheDays', 30) and config == old['config'] and enabled == old.get('enabled', 1):
+        updateMountCopyConcurrency(mountId, concurrency,
+                                   persist=lambda: storageMapper.updateCachePolicy(mountId, concurrency, days))
+        from service.engine import engineService
+        engineService.invalidateClient(old['engineId'])
+        return
     mount = {
         "id": mountId,
         "expectedVersion": expectedVersion,
         "expectedConcurrency": old.get("copyConcurrency", 5),
         "changesBackingLocation": movesBacking,
+        "cacheDays": days,
+        "resetCache": (days == 0 or old.get('cacheDays', 30) == 0 or old['config'] != config
+                       or enabled != old.get('enabled', 1)),
+        "resetDependents": old['config'] != config,
         "name": name,
         "driverType": driverType,
         "config": config,

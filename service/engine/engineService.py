@@ -4,6 +4,7 @@ from mapper.alistMapper import getEngineById
 from mapper import storageMapper
 from service.alist.alistClient import AlistClient
 from service.engine.taosyncClient import TaoSyncClient
+from common.directoryCache import storedListings
 
 
 clientList = {}
@@ -101,7 +102,7 @@ def getClientById(engineId):
                 return client
         engine = getEngineById(engineId)
         if engine.get("engineType") == "taosync":
-            client = TaoSyncClient(engineId)
+            client = TaoSyncClient(engineId, listingCache=storedListings)
         else:
             client = AlistClient(engine["url"], engine["token"], engineId)
         with clientLock:

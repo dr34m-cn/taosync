@@ -45,7 +45,7 @@ def init_sql(conn):
                     "database has storage data but no administrator user; refusing destructive recovery"
                 )
             for table in ('job_dispatch', 'job_link_target', 'job_link', 'job_source_snapshot', 'job_source_snapshot_meta',
-                          'storage_mount', 'notify', 'job_task_item', 'job_task',
+                          'storage_directory_cache', 'storage_mount', 'notify', 'job_task_item', 'job_task',
                           'job', 'alist_list', 'api_key', 'execution_api_key', 'user_list'):
                 cursor.execute("drop table if exists " + table)
             userTableExists = False
@@ -314,8 +314,16 @@ def init_sql(conn):
                    "enabled integer DEFAULT 1, configVersion integer DEFAULT 1, authVersion integer DEFAULT 1,"
                    "createTime integer DEFAULT (strftime('%s', 'now')),"
                    "unique (engineId, name))")
+    from common.directoryCache import SCHEMA as directoryCacheSchema
+    cursor.execute(directoryCacheSchema)
+    cursor.execute('create index if not exists idx_cache_cloud_parent on storage_directory_cache(cloud,folderId) '
+                   'where cloud is not null')
     cursor.execute("pragma table_info(storage_mount)")
     mountColumns = {row[1] for row in cursor.fetchall()}
+    if 'cacheDays' not in mountColumns:
+        cursor.execute('alter table storage_mount add column cacheDays integer not null default 30')
+    if 'cacheEpoch' not in mountColumns:
+        cursor.execute('alter table storage_mount add column cacheEpoch integer not null default 1')
     if 'configVersion' not in mountColumns:
         cursor.execute("alter table storage_mount add column configVersion integer DEFAULT 1")
     if 'authVersion' not in mountColumns:

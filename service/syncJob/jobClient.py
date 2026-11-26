@@ -18,10 +18,12 @@ from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from common.config import getConfig
+from common.directoryCache import source_listing
 from common.LNG import G
 from common.fileRetryReason import FileRetryError
 from common.fileFingerprint import contentHashes, contentHashesDiffer
 from service.storage.localAccess import LocalPathError
+from service.storage.drivers.scanState import scanning_child
 from mapper import jobMapper
 from service.engine import engineService
 from service.syncJob import taskService
@@ -1205,7 +1207,7 @@ class JobTask:
             errMsg = failure_reason(e)
         self.delHook(path, fileName, None if isPath else size, status, errMsg, isPath, createTime)
 
-    def listDir(self, path, firstDst, spec, rootPath, isSrc=True, recordError=True, detailsOut=None):
+    def listDir(self, path, firstDst, spec, rootPath, isSrc=True, recordError=True, detailsOut=None, *, fresh=False):
         """
         列出目录
         self.job['useCacheT']: 扫描目标目录时，是否使用缓存，0-不使用，1-使用
@@ -1220,7 +1222,16 @@ class JobTask:
         :return:
         """
         useCache = 1 if isSrc and not firstDst else self.job[f"useCache{'S' if isSrc else 'T'}"]
+        if isinstance(self.alistClient, engineService.TaoSyncClient) and (
+            fresh or (self.job.get('sourceMode') and getattr(self, 'fullCompare', False))
+            or (isSrc and self.job['method'] == 1)
+        ):
+            # Do not plan deletions from a stale source or certify a cached periodic comparison.
+            useCache = 0
+        sourceToken = source_listing.set(isSrc)
         scanInterval = self.job[f"scanInterval{'S' if isSrc else 'T'}"]
+        # Mirror scans can authorize target deletions; a moved ID may still be readable.
+        token = scanning_child.set(path != rootPath and self.job['method'] != 1)
         try:
             entries, details = self.readDirectory(
                 path, useCache, scanInterval, spec, rootPath
@@ -1245,6 +1256,9 @@ class JobTask:
             self.copyHook(path if isSrc else None, None if isSrc else path, None, None, status=7, errMsg=errMsg,
                           isPath=1)
             raise e
+        finally:
+            scanning_child.reset(token)
+            source_listing.reset(sourceToken)
 
     def readDirectory(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):
         detailApi = getattr(self.alistClient, 'fileListDetailApi', None)
@@ -1308,7 +1322,7 @@ class JobTask:
         if self.breakFlag:
             return
         try:
-            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False)
+            dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, fresh=True)
         except Exception:
             return
         for key, size in dstFiles.items():
@@ -1358,6 +1372,14 @@ class JobTask:
             if dstFiles is None:
                 return
         if self.job['method'] == 1:
+            if (isinstance(self.alistClient, engineService.TaoSyncClient) and self.job.get('useCacheT')
+                    and dstFiles.keys() - srcFiles.keys()):
+                try:
+                    targetDetails.clear()
+                    dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False,
+                                            detailsOut=targetDetails, fresh=True)
+                except Exception:
+                    return
             if srcPath == srcRootPath and not srcFiles and dstFiles:
                 # 源根目录为空而目标仍有内容：常见于硬盘/NAS 掉线后只剩空挂载点，拒绝清空目标
                 self.protectEmptySource(srcPath, dstPath)

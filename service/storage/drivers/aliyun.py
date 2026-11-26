@@ -23,13 +23,16 @@ from urllib3.connectionpool import HTTPSConnectionPool
 from urllib3.util import connection as urllib3_connection
 
 from common.fileFingerprint import fileFingerprint
+from common.directoryCache import cloud_listing
 
 from .base import RAPID_UPLOAD, StorageDriver, TransferCancelled, check_cancel, child_path, normalize_path
+from .scanState import scanning_child
 from ..backupCipher import BackupNamespaceError
 
 
 _GLOBAL_RATE_LOCK = threading.Lock()
 _GLOBAL_RATE_STATES = {}
+_MISSING_PARENT_CODES = {'InvalidParentFileId', 'NotFound.File', 'NotFound.ParentFile', 'FileIdNotFound'}
 
 
 class AliyunAPIError(RuntimeError):
@@ -585,15 +588,32 @@ class AliyunDriveDriver(StorageDriver):
         path = normalize_path(path)
         state = self.scan_state.get()
         revision = state.revision if state is not None else None
-        parent = self._resolve(path)
-        if parent.get("type") != "folder":
-            raise NotADirectoryError(path)
-        entries = self._list_id(parent["file_id"])
+        hint = state.take_child_folder(path) if state is not None and scanning_child.get() else None
+        if hint is not None:
+            parent = hint
+            try:
+                entries = self._list_id(parent['file_id'])
+            except AliyunAPIError as exc:
+                if exc.code not in _MISSING_PARENT_CODES:
+                    raise
+                revision = state.invalidate(posixpath.dirname(path) or '/')
+                hint = None
+        if hint is None:
+            parent = self._resolve(path)
+            if parent.get("type") != "folder":
+                raise NotADirectoryError(path)
+            entries = self._list_id(parent["file_id"])
         if state is not None:
-            state.record(path, parent, entries, revision)
+            state.record(path, parent, entries, revision, path_resolved=hint is None)
+        collector = cloud_listing.get()
+        if collector is not None:
+            collector['identity'] = (self.cache_scope(), parent['file_id'])
         result = [self._entry(item, details) for item in entries]
         result.sort(key=lambda x: (not x["is_dir"], x["name"].casefold()))
         return result
+
+    def cache_scope(self):
+        return json.dumps([self.api_url, self.drive_id])
 
     @staticmethod
     def _entry(item, details):
@@ -938,10 +958,8 @@ class AliyunDriveDriver(StorageDriver):
                 if isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in {'AlreadyExist', 'AlreadyExist.File'}:
                     raise BackupNamespaceError('crypt_name_conflict') from exc
                 raise
-            recoverable = isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in {
-                'AlreadyExist', 'AlreadyExist.File', 'InvalidParentFileId',
-                'NotFound.File', 'NotFound.ParentFile', 'FileIdNotFound',
-            }
+            recoverable = (isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in
+                           _MISSING_PARENT_CODES | {'AlreadyExist', 'AlreadyExist.File'})
             # At or below the threshold create has not read the source at all.
             # Re-resolve once; never replay a consumed large-file stream.
             if known is None or not recoverable or size > self.RAPID_UPLOAD_THRESHOLD:
@@ -1179,7 +1197,7 @@ class AliyunDriveDriver(StorageDriver):
             if any(item.get("file_id") == source["file_id"] for item in matches):
                 if progress:
                     progress(1.0)
-                return
+                return self._entry(source, False)
             check_cancel(cancel)
             if (source.get("parent_file_id") == parent["file_id"]
                     or (self is destination and posixpath.dirname(source_path) == parent_path)):
@@ -1197,6 +1215,7 @@ class AliyunDriveDriver(StorageDriver):
             # not delete the moved object or report it as cancelled.
             if progress:
                 progress(1.0)
+            return self._entry(source, False)
 
     def rename(self, path, name, cancel=None):
         path = normalize_path(path, allow_root=False)

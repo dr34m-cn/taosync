@@ -52,6 +52,8 @@ class ScannedUploadTests(unittest.TestCase):
     def request(self, endpoint, data):
         with self.api_lock:
             if endpoint.endswith('/list'):
+                if data['parent_file_id'] not in self.entries:
+                    raise AliyunAPIError('directory removed', 'NotFound.ParentFile')
                 return {'items': list(self.entries[data['parent_file_id']])}
             if endpoint.endswith('/search'):
                 parent, name = data['query'].split("'")[1::2]
@@ -99,6 +101,109 @@ class ScannedUploadTests(unittest.TestCase):
 
     def endpoints(self):
         return [call.args[0].rsplit('/', 1)[-1] for call in self.driver._request.call_args_list]
+
+    def scan_task(self, method=0):
+        vm = Mock(job={'alistId': 1, 'method': method, 'useCacheS': 0, 'scanIntervalS': 0})
+        with patch('service.syncJob.jobClient.engineService.getClientById', return_value=self.base), \
+                patch('service.syncJob.jobClient.taskTimeoutSeconds', return_value=0):
+            return JobTask(1, vm)
+
+    def listed_ids(self):
+        return [call.args[1]['parent_file_id'] for call in self.driver._request.call_args_list]
+
+    def test_recursive_scan_lists_each_folder_once_and_keeps_verification_fresh(self):
+        self.entries['parent'] = [dict(name='deep', type='folder', file_id='child')]
+        self.entries['child'] = [dict(name='a', type='file', file_id='file', size=3)]
+        task = self.scan_task()
+        self.assertTrue(task.scanSourceTree('/D/', None, '/D/'))
+        self.assertEqual(self.listed_ids(), ['root', 'parent', 'child'])
+        self.assertEqual(task.sourceSnapshot['folder/deep/a']['size'], 3)
+
+        task.listDir('/D/', True, None, '/D/')  # Offer a new, unconsumed hint for verification.
+        self.entries['root'] = [dict(self.folder, file_id='replacement')]
+        self.entries['replacement'] = []  # The old ID still exists elsewhere.
+        self.driver._request.reset_mock()
+        self.assertEqual(task.readDirectory('/D/folder/')[0], {})
+        self.assertEqual(self.listed_ids(), ['root', 'replacement'])
+
+    def test_paginated_parent_supplies_child_id_from_its_last_page(self):
+        def request(endpoint, data):
+            if data['parent_file_id'] == 'root' and not data['marker']:
+                return {'items': [dict(name='a', type='file', file_id='file')], 'next_marker': 'page2'}
+            return self.request(endpoint, data)
+
+        self.driver._request.side_effect = request
+        task = self.scan_task()
+        self.assertTrue(task.scanSourceTree('/D/', None, '/D/'))
+        self.assertEqual(self.listed_ids(), ['root', 'root', 'parent'])
+
+    def test_stale_scan_id_re_resolves_path_once_and_records_replacement(self):
+        task = self.scan_task()
+        task.listDir('/D/', True, None, '/D/')
+        self.entries['root'] = [dict(self.folder, file_id='replacement')]
+        self.entries['replacement'] = [dict(name='new', type='file', file_id='new', size=1)]
+        del self.entries['parent']
+        self.driver._request.reset_mock()
+        self.assertEqual(task.listDir('/D/folder/', True, None, '/D/'), {'new': 1})
+        self.assertEqual(self.listed_ids(), ['parent', 'root', 'replacement'])
+        self.assertEqual(task.alistClient.scan_states[2].get('/folder')[0]['file_id'], 'replacement')
+
+    def test_scan_id_does_not_retry_rate_limit_as_missing_directory(self):
+        task = self.scan_task()
+        task.listDir('/D/', True, None, '/D/')
+        self.driver._request.reset_mock()
+        self.driver._request.side_effect = AliyunAPIError('rate limited', 'TooManyRequests')
+        with self.assertRaisesRegex(AliyunAPIError, 'rate limited'):
+            task.listDir('/D/folder/', True, None, '/D/', recordError=False)
+        self.assertEqual(self.listed_ids(), ['parent'])
+
+    def test_mirror_planning_observes_replacement_even_if_the_old_id_is_readable(self):
+        task = self.scan_task(method=1)
+        task.listDir('/D/', True, None, '/D/')
+        self.entries['root'] = [dict(self.folder, file_id='replacement')]
+        self.entries['replacement'] = [dict(name='keep', type='file', file_id='keep', size=1)]
+        self.driver._request.reset_mock()
+        self.assertEqual(task.listDir('/D/folder/', True, None, '/D/'), {'keep': 1})
+        self.assertEqual(self.listed_ids(), ['root', 'replacement'])
+
+    def test_scan_hint_cannot_direct_an_upload_into_a_moved_folder(self):
+        task = self.scan_task()
+        task.listDir('/D/', True, None, '/D/')
+        self.entries['root'] = [dict(self.folder, name='moved'), dict(self.folder, file_id='replacement')]
+        self.entries['replacement'] = []
+        task.listDir('/D/folder/', True, None, '/D/')
+        self.client = task.alistClient
+        self.upload()
+        self.assertEqual(self.entries['parent'], [])
+        self.assertEqual([item['name'] for item in self.entries['replacement']], ['a'])
+
+    def test_missing_scan_folder_is_not_recorded_as_empty(self):
+        task = self.scan_task()
+        task.listDir('/D/', True, None, '/D/')
+        self.entries['root'] = []
+        del self.entries['parent']
+        with self.assertRaises(FileNotFoundError):
+            task.listDir('/D/folder/', True, None, '/D/', recordError=False)
+        self.assertTrue(task.sourceScanFailed)
+        self.assertIsNone(task.alistClient.scan_states[2].get('/folder'))
+
+    def test_ambiguous_invalidated_and_other_run_ids_are_not_used(self):
+        for case in ('ambiguous', 'invalidated', 'new_run'):
+            with self.subTest(case=case):
+                self.entries['root'] = [self.folder]
+                if case == 'ambiguous':
+                    self.entries['root'].append(dict(self.folder, file_id='older'))
+                task = self.scan_task()
+                task.listDir('/D/', True, None, '/D/')
+                if case == 'invalidated':
+                    task.alistClient.scan_states[2].invalidate('/folder')
+                elif case == 'new_run':
+                    task = self.scan_task()
+                self.entries['root'] = [dict(self.folder, file_id='replacement')]
+                self.entries['replacement'] = []
+                self.driver._request.reset_mock()
+                task.listDir('/D/folder/', True, None, '/D/')
+                self.assertEqual(self.listed_ids(), ['root', 'replacement'])
 
     def test_scan_reaches_copy_thread_and_new_files_need_only_create_complete(self):
         self.scan()
@@ -157,7 +262,7 @@ class ScannedUploadTests(unittest.TestCase):
         self.scan()
         other = self.base.forSync()
         self.assertIsNone(other.scan_states[2].get('/folder'))
-        self.assertEqual(other.entry_cache, {})
+        self.assertIs(other.listings, self.base.listings)
 
     def test_job_queue_uses_the_same_scoped_client_as_scanning(self):
         vm = Mock(job={'alistId': 1, 'method': 0})
@@ -171,11 +276,13 @@ class ScannedUploadTests(unittest.TestCase):
         self.assertIs(task.waiting[0].alistClient, task.alistClient)
         self.assertIsNotNone(task.waiting[0].alistClient.scan_states[2].get('/folder'))
 
-    def test_successful_copy_invalidates_shared_browser_cache(self):
+    def test_successful_copy_patches_shared_listing_without_exposing_cloud_ids(self):
         self.base.fileListApi('/D/folder')
         self.scan()
         self.upload()
-        self.assertNotIn((2, '/folder'), self.base.entry_cache)
+        self.driver._request.reset_mock()
+        self.assertEqual(self.base.fileListApi('/D/folder', useCache=1), {'a': 3})
+        self.driver._request.assert_not_called()
 
     def test_new_directory_immediately_supports_query_free_upload(self):
         self.client.fileListApi('/D')

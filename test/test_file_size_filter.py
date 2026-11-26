@@ -138,6 +138,7 @@ class FileSizeFilterSyncTest(unittest.TestCase):
     @staticmethod
     def _task(method=1, min_size=100, max_size=200):
         task = JobTask.__new__(JobTask)
+        task.alistClient = mock.Mock()
         task.job = {
             'method': method,
             'minFileSize': min_size,

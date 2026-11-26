@@ -115,6 +115,7 @@ notify_test_msg: 这是一条由您自己发送的 TaoSync 测试消息，当你
 invalid_username: "用户名不能为空，最多64个字符，不能包含控制字符"
 
 invalid_directory_name: "请输入有效的目录名"
+directory_cache_days_invalid: "缓存保留天数必须是 -1 到 2147483647 之间的整数。"
 root_directory_creation_forbidden: "不能在根目录下新建目录"
 directory_name_exists: "该位置已存在同名文件或目录"
 update_method: 不支持的请求方式

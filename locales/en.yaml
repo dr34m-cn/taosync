@@ -115,6 +115,7 @@ notify_test_msg: This is a TaoSync test message sent by yourself. When you see t
 invalid_username: "Username must contain 1 to 64 characters without control characters"
 
 invalid_directory_name: "Enter a valid folder name"
+directory_cache_days_invalid: "Cache retention must be an integer from -1 to 2147483647 days."
 root_directory_creation_forbidden: "Cannot create a folder in the root directory"
 directory_name_exists: "A file or folder with this name already exists"
 update_method: Unsupported request method
