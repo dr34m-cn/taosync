@@ -13,6 +13,7 @@
     main{max-width:1120px;margin:auto;padding:24px 20px 16px} header,nav,.heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     header{border-top:4px solid var(--accent);padding:16px 0;border-bottom:1px solid var(--line)} header strong{font:700 22px/1.2 Georgia,serif}
     h1{font-size:26px;line-height:1.25;margin:0}.heading{padding:28px 0 16px} p{margin:0;color:var(--muted)}
+    .sync-stats{padding:20px 0 16px;border-bottom:1px solid var(--line)}.sync-stats strong{display:block;font-size:18px;font-variant-numeric:tabular-nums}.sync-stats small{color:var(--muted)}
     table{border-collapse:collapse;width:100%;table-layout:fixed;text-align:start} col:nth-child(1){width:21%} col:nth-child(2){width:22%}
     th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:start;overflow-wrap:anywhere} th{background:var(--band);font-size:14px}
     td{font:14px/1.55 ui-monospace,Consolas,monospace} nav{justify-content:flex-end;margin:16px 0}
@@ -25,6 +26,7 @@
 </head>
 <body><main>
   <header><strong><img src="./logo.ico" width="28" height="28" alt="">TaoSync</strong><button id="language" type="button">English</button></header>
+  <section class="sync-stats"><strong id="stats"></strong><small id="stats-note"></small></section>
   <div class="heading"><h1 id="title">构建授信列表</h1><a href="./auth.json">auth.json</a></div>
   <div class="filters">
     <label><span id="versions">版本范围</span><select id="scope"><option value="stable" id="stable" selected>仅正式版</option><option value="all" id="all">展示全部版本</option></select></label>
@@ -41,9 +43,39 @@
   const byId = id => document.getElementById(id);
   Object.assign(strings['zh-CN'], {versions:'版本范围',stable:'仅正式版',all:'展示全部版本',architecture:'架构',any:'全部架构',published:'发布时间',noMatch:'没有符合筛选条件的记录',unknown:'未知'});
   Object.assign(strings.en, {versions:'Versions',stable:'Official releases only',all:'Show all versions',architecture:'Architecture',any:'All architectures',published:'Published',noMatch:'No builds match these filters',unknown:'Unknown'});
+  let totals = null, statsFailed = false;
+  function renderStats(){
+    const zh = lang === 'zh-CN';
+    byId('stats-note').textContent = zh ? '仅包含使用v0.5.2及之后版本TaoSync、且在系统设置中开启统计信息的统计。'
+      : 'Includes only TaoSync v0.5.2 and later with statistics enabled in system settings.';
+    if (!totals) {
+      byId('stats').textContent = statsFailed ? (zh ? '累计统计暂不可用' : 'Sync totals temporarily unavailable')
+        : (zh ? '正在读取累计统计…' : 'Loading sync totals…');
+      return;
+    }
+    const files = totals.files.toLocaleString(lang);
+    const units = ['B','KB','MB','GB','TB','PB','EB','ZB','YB'];
+    let unit = 0, scale = 1n;
+    while (unit < units.length - 1 && totals.bytes >= scale * 1000n) { scale *= 1000n; unit++; }
+    const hundredths = totals.bytes * 100n / scale;
+    const volume = (hundredths / 100n).toLocaleString(lang) + '.' + String(hundredths % 100n).padStart(2, '0') + units[unit];
+    byId('stats').textContent = zh ? `TaoSync累计为用户同步超过${files}个文件，总体积超过${volume}`
+      : `TaoSync has synced over ${files} files for users, totaling over ${volume}.`;
+  }
+  async function refreshStats(){
+    try {
+      const endpoint = location.hostname.endsWith('.github.io') ? 'https://taoapi.dr34m.cn/v1/stats' : '/v1/stats';
+      const res = await fetch(endpoint, {cache:'no-store', credentials:'omit', referrerPolicy:'no-referrer', signal:AbortSignal.timeout(8000)});
+      if (!res.ok) throw Error();
+      const data = await res.json();
+      totals = {files:BigInt(data.files), bytes:BigInt(data.bytes)};
+    } catch {statsFailed = true}
+    renderStats();
+  }
   const size = 20;
   let lang = navigator.language.startsWith('zh') ? 'zh-CN' : 'en', entries = [], page = 1, state = 'loading';
   function render(){
+    renderStats();
     const s = strings[lang], target = byId('target').value;
     const filtered = entries.filter(e => (!target || target === e.arch) &&
       (byId('scope').value === 'all' || !/build|dev|test/i.test(e.version)));
@@ -63,6 +95,8 @@
   byId('language').onclick = () => {lang = lang === 'en' ? 'zh-CN' : 'en'; render()};
   byId('scope').onchange = byId('target').onchange = () => {page = 1; render()};
   render();
+  refreshStats();
+  setInterval(refreshStats, 10000);
   (async () => {
     try {
       const res = await fetch('./auth.json',{cache:'no-store'});
