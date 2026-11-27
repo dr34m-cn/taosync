@@ -5,6 +5,7 @@ import posixpath
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from contextvars import ContextVar
 
 from common import sqlBase
@@ -18,14 +19,52 @@ SCHEMA = ('create table if not exists storage_directory_cache('
           'primary key(mountId,path)) without rowid')
 
 
+def _norm(path):
+    return path.rstrip('/') or '/'
+
+
 class DirectoryCache:
     def __init__(self, persistent=False):
         self.lock = threading.RLock()
         self.revision = 0
+        self._active = []
         self.persistent = persistent
         if not persistent:
             self.db = sqlite3.connect(':memory:', check_same_thread=False)
             self.db.execute(SCHEMA)
+
+    @contextmanager
+    def scan(self, mount, path):
+        token = [mount['id'], _norm(path), False]
+        with self.lock:
+            self._active.append(token)
+        try:
+            yield token
+        finally:
+            with self.lock:
+                try:
+                    self._active.remove(token)
+                except ValueError:
+                    pass
+
+    def _invalidate_active(self, mid, path, kind):
+        if path == '/':
+            for token in self._active:
+                if token[0] == mid:
+                    token[2] = True
+            return
+        parent, _ = posixpath.split(path)
+        prefix = path + '/'
+        for token in self._active:
+            if token[0] != mid:
+                continue
+            active_path = token[1]
+            if active_path == parent:
+                token[2] = True
+            elif kind != 'directory' and (active_path == path or active_path.startswith(prefix)):
+                token[2] = True
+            elif kind != 'delete' and parent.startswith(active_path.rstrip('/') + '/'):
+                token[2] = True
 
     def _run(self, mount, action):
         def transact(conn):
@@ -43,6 +82,7 @@ class DirectoryCache:
             return sqlBase.connect_sql(transact)() if self.persistent else transact(self.db)
 
     def read(self, mount, path, strict=False, source=False):
+        path = _norm(path)
         def action(conn, days):
             row = conn.execute('select scanned,strict,sourceReady,entries from storage_directory_cache '
                                'where mountId=? and path=?', (mount['id'], path)).fetchone()
@@ -56,8 +96,10 @@ class DirectoryCache:
         return self._run(mount, action)
 
     def record(self, mount, path, entries, strict, revision, identity=None):
+        path = _norm(path)
         def action(conn, days):
-            if self.revision == revision:
+            fresh = self.revision == revision if isinstance(revision, int) else not revision[2]
+            if fresh:
                 conn.execute('insert or replace into storage_directory_cache values(?,?,?,?,?,?,?,?)',
                              (mount['id'], path, time.time(), strict, 1, json.dumps(entries, ensure_ascii=False),
                               *(identity or (None, None))))
@@ -65,6 +107,7 @@ class DirectoryCache:
 
     def cloudAliasPath(self, source, path, other):
         """Map different roots on a known shared drive using previously listed folders, without I/O to the drive."""
+        path = _norm(path)
         def locate(conn):
             def path_of(mount, folder):
                 row = conn.execute('select path from storage_directory_cache where mountId=? and folderId=? limit 1',
@@ -82,7 +125,7 @@ class DirectoryCache:
                 return relative(root, path)
             root = path_of(other, source['config'].get('root_folder_id') or 'root')
             if root is not None:
-                return posixpath.join(root, path.lstrip('/'))
+                return posixpath.join(root, path.lstrip('/')).rstrip('/') or '/'
             # Two independently listed subtrees can intersect even if their roots were never scanned.
             at = path
             while at != '/':
@@ -98,22 +141,54 @@ class DirectoryCache:
 
     def cloudMkdir(self, cloud, folderId, name):
         # Match actual listed parent IDs across aliases. Draft picker paths are not authoritative.
-        @sqlBase.connect_sql
-        def patch(conn):
+        def find_affected(conn):
+            if not self.persistent:
+                rows = conn.execute('select mountId,path,1 from storage_directory_cache '
+                                    'where cloud=? and folderId=?', (cloud, folderId)).fetchall()
+                return rows, []
             rows = conn.execute('select c.mountId,c.path,m.cacheEpoch from storage_directory_cache c '
                                 'join storage_mount m on c.mountId=m.id where c.cloud=? and c.folderId=?',
                                 (cloud, folderId)).fetchall()
-            for mid, path, epoch in rows:
-                self.change({'id': mid, 'cacheEpoch': epoch}, posixpath.join(path, name), 'directory')
+            crypt_rows = []
+            if rows:
+                mount_ids = sorted({mid for mid, _, _ in rows})
+                placeholders = ','.join('?' for _ in mount_ids)
+                crypt_rows = conn.execute(
+                    f"select id,cacheEpoch,config from storage_mount where driverType='crypt' "
+                    f"and json_extract(config,'$.target_mount_id') in ({placeholders})",
+                    mount_ids,
+                ).fetchall()
+            return rows, crypt_rows
+
         with self.lock:
             self.revision += 1
-            patch()
+            for token in self._active:
+                token[2] = True
+            rows, crypt_rows = sqlBase.connect_sql(find_affected)() if self.persistent else find_affected(self.db)
+            created_by_mount = {}
+            for mid, path, epoch in rows:
+                created = _norm(posixpath.join(path, name))
+                created_by_mount.setdefault(mid, []).append(created)
+                self.change({'id': mid, 'cacheEpoch': epoch}, created, 'directory')
+            if crypt_rows:
+                from service.storage.pathIdentity import virtual_paths_overlap
+                for cid, cepoch, raw_cfg in crypt_rows:
+                    try:
+                        cfg = json.loads(raw_cfg or '{}')
+                    except (TypeError, ValueError):
+                        continue
+                    base = cfg.get('target_path', '/')
+                    if any(virtual_paths_overlap(created, base, case_sensitive=False)
+                           for created in created_by_mount.get(cfg.get('target_mount_id'), ())):
+                        self.change({'id': cid, 'cacheEpoch': cepoch}, '/', 'unknown')
 
     def change(self, mount, path, kind, size=None):
         """Patch only an already-listed parent. Never mark a partial listing as complete."""
+        path = _norm(path)
         def action(conn, days):
             mid = mount['id']
             self.revision += 1
+            self._invalidate_active(mid, path, kind)
 
             def forget_subtree(prefix):
                 if prefix == '/':
@@ -129,6 +204,10 @@ class DirectoryCache:
                 if row is None:
                     return
                 entries = json.loads(row[0])
+                if any(item['name'] != name and item['name'].casefold() == name.casefold() for item in entries):
+                    # Case-only collisions behave differently across filesystems; re-list cleanly.
+                    conn.execute('delete from storage_directory_cache where mountId=? and path=?', (mid, parent))
+                    return
                 matches = [item for item in entries if item['name'] == name]
                 if change == 'directory' and len(matches) == 1 and matches[0]['is_dir']:
                     return

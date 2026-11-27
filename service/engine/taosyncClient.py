@@ -367,25 +367,25 @@ class TaoSyncClient:
             if cached is not None:
                 return cached
         self.checkWait(normalized, scanInterval)
-        revision = self.listings.revision
         cloud = {}
         identity_token = cloud_listing.set(cloud)
-        try:
-            with self._scanScope(mount):
-                token = sync_listing.set(strict)
-                try:
-                    entries = driver.list(relative, details=True)
-                finally:
-                    sync_listing.reset(token)
-                identity = cloud.get('identity') if mount['driverType'] == 'aliyun' else None
-        except FileNotFoundError:
-            self.listings.change(mount, relative, 'unknown')
-            raise FileNotFoundError("directory not found: " + normalized)
-        finally:
-            cloud_listing.reset(identity_token)
-        # A local browser listing may omit unreadable/unsafe entries; a sync scan must not.
-        browser_safe = mount['driverType'] not in ('local', 'crypt')
-        self.listings.record(mount, relative, entries, strict or browser_safe, revision, identity)
+        with self.listings.scan(mount, relative) as scan_token:
+            try:
+                with self._scanScope(mount):
+                    token = sync_listing.set(strict)
+                    try:
+                        entries = driver.list(relative, details=True)
+                    finally:
+                        sync_listing.reset(token)
+                    identity = cloud.get('identity') if mount['driverType'] == 'aliyun' else None
+            except FileNotFoundError:
+                self.listings.change(mount, relative, 'unknown')
+                raise FileNotFoundError("directory not found: " + normalized)
+            finally:
+                cloud_listing.reset(identity_token)
+            # A local browser listing may omit unreadable/unsafe entries; a sync scan must not.
+            browser_safe = mount['driverType'] not in ('local', 'crypt')
+            self.listings.record(mount, relative, entries, strict or browser_safe, scan_token, identity)
         return entries
 
     def fileListApi(self, path, useCache=0, scanInterval=0, spec=None, rootPath=None):

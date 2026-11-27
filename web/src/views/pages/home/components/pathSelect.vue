@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { FolderAdd } from "@element-plus/icons-vue";
 import { alistCreateDirectory, alistGetPath } from "@/api/job";
 import { useI18n } from "vue-i18n";
@@ -15,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(["submit"]);
 const { t } = useI18n();
 const dialogShow = ref(false);
+const treeKey = ref(0);
 const tree = ref();
 const selected = ref(null);
 const createShow = ref(false);
@@ -23,6 +24,17 @@ const folderName = ref("");
 const parentNode = ref(null);
 const saving = ref(false);
 const nameError = ref("");
+
+watch(
+  () => [props.rootNode?.path, props.rootNode?.label, props.rootNode?.id],
+  () => {
+    if (!dialogShow.value) return;
+    selected.value = null;
+    createShow.value = false;
+    parentNode.value = null;
+    treeKey.value += 1;
+  }
+);
 
 function show() {
   selected.value = null;
@@ -98,11 +110,12 @@ defineExpose({ show });
 
 <template>
   <el-dialog v-model="dialogShow" top="8vh" :close-on-click-modal="false" :title="t('pathSelect.title')" width="min(520px, 94vw)" append-to-body>
-    <el-tree v-if="dialogShow" ref="tree" node-key="path" :load="loadNode" lazy highlight-current
+    <slot name="toolbar" />
+    <el-tree v-if="dialogShow" :key="treeKey" ref="tree" node-key="path" :load="loadNode" lazy highlight-current
       :default-expanded-keys="['/']" @node-click="data => selected = physicalRoot || data.path !== '/' ? data : null">
       <template #default="{ node, data }">
         <span class="directory-row">
-          <span class="directory-label" :title="data.path">{{ data.label }}</span>
+          <span class="directory-label" :title="data.title || data.path">{{ data.label }}</span>
           <el-button v-if="physicalRoot || data.path !== '/'" link type="primary" :icon="FolderAdd" :title="t('pathSelect.newFolder')" :aria-label="t('pathSelect.newFolder')"
             :disabled="node.loading" @click.stop="openCreate(node)" />
         </span>

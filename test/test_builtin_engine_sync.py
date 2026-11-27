@@ -171,6 +171,19 @@ class DirectoryListingPolicyTest(EngineTestBase):
         Path(self.dst, 'external').unlink()
         self.assertNotIn('external', client.fileListApi('/D', 1))
 
+    def test_full_sync_with_cached_target_recovers_externally_removed_target_root(self):
+        sub_dst = Path(self.dst, 'sub')
+        sub_dst.mkdir()
+        write(self.src, 'a.txt', 'hello')
+        job = self._job(method=1, dst='/D/sub/')
+        jobService.getJobClientById(job).job['useCacheT'] = 1
+        self.assertEqual(self._run(job)[0], 2)
+        shutil.rmtree(sub_dst)
+        Path(self.src, 'a.txt').unlink()
+        write(self.src, 'b.txt', 'world')
+        self.assertEqual(self._run(job)[0], 2)
+        self.assertEqual(tree(sub_dst), {'b.txt': b'world'})
+
 
 class JobLinksTest(EngineTestBase):
     def link(self, source, targets, condition='finished', minutes=0):

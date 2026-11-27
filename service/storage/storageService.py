@@ -630,12 +630,6 @@ def updateMount(data):
         (config.get(key) or "") != (old["config"].get(key) or "")
         for key in ("drive_id", "access_token", "refresh_proof")
     )
-    if days != old.get('cacheDays', 30) and config == old['config'] and enabled == old.get('enabled', 1):
-        updateMountCopyConcurrency(mountId, concurrency,
-                                   persist=lambda: storageMapper.updateCachePolicy(mountId, concurrency, days))
-        from service.engine import engineService
-        engineService.invalidateClient(old['engineId'])
-        return
     # Upload preferences do not change the backing storage or the directory contents.
     changedFields = {key for key in old['config'].keys() | config.keys() if old['config'].get(key) != config.get(key)}
     uploadPolicyOnly = (driverType == 'aliyun' and enabled == old.get('enabled', 1) and changedFields
@@ -660,7 +654,7 @@ def updateMount(data):
         ),
     }
     updateMountCopyConcurrency(mountId, concurrency, persist=lambda: storageMapper.updateMount(mount))
-    if uploadPolicyOnly:
+    if not storageChanged and enabled == old.get('enabled', 1):
         from service.engine import engineService
         engineService.invalidateClient(old['engineId'])
     else:

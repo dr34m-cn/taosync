@@ -7,6 +7,7 @@ import io
 import json
 import logging
 import secrets
+import signal
 import threading
 import time
 from dataclasses import dataclass, field
@@ -622,10 +623,20 @@ def main():
         config["server"]["port"],
     )
     totals = app.settings['sync_totals']
-    ticker = tornado.ioloop.PeriodicCallback(totals.checkpoint, 60_000)
+    loop = tornado.ioloop.IOLoop.current()
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, lambda *_args: loop.add_callback_from_signal(loop.stop))
+
+    async def periodic_checkpoint():
+        try:
+            await totals.checkpoint()
+        except Exception:
+            logging.exception("Failed to checkpoint sync totals")
+
+    ticker = tornado.ioloop.PeriodicCallback(periodic_checkpoint, 60_000)
     ticker.start()
     try:
-        tornado.ioloop.IOLoop.current().start()
+        loop.start()
     finally:
         ticker.stop()
         totals.flush()

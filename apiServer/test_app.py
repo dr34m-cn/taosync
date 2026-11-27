@@ -13,7 +13,7 @@ import tornado.testing
 try:
     from .app import AliyunOAuthClient, SessionStore, SyncTotals, make_app
 except ImportError:  # pragma: no cover - unittest discovery may import this as a script module
-    from app import AliyunOAuthClient, SessionStore, make_app
+    from app import AliyunOAuthClient, SessionStore, SyncTotals, make_app
 
 
 class Response:
@@ -167,6 +167,19 @@ class AnonymousStatsTest(tornado.testing.AsyncHTTPTestCase):
                                   body=json.dumps({'files': 1, 'bytes': 2}))
         self.assertEqual(response.code, 500)
         self.assertEqual(totals.snapshot(), (0, 0))
+
+    def test_creates_parent_directory_and_accepts_case_insensitive_content_type(self):
+        nested = Path(self.enterContext(tempfile.TemporaryDirectory())) / 'nested' / 'dir' / 'sync-stats.db'
+        self.assertEqual(SyncTotals(nested).snapshot(), (0, 0))
+        response = self.fetch('/v1/stats', method='POST',
+                              headers={'Content-Type': 'Application/JSON; charset=utf-8'},
+                              body=json.dumps({'files': 2, 'bytes': 10}))
+        self.assertEqual(response.code, 204)
+        self.assertEqual(self._app.settings['sync_totals'].snapshot(), (2, 10))
+        oversized = self.fetch('/v1/stats', method='POST',
+                               headers={'Content-Type': 'application/json'},
+                               body='{"files":1,"bytes":1,"pad":"' + 'x' * 260 + '"}')
+        self.assertEqual(oversized.code, 413)
 
 
 if __name__ == "__main__":

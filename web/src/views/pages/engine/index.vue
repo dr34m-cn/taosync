@@ -39,6 +39,7 @@ import {
 import { useI18n } from "vue-i18n";
 import CloudFiles from "./CloudFiles.vue";
 import PathSelect from '../home/components/pathSelect.vue';
+import { formatRemoteRootLabel, joinRemotePath, normalizeRemoteRoot } from "@/utils/remoteFolderPicker";
 
 const { t } = useI18n();
 const alistList = ref([]);
@@ -82,6 +83,7 @@ const sftpTestRootPath = ref("");
 const sftpDirectoryOptions = ref([]);
 const sftpOriginalCredentialIdentity = ref("");
 const folderPicker = ref();
+const folderBrowseBase = ref("/");
 const aliyunAuthLoading = ref(false);
 const aliyunAuthHandle = ref("");
 const aliyunAuthQrCode = ref("");
@@ -89,6 +91,7 @@ const aliyunAuthorizationUrl = ref("");
 const aliyunAuthStatus = ref("idle");
 const aliyunAuthExpiresIn = ref(0);
 let aliyunBrowseEpoch = 0;
+let folderBrowseEpoch = 0;
 let aliyunApplyingBrowseResult = false;
 let aliyunAuthPollTimer = null;
 let localBrowseRequestId = 0;
@@ -282,14 +285,48 @@ watch(
   { flush: "sync" }
 );
 
+const configuredRemoteRoot = computed(() => {
+  const { driverType, config } = mountData.value || {};
+  if (!['smb', 'ftp', 'sftp'].includes(driverType)) return '/';
+  return normalizeRemoteRoot(config?.root_path);
+});
+
 const folderRoot = computed(() => {
   const { driverType, config } = mountData.value || {};
   if (driverType === 'crypt' || driverType === 'aliyun') return { path: '/', id: 'root', label: '/' };
-  const base = driverType === 'sftp' ? sftpTestRootPath.value : config?.root_path;
-  const path = String(base || '/').replaceAll('\\', '/');
-  const label = driverType === 'smb' && config.share ? config.share + ':' + (path.startsWith('/') ? path : '/' + path) : path;
-  return { path: '/', id: 'root', label };
+  const label = formatRemoteRootLabel(driverType, config?.share, folderBrowseBase.value);
+  return { path: '/', id: 'root', label, title: label };
 });
+
+const remotePickerToolbar = computed(() => {
+  const { driverType, config } = mountData.value || {};
+  if (!['smb', 'ftp', 'sftp'].includes(driverType)) return null;
+  if (folderBrowseBase.value !== '/') {
+    const currentLabel = formatRemoteRootLabel(driverType, config?.share, folderBrowseBase.value);
+    return {
+      currentLabel,
+      currentText: t('pathSelect.browsingFrom', { path: currentLabel }),
+      actionText: t('pathSelect.backToRoot'),
+      nextBase: '/',
+    };
+  }
+  const configured = configuredRemoteRoot.value;
+  if (configured !== '/') {
+    const configuredLabel = formatRemoteRootLabel(driverType, config?.share, configured);
+    return {
+      currentLabel: configuredLabel,
+      currentText: t('pathSelect.currentPath', { path: configuredLabel }),
+      actionText: t('pathSelect.browseFromCurrent'),
+      nextBase: configured,
+    };
+  }
+  return null;
+});
+
+function setFolderBrowseBase(base) {
+  folderBrowseEpoch += 1;
+  folderBrowseBase.value = normalizeRemoteRoot(base);
+}
 
 const folderReady = computed(() => {
   const { driverType, config } = mountData.value || {};
@@ -316,21 +353,33 @@ async function folderOperation(parent, name) {
       .map(({ path }) => ({ label: path, path: childPath(path) }));
   }
   const epoch = aliyunBrowseEpoch;
+  const browseEpoch = folderBrowseEpoch;
+  const browseBase = folderBrowseBase.value;
   const action = (kind === 'aliyun' ? 'aliyun' : 'remote') + (name === undefined ? 'Browse' : 'Mkdir');
   const { data } = await storageFolder({ action, driverType: kind, engineId: mount.engineId,
-    ...(mount.id ? { mountId: mount.id } : {}), config: { ...pickDriverConfig(kind, mount.config), ...(kind === 'sftp' ? { root_path: sftpTestRootPath.value } : {}) },
+    ...(mount.id ? { mountId: mount.id } : {}),
+    config: { ...pickDriverConfig(kind, mount.config), ...(kind === 'aliyun' ? {} : { root_path: browseBase }) },
     ...(kind === 'aliyun' ? { parentId: parent.id } : { path: parent.path }), name });
-  if (mount !== mountData.value || !mountShow.value || epoch !== aliyunBrowseEpoch) throw new Error('stale');
+  if (mount !== mountData.value || !mountShow.value || epoch !== aliyunBrowseEpoch || browseEpoch !== folderBrowseEpoch) {
+    throw new Error('stale');
+  }
   if (data.authorization) {
     aliyunApplyingBrowseResult = true;
     try { Object.assign(mount.config, data.authorization); } finally { aliyunApplyingBrowseResult = false; }
   }
-  const node = item => ({ label: item.name, path: item.path || childPath(item.name), id: item.id });
+  const node = item => {
+    const relPath = item.path || childPath(item.name);
+    const title = kind === 'aliyun'
+      ? relPath
+      : formatRemoteRootLabel(kind, mount.config?.share, joinRemotePath(browseBase, relPath));
+    return { label: item.name, path: relPath, title, id: item.id };
+  };
   return name === undefined ? data.directories.map(node) : node(data.directory);
 }
 
 async function openFolderPicker() {
   if (!folderReady.value) return;
+  setFolderBrowseBase('/');
   if (mountData.value.driverType === 'sftp' && !sftpConnectionTestSucceeded.value
       && !await testSftpConnection()) return;
   folderPicker.value?.show();
@@ -341,9 +390,11 @@ function selectFolder(path, node) {
   if (driverType === 'aliyun') Object.assign(config, { root_folder_path: path, root_folder_id: node.id });
   else if (driverType === 'crypt') config.target_path = path;
   else {
-    const base = String((driverType === 'sftp' ? sftpTestRootPath.value : config.root_path) || '/').replaceAll('\\', '/').replace(/\/+$/, '');
-    config.root_path = (base + (path === '/' ? '' : path)) || '/';
-    if (driverType === 'sftp' && sftpConnectionTestSucceeded.value) sftpDirectoryOptions.value.push({ value: config.root_path });
+    config.root_path = joinRemotePath(folderBrowseBase.value, path);
+    if (driverType === 'sftp' && sftpConnectionTestSucceeded.value
+        && !sftpDirectoryOptions.value.some(option => option.value === config.root_path)) {
+      sftpDirectoryOptions.value.push({ value: config.root_path });
+    }
   }
 }
 
@@ -579,6 +630,7 @@ watch(
     if (sftpApplyingTestResult || signature === previousSignature) return;
     cancelActiveSftpTest();
     sftpTestSignature.value = "";
+    sftpTestRootPath.value = "";
     sftpDirectoryOptions.value = [];
   },
   { flush: "sync" }
@@ -743,6 +795,7 @@ const resetSftpTest = () => {
 const addMount = () => {
   resetSftpTest();
   resetAliyunAuth();
+  setFolderBrowseBase("/");
   mountEditFlag.value = false;
   privateKeyVisible.value = false;
   mountData.value = {
@@ -759,6 +812,7 @@ const addMount = () => {
 const editMount = (mount) => {
   resetSftpTest();
   resetAliyunAuth();
+  setFolderBrowseBase("/");
   mountEditFlag.value = true;
   privateKeyVisible.value = false;
   mountData.value = {
@@ -793,6 +847,7 @@ const handleDriverChange = (driverType) => {
   if (mountEditFlag.value) return;
   resetSftpTest();
   resetAliyunAuth();
+  setFolderBrowseBase("/");
   localBrowseShow.value = false;
   smbDiscoverShow.value = false;
   smbShareDiscoverShow.value = false;
@@ -810,6 +865,7 @@ const handleSftpAuthChange = () => {
 const closeMount = () => {
   resetSftpTest();
   resetAliyunAuth();
+  setFolderBrowseBase("/");
   localBrowseShow.value = false;
   smbDiscoverShow.value = false;
   smbShareDiscoverShow.value = false;
@@ -1680,7 +1736,16 @@ onBeforeUnmount(() => {
     </el-dialog>
 
     <PathSelect v-if="mountShow" :key="mountData.driverType + ':' + (mountData.config.target_mount_id || '')" ref="folderPicker"
-      physical-root :root-node="folderRoot" :list-folders="folderOperation" :make-folder="folderOperation" @submit="selectFolder" />
+      physical-root :root-node="folderRoot" :list-folders="folderOperation" :make-folder="folderOperation" @submit="selectFolder">
+      <template v-if="remotePickerToolbar" #toolbar>
+        <div class="picker-root-bar">
+          <span class="picker-root-current" :title="remotePickerToolbar.currentLabel">{{ remotePickerToolbar.currentText }}</span>
+          <el-button link type="primary" @click="setFolderBrowseBase(remotePickerToolbar.nextBase)">
+            {{ remotePickerToolbar.actionText }}
+          </el-button>
+        </div>
+      </template>
+    </PathSelect>
 
     <el-dialog
       v-model="localBrowseShow"
@@ -2582,5 +2647,31 @@ onBeforeUnmount(() => {
   :global(.smb-discovery-dialog .smb-device-select) {
     display: none;
   }
+}
+
+:global(.picker-root-bar) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+:global(.picker-root-bar .picker-root-current) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.picker-root-bar .el-button) {
+  flex-shrink: 0;
+  font-size: 12px;
 }
 </style>

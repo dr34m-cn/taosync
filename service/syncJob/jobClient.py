@@ -1377,9 +1377,14 @@ class JobTask:
                 try:
                     targetDetails.clear()
                     dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False,
-                                            detailsOut=targetDetails, fresh=True)
-                except Exception:
-                    return
+                                            recordError=not isTargetRoot, detailsOut=targetDetails, fresh=True)
+                except Exception as e:
+                    if not isTargetRoot:
+                        return
+                    dstFiles = self.recoverMissingTargetRoot(srcPath, dstPath, spec, dstRootPath, firstDst, e,
+                                                             detailsOut=targetDetails)
+                    if dstFiles is None:
+                        return
             if srcPath == srcRootPath and not srcFiles and dstFiles:
                 # 源根目录为空而目标仍有内容：常见于硬盘/NAS 掉线后只剩空挂载点，拒绝清空目标
                 self.protectEmptySource(srcPath, dstPath)
@@ -1447,12 +1452,13 @@ class JobTask:
         self.recordRootFailure(errMsg, True)
         self.copyHook(srcPath, dstPath, None, None, status=7, errMsg=errMsg, isPath=1)
 
-    def recoverMissingTargetRoot(self, srcPath, dstPath, spec, dstRootPath, firstDst, error):
+    def recoverMissingTargetRoot(self, srcPath, dstPath, spec, dstRootPath, firstDst, error, detailsOut=None):
         """目标根目录无法列出时尝试创建它；仍无法列出则按目标扫描失败记录。"""
         if not self.breakFlag:
             try:
                 self.alistClient.mkdir(dstPath, self.job['scanIntervalT'])
-                dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, recordError=False)
+                dstFiles = self.listDir(dstPath, firstDst, spec, dstRootPath, False, recordError=False,
+                                        detailsOut=detailsOut, fresh=True)
             except Exception:
                 pass
             else:

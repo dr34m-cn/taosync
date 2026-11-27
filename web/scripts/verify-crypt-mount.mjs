@@ -93,7 +93,7 @@ try {
   assert.deepEqual(browses, [{ alistId: '1', path: '/Archive/' }, { alistId: '1', path: '/Archive/备份/' }]);
   await field('加密文件夹名称').locator('.el-switch').click();
   await save();
-  assert.deepEqual(writes[0], { engineId: 1, driverType: 'crypt', name: 'Child vault', copyConcurrency: 5,
+  assert.deepEqual(writes[0], { engineId: 1, driverType: 'crypt', name: 'Child vault', copyConcurrency: 5, cacheDays: 30,
     config: { target_mount_id: 2, target_path: '/备份/2026', encryption_key: key, encrypt_dir_names: true } });
 
   const row = page.locator('.mount-item').filter({ hasText: 'Child vault' });
@@ -107,7 +107,7 @@ try {
   await page.getByRole('tooltip').filter({ hasText: '不可更改' }).waitFor();
   await field('并行复制数').getByRole('spinbutton').fill('7');
   await save();
-  assert.deepEqual(writes[1], { id: 11, copyConcurrency: 7 });
+  assert.deepEqual(writes[1], { id: 11, copyConcurrency: 7, cacheDays: 30 });
 
   await newCrypt('Root vault');
   await chooseMount('Archive');

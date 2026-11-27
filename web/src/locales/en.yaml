@@ -548,6 +548,10 @@ pathSelect:
   invalidName: Enter a single folder name
   title: Select Directory
   selectFirst: Select a path first
+  currentPath: "Current path: {path}"
+  browsingFrom: "Browsing from: {path}"
+  browseFromCurrent: Browse from current path
+  backToRoot: Back to root
 apiKey:
   groupTitle: API keys
   title: General API key

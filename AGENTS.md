@@ -4,6 +4,11 @@ Before exploring or changing this workspace, read `~/memory/projects/taosync.md`
 
 After a material architecture, persistence, API, or synchronization change, update that memory entry and the projects index. Do not store credentials, local runtime data, or temporary task state in project memory.
 
+# Synchronization Principles
+
+- **Speed-first comparison**: Compare file hashes only when hashes are already directly available without extra hashing or download/network overhead. Because computing or fetching file hashes on demand can take enormous time, falling back to simple file-size comparison (including when cached/patched entries do not carry hashes) is an intentional design choice, not a bug.
+- **Target directory caching is an explicit user choice**: Target directories are typically unchanged outside sync, or any external edits (such as manually deleting files on the target) are deliberate; forcing a live target scan in those cases can undesirably re-sync files the user intentionally removed. When target directory caching is enabled, relying on that cache is an intentional user choice and must not be treated as a bug.
+
 # Markdown Documentation
 
 Before creating, modifying, or deleting a README file (including README.md and README_EN.md), obtain the user's explicit request or confirmation for that specific change in the current request. If a task appears to require a README change, list the proposed change and wait for confirmation first. Other Markdown files may be created, modified, or deleted as needed for the authorized task without additional confirmation.

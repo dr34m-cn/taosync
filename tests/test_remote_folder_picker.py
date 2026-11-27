@@ -41,3 +41,30 @@ class FolderPickerTest(unittest.TestCase):
         with patch.object(storage.storageMapper, 'getMountById', return_value=old):
             cfg = storage._networkRequestConfig(dict(engineId=1, mountId=2, config={'tls': False}), 'ftp')
         self.assertEqual(cfg['password'], '')
+
+    def test_unavailable_smb_share_returns_localized_error(self):
+        req = dict(engineId=1, driverType='smb', path='/', config=dict(host='server', share='Missing'))
+        for lang, fragment in (('en', 'unavailable'), ('zh_CN', '不可用')):
+            with self.subTest(lang=lang), patch.object(storage, 'get_context_lang', return_value=lang):
+                with self.assertRaises(ValueError) as caught:
+                    storage.remoteFolder(req)
+                self.assertIn(fragment, str(caught.exception))
+                self.assertNotIn('picker_smb_share_unavailable', str(caught.exception))
+
+    def test_existing_mount_can_browse_from_root_while_reusing_stored_credentials(self):
+        for kind, extra in (
+            ('smb', dict(share='Share', host='server', port=445, username='person', password='secret')),
+            ('ftp', dict(host='server', port=21, username='person', password='secret', tls=False)),
+            ('sftp', dict(host='server', port=22, username='person', auth_type='password', password='secret')),
+        ):
+            with self.subTest(kind=kind):
+                old = dict(engineId=1, driverType=kind, config=dict(root_path='/photos/2026', **extra))
+                self.driver.list_filtered.return_value = [dict(name='videos', is_dir=True)]
+                req = dict(engineId=1, mountId=7, driverType=kind, path='/',
+                           config=dict({k: v for k, v in extra.items() if k != 'password'}, password='', root_path='/'))
+                with patch.object(storage.storageMapper, 'getMountById', return_value=old):
+                    result = storage.remoteFolder(req)
+                self.assertEqual(result, {'directories': [{'name': 'videos', 'path': '/videos'}]})
+                used_cfg = self.create.call_args.args[1]
+                self.assertEqual(used_cfg['root_path'], '/')
+                self.assertEqual(used_cfg['password'], 'secret')

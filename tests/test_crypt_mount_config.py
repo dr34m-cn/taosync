@@ -243,3 +243,15 @@ class CryptMountConfigTests(unittest.TestCase):
             storage.updateMount({"id": cloud, "config": {"rapid_upload": False}})
         current = mapper.getMountById(cloud)
         self.assertEqual((current["configVersion"], current["copyConcurrency"]), (before, 8))
+        # Cache retention edits through the full form must keep optimistic locking and preserve source snapshots.
+        def bump_limit_before_update(row):
+            mapper.updateCopyConcurrency(cloud, 9)
+            update(row)
+        with patch.object(mapper, "updateMount", side_effect=bump_limit_before_update), self.assertRaisesRegex(ValueError, "changed"):
+            storage.updateMount({"id": cloud, "cacheDays": 7, "config": {}})
+        with patch('mapper.jobMapper.clearSourceSnapshotsByEngine') as clear_snapshots:
+            storage.updateMount({"id": cloud, "cacheDays": 7, "copyConcurrency": 9, "config": {}})
+            storage.updateMount({"id": self.base, "copyConcurrency": 6, "config": {"root_path": str(self.root)}})
+        clear_snapshots.assert_not_called()
+        self.assertEqual(mapper.getMountById(cloud)["cacheDays"], 7)
+        self.assertEqual(mapper.getMountById(self.base)["copyConcurrency"], 6)

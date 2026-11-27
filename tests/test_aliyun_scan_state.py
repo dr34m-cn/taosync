@@ -311,6 +311,17 @@ class ScannedUploadTests(unittest.TestCase):
         self.assertEqual([item['parent_file_id'] for item in creates], ['parent', 'replacement'])
         self.driver.session.put.assert_called_once()
 
+    def test_stale_parent_still_refreshes_above_threshold_when_rapid_upload_is_off(self):
+        self.driver.rapid_upload = False
+        self.driver.rapid_upload_min_bytes = 0
+        self.scan()
+        self.entries['replacement'] = self.entries.pop('parent')
+        self.entries['root'] = [dict(self.folder, file_id='replacement')]
+        self.upload()
+        creates = [call.args[1] for call in self.driver._request.call_args_list if call.args[0].endswith('/create')]
+        self.assertEqual([item['parent_file_id'] for item in creates], ['parent', 'replacement'])
+        self.driver.session.put.assert_called_once()
+
     def test_overwrite_keeps_old_file_until_complete_and_checks_conflicts(self):
         old = {'name': 'a', 'file_id': 'old', 'type': 'file', 'size': 1}
         self.entries['parent'].append(old)

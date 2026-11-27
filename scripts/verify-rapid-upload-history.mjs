@@ -57,7 +57,7 @@ try {
     await page.goto(`${server.url}/#/home/task?jobId=2`);
     const stats = page.locator('details.history-stats');
     await stats.first().locator('summary').click();
-    assert.match(await stats.first().innerText(), english ? /2 files · 2\.00 GB/ : /2 个文件 · 2\.00 GB/);
+    assert.match(await stats.first().innerText(), english ? /2 files · 2 GB/ : /2 个文件 · 2 GB/);
     assert.match(await stats.first().locator('summary').innerText(), english ? /Processed 16 files/ : /16 个文件/);
     if (english) assert.doesNotMatch(await stats.first().innerText(), /[\u3400-\u9fff]/);
     assert.equal(await stats.nth(1).getByText(english ? 'Instant upload' : '秒传', { exact: true }).count(), 0);

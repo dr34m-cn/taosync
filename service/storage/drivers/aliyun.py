@@ -956,6 +956,8 @@ class AliyunDriveDriver(StorageDriver):
             "part_info_list": part_info,
             **_upload_times(getattr(source, "metadata", {})),
         }
+        rapid_attempted = (self.rapid_upload and size > self.rapid_upload_min_bytes
+                           and getattr(source, 'allow_rapid_upload', True) is not False)
         try:
             created, source, _source_consumed = self._create_upload(create_data, source, size, cancel)
             if new_file and created.get('exist'):
@@ -970,9 +972,9 @@ class AliyunDriveDriver(StorageDriver):
                 raise
             recoverable = (isinstance(exc, FileExistsError) or getattr(exc, 'code', '') in
                            _MISSING_PARENT_CODES | {'AlreadyExist', 'AlreadyExist.File'})
-            # At or below the threshold create has not read the source at all.
-            # Re-resolve once; never replay a consumed large-file stream.
-            if known is None or not recoverable or size > self.rapid_upload_min_bytes:
+            # When rapid upload was not attempted, create has not read the source at all.
+            # Re-resolve once; never replay a potentially consumed stream.
+            if known is None or not recoverable or rapid_attempted:
                 raise
             state.invalidate(parent_path or '/')
             parent = self._resolve(parent_path or '/', targeted=True)

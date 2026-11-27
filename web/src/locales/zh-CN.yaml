@@ -548,6 +548,10 @@ pathSelect:
   invalidName: 请输入单个有效的目录名
   title: 选择目录
   selectFirst: 请先选择路径
+  currentPath: "当前路径：{path}"
+  browsingFrom: "浏览起点：{path}"
+  browseFromCurrent: 从当前路径浏览
+  backToRoot: 返回根目录
 apiKey:
   groupTitle: API秘钥
   title: 通用API秘钥

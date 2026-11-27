@@ -27,7 +27,7 @@ const totals = computed(() => operations.reduce((sum, [key]) => {
       </template>
       <template v-if="task.fileStats.rapidUpload?.count">
         <dt>{{ $t("taskDetail.instantUpload") }}</dt>
-        <dd>{{ $t("taskDetail.filesCount", task.fileStats.rapidUpload.count) }} · {{ (task.fileStats.rapidUpload.size / 1024 ** 3).toFixed(2) }} GB</dd>
+        <dd>{{ $t("taskDetail.filesCount", task.fileStats.rapidUpload.count) }} · {{ parseSize(task.fileStats.rapidUpload.size ?? 0) }}</dd>
       </template>
       <template v-if="task.fileStats.failed">
         <dt>{{ $t("task.fail") }}</dt>

@@ -5,6 +5,7 @@ import logging
 import sqlite3
 import threading
 from contextlib import closing
+from pathlib import Path
 
 import tornado.web
 
@@ -14,7 +15,8 @@ class SyncTotals:
         self.database = database
         self.lock = threading.Lock()
         self.writer = threading.Lock()
-        with closing(sqlite3.connect(database)) as db, db:
+        Path(database).parent.mkdir(parents=True, exist_ok=True)
+        with closing(sqlite3.connect(database, timeout=15)) as db, db:
             # Decimal text also preserves totals beyond SQLite's signed 64-bit range.
             db.execute('CREATE TABLE IF NOT EXISTS totals (id INTEGER PRIMARY KEY CHECK(id=1), files TEXT NOT NULL, bytes TEXT NOT NULL)')
             db.execute("INSERT OR IGNORE INTO totals VALUES (1, '0', '0')")
@@ -34,7 +36,7 @@ class SyncTotals:
         with self.writer:
             snapshot = self.snapshot()
             if snapshot != self.saved:
-                with closing(sqlite3.connect(self.database)) as db, db:
+                with closing(sqlite3.connect(self.database, timeout=15)) as db, db:
                     db.execute('UPDATE totals SET files=?, bytes=? WHERE id=1', tuple(map(str, snapshot)))
                 self.saved = snapshot
 
@@ -60,13 +62,23 @@ class StatsHandler(tornado.web.RequestHandler):
         if self.request.query:
             raise tornado.web.HTTPError(400)
         if self.request.method == 'POST':
-            if self.request.headers.get('Content-Type', '').split(';')[0].strip() != 'application/json':
+            if self.request.headers.get('Content-Type', '').split(';')[0].strip().lower() != 'application/json':
                 raise tornado.web.HTTPError(415)
-            if int(self.request.headers.get('Content-Length', 0)) > 256:
-                raise tornado.web.HTTPError(413)
+            raw_length = self.request.headers.get('Content-Length')
+            if raw_length is not None:
+                try:
+                    length = int(raw_length)
+                except ValueError:
+                    raise tornado.web.HTTPError(400) from None
+                if length < 0:
+                    raise tornado.web.HTTPError(400)
+                if length > 256:
+                    raise tornado.web.HTTPError(413)
         self.request.connection.set_max_body_size(256)
 
     def data_received(self, chunk):
+        if len(self.body) + len(chunk) > 256:
+            raise tornado.web.HTTPError(413)
         self.body.extend(chunk)
 
     def get(self):

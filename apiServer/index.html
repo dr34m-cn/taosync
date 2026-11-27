@@ -54,11 +54,13 @@
       return;
     }
     const files = totals.files.toLocaleString(lang);
+    const bytes = totals.bytes < 0n ? 0n : totals.bytes;
     const units = ['B','KB','MB','GB','TB','PB','EB','ZB','YB'];
     let unit = 0, scale = 1n;
-    while (unit < units.length - 1 && totals.bytes >= scale * 1000n) { scale *= 1000n; unit++; }
-    const hundredths = totals.bytes * 100n / scale;
-    const volume = (hundredths / 100n).toLocaleString(lang) + '.' + String(hundredths % 100n).padStart(2, '0') + units[unit];
+    while (unit < units.length - 1 && bytes >= scale * 1024n) { scale *= 1024n; unit++; }
+    const hundredths = bytes * 100n / scale;
+    const volume = unit === 0 ? bytes.toLocaleString(lang) + units[0]
+      : (hundredths / 100n).toLocaleString(lang) + '.' + String(hundredths % 100n).padStart(2, '0') + units[unit];
     byId('stats').textContent = zh ? `TaoSync累计为用户同步超过${files}个文件，总体积超过${volume}`
       : `TaoSync has synced over ${files} files for users, totaling over ${volume}.`;
   }

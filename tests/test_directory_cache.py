@@ -77,9 +77,46 @@ class DirectoryCacheTests(unittest.TestCase):
                                           config={'root_folder_id': 'inside'}))
         nested = storageMapper.getMountById(mid)
         self.put('/Shows', identity=('drive', 'inside'))
+        self.put('/Shows/Season', [{'name': 'ep1', 'is_dir': False, 'size': 5}])
         self.assertEqual(self.cache.cloudAliasPath(self.mount, '/Shows/Title', nested), '/Title')
         self.assertEqual(self.cache.cloudAliasPath(nested, '/Title', self.mount), '/Shows/Title')
+        self.assertEqual(self.cache.cloudAliasPath(nested, '/', self.mount), '/Shows')
         self.assertIsNone(self.cache.cloudAliasPath(self.mount, '/Other', nested))
+        self.cache.change(self.mount, self.cache.cloudAliasPath(nested, '/', self.mount), 'unknown')
+        self.assertIsNone(self.cache.read(self.mount, '/Shows'))
+        self.assertIsNone(self.cache.read(self.mount, '/Shows/Season'))
+
+    def test_scan_token_ignores_unrelated_mounts_and_siblings_but_rejects_same_directory_races(self):
+        other_id = storageMapper.addMount(dict(engineId=1, name='other', driverType='local', config={}))
+        other = storageMapper.getMountById(other_id)
+        self.put('/dir1')
+        with self.cache.scan(other, '/src') as other_scan, self.cache.scan(self.mount, '/dir2') as sibling_scan, \
+                self.cache.scan(self.mount, '/dir1') as target_scan:
+            self.cache.change(self.mount, '/dir1/new', 'file', 9)
+            self.cache.record(other, '/src', [{'name': 'a', 'is_dir': False, 'size': 1}], True, other_scan)
+            self.cache.record(self.mount, '/dir2', [{'name': 'b', 'is_dir': False, 'size': 2}], True, sibling_scan)
+            self.cache.record(self.mount, '/dir1', [], True, target_scan)
+        self.assertEqual(self.cache.read(other, '/src')[0]['name'], 'a')
+        self.assertEqual(self.cache.read(self.mount, '/dir2')[0]['name'], 'b')
+        self.assertEqual(self.cache.read(self.mount, '/dir1')[0]['name'], 'new')
+
+    def test_case_only_collision_invalidates_parent_instead_of_duplicating(self):
+        self.put('/dir', [{'name': 'Report.txt', 'is_dir': False, 'size': 10}])
+        self.cache.change(self.mount, '/dir/report.txt', 'file', 20)
+        self.assertIsNone(self.cache.read(self.mount, '/dir'))
+
+    def test_cloud_mkdir_invalidates_overlapping_crypt_view(self):
+        crypt_id = storageMapper.addMount(dict(
+            engineId=1, name='vault', driverType='crypt',
+            config={'target_mount_id': self.mount['id'], 'target_path': '/a',
+                    'encryption_key': 'fernet:v1:stub', 'encrypt_dir_names': False},
+        ), target=self.mount)
+        crypt = storageMapper.getMountById(crypt_id)
+        self.put('/a', identity=('drive', 'parent'))
+        self.cache.record(crypt, '/', [], True, self.cache.revision)
+        self.cache.cloudMkdir('drive', 'parent', 'sub')
+        self.assertEqual(self.cache.read(self.mount, '/a')[0]['name'], 'sub')
+        self.assertIsNone(self.cache.read(crypt, '/'))
 
     @patch('service.storage.storageService.get_context_lang', return_value='en')
     def test_policy_validation(self, _lang):
