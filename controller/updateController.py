@@ -22,6 +22,38 @@ class UpdateInfo(BaseHandler):
         return update.info()
 
 
+class UpdateCheck(BaseHandler):
+    check_task = None
+
+    async def get(self):
+        self.set_header('Cache-Control', 'no-store')
+        self.set_header('Content-Type', 'application/json; charset=UTF-8')
+        lang = self.request.headers.get('Accept-Language', 'zh_CN')
+        if self.authenticated_user() is None:
+            if 'Authorization' in self.request.headers:
+                self.set_status(401)
+                self.finish({'code': 401, 'data': None, 'msg': t('api_key_invalid', lang)})
+            else:
+                self.clear_cookie(self.session_cookie_name, secure=self.request.protocol == 'https')
+                key = 'login_expired' if self.get_cookie(self.session_cookie_name) else 'sign_in'
+                self.finish({'code': 401, 'data': None, 'msg': t(key, lang)})
+            return
+        self.check_task = asyncio.create_task(update.check_latest_version())
+        try:
+            result = await self.check_task
+        except asyncio.CancelledError:
+            return
+        finally:
+            self.check_task = None
+        if not self._finished and not self.request.connection.stream.closed():
+            self.finish({'code': 200, 'data': result, 'msg': ''})
+
+    def on_connection_close(self):
+        super().on_connection_close()
+        if self.check_task is not None and not self.check_task.done():
+            self.check_task.cancel()
+
+
 @stream_request_body
 class ProgramUpload(BaseHandler):
     # Only this endpoint raises the connection's body limit. No multipart buffering.

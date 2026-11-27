@@ -613,6 +613,10 @@ setting:
   hours: 小时
   username: 用户名
   version: TaoSync 版本：__version_placeholder__
+  updateAvailableTitle: 发现新版本：{latest}
+  updateAvailableDesc: 当前版本为 {current}，最新正式版为 {latest}，建议及时更新。
+  downloadLatest: 前往下载
+  goToProgramUpdate: 在线更新
   github: 项目地址（GitHub）
   issues: 问题反馈（GitHub Issues）
 taskStatus:

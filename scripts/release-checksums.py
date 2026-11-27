@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from apiServer.trust_manifest import LABEL, encode_manifest, parse_builds
+from apiServer.trust_manifest import LABEL, encode_manifest, parse_builds, split_builds
 
 
 def manifest(directory, tag, include_apk=False):
@@ -43,6 +43,16 @@ if __name__ == '__main__':
         _, _, previous, addition, output = sys.argv
         old = parse_builds(Path(previous).read_bytes()) if previous != '-' else []
         Path(output).write_bytes(encode_manifest(old + parse_builds(Path(addition).read_bytes())))
+    elif sys.argv[1] == 'split':
+        _, _, stable_out, dev_out, latest_out, *sources = sys.argv
+        combined = []
+        for source in sources:
+            if source != '-':
+                combined.extend(parse_builds(Path(source).read_bytes()))
+        stable, dev, latest_version, latest = split_builds(combined)
+        Path(stable_out).write_bytes(encode_manifest(stable))
+        Path(dev_out).write_bytes(encode_manifest(dev))
+        Path(latest_out).write_bytes(encode_manifest(latest, version=latest_version))
     else:
         for digest, target in manifest(Path(sys.argv[1]), sys.argv[2]):
             print(digest, target)

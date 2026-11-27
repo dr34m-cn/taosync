@@ -613,6 +613,10 @@ setting:
   hours: hours
   username: Username
   version: "TaoSync version: __version_placeholder__"
+  updateAvailableTitle: "Update available: {latest}"
+  updateAvailableDesc: "Current version is {current}; the latest official release is {latest}."
+  downloadLatest: Download release
+  goToProgramUpdate: Program update
   github: Project (GitHub)
   issues: Issues (GitHub)
 taskStatus:

@@ -18,7 +18,9 @@ a = Analysis(
     datas=[
         ('web/dist/', 'front'),
         ('locales/', 'locales'),
-    ] + ([('build-target.txt', '.')] if build_target.is_file() else []) + charset_datas + tzdata_datas,
+    ] + ([('build-target.txt', '.')] if build_target.is_file() else [])
+      + ([('version.txt', '.')] if Path('version.txt').is_file() else [])
+      + charset_datas + tzdata_datas,
     hiddenimports=charset_hiddenimports + ['anyio._backends._asyncio'] + tzdata_hiddenimports,
     hookspath=[],
     hooksconfig={},

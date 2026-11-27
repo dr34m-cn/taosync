@@ -56,11 +56,12 @@ python scripts/run-backend-tests.py --shuffle-seed 42
 
 # Code Summary Preferences
 
-- When the user asks for a coding-work summary, including `总结`, `按code记忆格式要求总结`, `按code记忆要求的格式总结`, or asks how to summarize, first read `~/code/memory.md` again and follow its current summary protocol. Do not rely on an earlier reading or recollection.
-- Summarize only completed code changes since the most recent valid summary checkpoint in this conversation. If no valid checkpoint exists, summarize completed code changes from the beginning of the conversation. Do not repeat changes covered by an earlier checkpoint.
-- Describe implemented features and behavioral changes: what users can now do or what behavior changed. Omit file paths, function/class names, variables, code snippets, CSS properties, SQL, API parameters, and other implementation details unless they are the point of the change.
-- Use exactly these category prefixes: `add 增加了`, `update 更新了`, `fix 修复了`, and `remove 移除了`.
-- Return only one Markdown fenced code block with exactly two content lines and no blank line. Line 1 is one short Chinese sentence summarizing the changes, without a category prefix. Line 2 is the categorized changelog: join every item with ` && ` and do not insert line breaks within it.
-- Exclude acknowledgements, explanations, verification, tests, runtime status, memory or preference updates, environment details, and other non-code-change work. Do not include any text outside the code block.
-- Treat each valid two-line summary as the new checkpoint for subsequent summaries; keep earlier valid checkpoints.
+- When the user asks for a coding-work summary (including `总结`, `按code记忆格式要求总结`, `按code记忆要求的格式总结`, or asking how to summarize), follow the protocol below directly; do not read `~/code/memory.md`.
+- Both lines must summarize only completed code changes since the most recent valid summary checkpoint in this conversation. If no valid checkpoint exists, summarize completed code changes from the beginning of the conversation. Do not repeat changes covered by an earlier checkpoint.
+- Describe user-visible features and behavioral changes: what users can now do or what behavior changed. Omit file paths, function/class names, variables, code snippets, CSS properties, SQL, API parameters, and other implementation details unless the implementation detail itself is the point of the change.
+- Return only one Markdown fenced code block with exactly two content lines, no blank line between them, and no text outside the code block.
+- Line 1 is one short Chinese sentence summarizing the changes, without a category prefix.
+- Line 2 lists the categorized changes using only these prefixes: `add 增加了`, `update 更新了`, `fix 修复了`, and `remove 移除了`. Join every item with ` && ` and do not insert line breaks within Line 2.
+- Exclude acknowledgements, explanations, verification, tests, runtime status, memory or preference updates, environment details, and other non-code-change work.
+- Each valid two-line summary becomes the new checkpoint for subsequent summaries; earlier valid checkpoints (including those created before format changes) remain valid.
 

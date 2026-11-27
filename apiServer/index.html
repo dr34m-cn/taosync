@@ -18,7 +18,8 @@
     th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:start;overflow-wrap:anywhere} th{background:var(--band);font-size:14px}
     td{font:14px/1.55 ui-monospace,Consolas,monospace} nav{justify-content:flex-end;margin:16px 0}
     button,a,select{font:inherit;color:var(--accent)} button,select{border:1px solid var(--line);border-radius:4px;background:var(--bg);padding:6px 12px;cursor:pointer}
-    header strong,.filters,.filters label{display:flex;align-items:center;gap:8px}
+    header strong,.filters,.filters label,.manifest-links{display:flex;align-items:center;gap:8px}
+    .manifest-links{gap:12px;flex-wrap:wrap}
     .filters{flex-wrap:wrap;gap:12px 24px;margin-bottom:18px}.filters select{max-width:100%}
     button:disabled{opacity:.48;cursor:default} :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     @media(max-width:580px){main{padding:12px 12px 16px} col:nth-child(1),col:nth-child(2){width:25%} th,td{padding:8px 5px} td{font-size:12px} nav{justify-content:space-between}}
@@ -27,7 +28,7 @@
 <body><main>
   <header><strong><img src="./logo.ico" width="28" height="28" alt="">TaoSync</strong><button id="language" type="button">English</button></header>
   <section class="sync-stats"><strong id="stats"></strong><small id="stats-note"></small></section>
-  <div class="heading"><h1 id="title">构建授信列表</h1><a href="./auth.json">auth.json</a></div>
+  <div class="heading"><h1 id="title">构建授信列表</h1><div class="manifest-links"><a href="./latest.json">latest.json</a><a href="./auth.json">auth.json</a><a href="./auth-dev.json">auth-dev.json</a></div></div>
   <div class="filters">
     <label><span id="versions">版本范围</span><select id="scope"><option value="stable" id="stable" selected>仅正式版</option><option value="all" id="all">展示全部版本</option></select></label>
     <label><span id="architecture">架构</span><select id="target"><option value="" id="any">全部架构</option></select></label>
@@ -75,12 +76,42 @@
     renderStats();
   }
   const size = 20;
-  let lang = navigator.language.startsWith('zh') ? 'zh-CN' : 'en', entries = [], page = 1, state = 'loading';
+  let lang = navigator.language.startsWith('zh') ? 'zh-CN' : 'en', stableEntries = [], devEntries = [], page = 1, stableState = 'loading', devState = 'idle';
+  function parseManifestDoc(doc){
+    if (doc.schema !== 1 || !Array.isArray(doc.entries) || !doc.entries.every(e => e && typeof e.version==='string' && typeof e.arch==='string' && /^[a-f0-9]{64}$/.test(e.sha256))) throw Error();
+    const list = doc.entries.reverse().map(e => ({...e, date:doc.publishedAt?.[[e.version,e.arch,e.sha256].join('/')]}));
+    list.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+    return list;
+  }
+  function syncArchOptions(source){
+    const select = byId('target'), current = select.value;
+    const arches = [...new Set(source.map(e => e.arch))].sort();
+    while (select.options.length > 1) select.remove(1);
+    for(const arch of arches) select.add(new Option(arch, arch));
+    select.value = arches.includes(current) ? current : '';
+  }
+  async function loadDev(){
+    if (devState === 'loading' || devState === 'ready') return;
+    devState = 'loading';
+    render();
+    try {
+      const res = await fetch('./auth-dev.json', {cache:'no-store'});
+      if (!res.ok) throw Error();
+      devEntries = parseManifestDoc(await res.json());
+      devState = 'ready';
+    } catch {devState = 'error'}
+    render();
+  }
   function render(){
     renderStats();
-    const s = strings[lang], target = byId('target').value;
-    const filtered = entries.filter(e => (!target || target === e.arch) &&
-      (byId('scope').value === 'all' || !/build|dev|test/i.test(e.version)));
+    const s = strings[lang], showAll = byId('scope').value === 'all';
+    const state = showAll
+      ? (stableState === 'error' || devState === 'error' ? 'error' : stableState === 'ready' && devState === 'ready' ? 'ready' : 'loading')
+      : stableState;
+    const entries = showAll ? [...stableEntries, ...devEntries].sort((a,b) => (b.date || '').localeCompare(a.date || '')) : stableEntries;
+    syncArchOptions(entries);
+    const target = byId('target').value;
+    const filtered = entries.filter(e => !target || target === e.arch);
     const pages = Math.ceil(filtered.length / size);
     document.documentElement.lang = lang; document.title = 'TaoSync · ' + s.title;
     for(const id of ['title','version','arch','prev','next','versions','stable','all','architecture','any','published']) byId(id).textContent = s[id];
@@ -95,7 +126,8 @@
   }
   byId('prev').onclick = () => {page--; render()}; byId('next').onclick = () => {page++; render()};
   byId('language').onclick = () => {lang = lang === 'en' ? 'zh-CN' : 'en'; render()};
-  byId('scope').onchange = byId('target').onchange = () => {page = 1; render()};
+  byId('scope').onchange = () => {page = 1; if (byId('scope').value === 'all') loadDev(); render()};
+  byId('target').onchange = () => {page = 1; render()};
   render();
   refreshStats();
   setInterval(refreshStats, 10000);
@@ -103,14 +135,9 @@
     try {
       const res = await fetch('./auth.json',{cache:'no-store'});
       if (!res.ok) throw Error();
-      const doc = await res.json();
-      if (doc.schema !== 1 || !Array.isArray(doc.entries) || !doc.entries.every(e => e && typeof e.version==='string' && typeof e.arch==='string' && /^[a-f0-9]{64}$/.test(e.sha256))) throw Error();
-      entries = doc.entries.reverse().map(e => ({...e, date:doc.publishedAt?.[[e.version,e.arch,e.sha256].join('/')]}));
-      entries.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
-      for(const arch of [...new Set(entries.map(e => e.arch))].sort())
-        byId('target').add(new Option(arch,arch));
-      state = 'ready';
-    } catch {state = 'error'}
+      stableEntries = parseManifestDoc(await res.json());
+      stableState = 'ready';
+    } catch {stableState = 'error'}
     render();
   })();
 </script></body></html>

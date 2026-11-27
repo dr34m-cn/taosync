@@ -588,7 +588,9 @@ def make_app(config, oauth=None, store=None):
         [
             (r"/(?:index\.html)?", TrustIndex),
             (r"/(logo\.ico)", tornado.web.StaticFileHandler, {"path": str(Path(__file__).parent)}),
-            (r"/auth\.json", PublicManifest),
+            (r"/auth\.json", PublicManifest, {"kind": "stable"}),
+            (r"/auth-dev\.json", PublicManifest, {"kind": "dev"}),
+            (r"/latest\.json", PublicManifest, {"kind": "latest"}),
             (r"/v1/trust/manifest", TrustPush),
             (r"/v1/stats", StatsHandler),
             (r"/health", HealthHandler, args),

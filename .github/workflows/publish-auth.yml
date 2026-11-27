@@ -62,11 +62,13 @@ jobs:
           PUSH_KEY: ${{ secrets.TAOSYNC_TRUST_API_KEY }}
         run: |
           : "${PUSH_KEY:?Missing TAOSYNC_TRUST_API_KEY}"
-          status=$(curl --disable --silent --show-error --fail --retry 4 --max-time 60 \
-            --output /dev/null --write-out '%{http_code}' --header "Authorization: Bearer $PUSH_KEY" \
-            --header 'Content-Type: application/json' --data-binary @auth.json \
-            https://taoapi.dr34m.cn/v1/trust/manifest)
-          test "$status" = 204
+          for file in auth.json auth-dev.json; do
+            status=$(curl --disable --silent --show-error --fail --retry 4 --max-time 60 \
+              --output /dev/null --write-out '%{http_code}' --header "Authorization: Bearer $PUSH_KEY" \
+              --header 'Content-Type: application/json' --data-binary "@$file" \
+              https://taoapi.dr34m.cn/v1/trust/manifest)
+            test "$status" = 204
+          done
 
   deploy-auth:
     needs: publish-auth

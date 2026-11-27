@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
+import axios from "axios";
 import { getSettings, updateSettings } from "@/api/settings";
 import { parseTime } from "@/utils/utils";
 import { useAppStore } from "@/store/useAppStore";
@@ -17,6 +18,8 @@ const formRef = ref();
 const loading = ref(false);
 const saving = ref(false);
 const ready = ref(false);
+const updateNotice = ref(null);
+const updateCheckController = new AbortController();
 const numericFields = ["task_save", "timeout", "source_full_scan_days"];
 const rules = Object.fromEntries(numericFields.map(key => [key, [{ type: "number", required: true, min: 0, message: t(`setting.${key}`), trigger: "blur" }]]));
 
@@ -47,7 +50,29 @@ const save = async () => {
   }
 };
 
-onMounted(load);
+const checkUpdate = async () => {
+  try {
+    const { data } = await axios.get("/svr/settings/update/check", {
+      signal: updateCheckController.signal,
+      timeout: 25000,
+    });
+    if (data?.code === 200 && data.data?.hasUpdate && data.data?.latestVersion) {
+      updateNotice.value = data.data;
+    }
+  } catch {
+    // Ignore offline, unauthorized, or aborted checks when opening Settings.
+  }
+};
+
+const scrollToProgramUpdate = () => {
+  document.getElementById("program-update-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+onMounted(() => {
+  load();
+  checkUpdate();
+});
+onBeforeUnmount(() => updateCheckController.abort());
 </script>
 
 <template>
@@ -59,6 +84,27 @@ onMounted(load);
         <span>{{ $t('common.createdAt') }}: {{ parseTime(appStore.user.createTime) }}</span>
       </div>
     </header>
+
+    <el-alert
+      v-if="updateNotice"
+      class="update-banner"
+      type="warning"
+      show-icon
+      :title="$t('setting.updateAvailableTitle', { latest: updateNotice.latestVersion })"
+      @close="updateNotice = null"
+    >
+      <div class="update-banner-body">
+        <span>{{ $t('setting.updateAvailableDesc', { current: updateNotice.currentVersion, latest: updateNotice.latestVersion }) }}</span>
+        <div class="update-banner-links">
+          <a href="https://github.com/dr34m-cn/taosync/releases/latest" target="_blank" rel="noopener noreferrer">
+            {{ $t('setting.downloadLatest') }}
+          </a>
+          <a href="#program-update-title" @click.prevent="scrollToProgramUpdate">
+            {{ $t('setting.goToProgramUpdate') }}
+          </a>
+        </div>
+      </div>
+    </el-alert>
 
     <section class="settings-section policy-section" aria-labelledby="policy-title" v-loading="loading" :aria-busy="loading">
       <h2 id="policy-title" class="section-heading"><el-icon aria-hidden="true"><Operation /></el-icon>{{ $t("setting.syncSettings") }}</h2>
@@ -136,6 +182,10 @@ onMounted(load);
   flex-wrap: wrap;
 }
 .page-heading { gap: 12px 24px; justify-content: space-between; margin-bottom: 24px; }
+.update-banner { margin-bottom: 20px; border-radius: 12px; }
+.update-banner-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; margin-top: 4px; }
+.update-banner-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.update-banner-links a { color: var(--el-color-primary); font-weight: 500; text-underline-offset: 3px; }
 h1 { margin: 0; font-size: 26px; font-weight: 650; line-height: 1.4; }
 .account-info { gap: 4px 16px; }
 .account-info span { min-width: 0; overflow-wrap: anywhere; }
