@@ -422,8 +422,7 @@ engine:
   directoryCopyConcurrency: "并行复制数：{name}"
   copyConcurrencyValue: "并行 {count}"
   rapidUpload: 哈希秒传
-  rapidUploadLargerThan: 文件大于
-  rapidUploadMinMb: 秒传条件（文件大小严格大于此 MB 数）
+  rapidUploadLargerThan: 秒传条件：文件大于
   removeWay: 删除方式
   secretPlaceholderEdit: 留空表示保留现有值
   mountNameRule: 请输入目录名称
@@ -598,7 +597,7 @@ setting:
   saveAndApply: 保存并生效
   saved: 配置已保存并生效
   anonymous_stats: 匿名统计
-  statsHint: 仅上报本次同步成功的文件数和总大小，不追溯历史数据。不会发送文件内容、文件名、路径、网盘信息或任何个人信息。统计服务仅保存累计值，不记录个人信息，无法将统计与个人关联。
+  statsHint: 开启匿名统计后，TaoSync 每次只发送两个数字：本次成功同步的文件数和总大小。不附带用户或设备标识，也不包含文件内容、文件名、路径或网盘信息。统计服务只保留累计值，不保留单次记录，任何人都无法从统计结果判断这两个数字来自谁。你可以随时关闭统计，不影响同步；重新开启也不会补报历史数据。
   task_save: 任务记录保留时间
   task_saveHint: 0 表示不自动清理
   timeout: 任务执行超时

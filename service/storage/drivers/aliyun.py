@@ -208,7 +208,7 @@ class AliyunDriveDriver(StorageDriver):
     driver_type = "aliyun"
     API_URL = "https://openapi.alipan.com"
     PART_SIZE = 20 * 1024 * 1024
-    DEFAULT_RAPID_UPLOAD_MIN_MB = 10
+    RAPID_UPLOAD_UNITS = {'KB': 1024, 'MB': 1024 ** 2, 'GB': 1024 ** 3}
     MAX_PARTS = 10000
 
     def __init__(
@@ -253,10 +253,14 @@ class AliyunDriveDriver(StorageDriver):
         self.rapid_upload = self.config.get("rapid_upload", True)
         if not isinstance(self.rapid_upload, bool):
             raise ValueError("Aliyun rapid_upload must be a boolean")
-        min_mb = self.config.get('rapid_upload_min_mb', self.DEFAULT_RAPID_UPLOAD_MIN_MB)
-        if type(min_mb) is not int or not 0 <= min_mb <= 2147483647:
-            raise ValueError(t('aliyun_rapid_upload_min_mb_invalid', get_context_lang()))
-        self.rapid_upload_min_bytes = min_mb * 1024 ** 2
+        threshold = self.config.get('rapid_upload_threshold', {
+            'value': self.config.get('rapid_upload_min_mb', 10), 'unit': 'MB',
+        })
+        if (not isinstance(threshold, dict) or type(threshold.get('value')) is not int
+                or not 0 <= threshold['value'] <= 2147483647 or not isinstance(threshold.get('unit'), str)
+                or threshold['unit'] not in self.RAPID_UPLOAD_UNITS):
+            raise ValueError(t('aliyun_rapid_upload_threshold_invalid', get_context_lang()))
+        self.rapid_upload_min_bytes = threshold['value'] * self.RAPID_UPLOAD_UNITS[threshold['unit']]
         self.save_config = save_config
         self.load_config = load_config
         self.auth_version = int(auth_version) if auth_version is not None else None

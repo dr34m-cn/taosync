@@ -147,8 +147,13 @@ try {
       const form = page.locator('.mount-editor-dialog');
       const rapidUpload = form.getByRole('switch');
       assert.equal(await rapidUpload.getAttribute('aria-checked'), 'true');
-      const threshold = form.getByRole('spinbutton', { name: '秒传条件（文件大小严格大于此 MB 数）' });
+      const threshold = form.getByRole('spinbutton', { name: '秒传条件：文件大于', exact: true });
+      const selectedUnit = form.locator('.rapid-upload-size .el-select__selected-item').filter({ hasText: /^(KB|MB|GB)$/ });
+      const chosenUnit = mobile ? 'GB' : 'KB';
       assert.equal(await threshold.inputValue(), '10');
+      assert.equal(await selectedUnit.innerText(), 'MB');
+      await selectedUnit.click();
+      await page.getByRole('option', { name: chosenUnit, exact: true }).click();
       await threshold.fill('32');
       await threshold.press('Tab');
       const concurrency = form.locator('.el-form-item').filter({ has: page.locator('.el-form-item__label', { hasText: /^并行复制数$/ }) });
@@ -174,7 +179,7 @@ try {
       assert.equal(saved.config.root_folder_id, 'year');
       assert.equal(saved.config.root_folder_path, '/Photos/2026');
       assert.equal(saved.config.rapid_upload, false);
-      assert.equal(saved.config.rapid_upload_min_mb, 32);
+      assert.deepEqual(saved.config.rapid_upload_threshold, { value: 32, unit: chosenUnit });
       assert.equal(saved.copyConcurrency, 8);
       await cloudRow.getByText('资源库 /Photos/2026', { exact: true }).waitFor();
       await cloudRow.getByRole('button', { name: '编辑', exact: true }).click();
@@ -182,6 +187,7 @@ try {
       assert.equal(await threshold.count(), 0);
       await form.locator('.el-switch').click();
       assert.equal(await threshold.inputValue(), '32');
+      assert.equal(await selectedUnit.innerText(), chosenUnit);
       const space = form.locator('.el-form-item').filter({ has: page.locator('.el-form-item__label', { hasText: '网盘空间' }) });
       await space.locator('.el-select').click();
       await page.getByRole('option', { name: '备份盘', exact: true }).click();
@@ -194,10 +200,14 @@ try {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await form.getByRole('button', { name: '取消', exact: true }).click();
       cloud.config = { ...cloud.config, auth_mode: undefined, auth_service_url: 'https://auth.example.test', root_folder_id: 'legacy-folder', root_folder_path: undefined };
+      delete cloud.config.rapid_upload_threshold;
+      Object.assign(cloud.config, { rapid_upload: true, rapid_upload_min_mb: 0 });
       await page.reload();
       await page.getByRole('button', { name: '目录管理', exact: true }).click();
       await cloudRow.getByRole('button', { name: '编辑', exact: true }).click();
       assert.equal(await form.getByText('legacy-folder', { exact: true }).count(), 0);
+      assert.equal(await threshold.inputValue(), '0');
+      assert.equal(await selectedUnit.innerText(), 'MB');
       await form.getByRole('button', { name: '确定', exact: true }).click();
       await form.waitFor({ state: 'hidden' });
       assert.equal(saved.config.root_folder_id, 'legacy-folder');

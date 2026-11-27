@@ -177,14 +177,21 @@ class CryptMountConfigTests(unittest.TestCase):
         epoch = mapper.getMountById(cloud)['cacheEpoch']
         with patch('mapper.jobMapper.clearSourceSnapshotsByEngine') as clear_snapshots:
             storage.updateMount({"id": cloud, "config": {"rapid_upload_min_mb": 32}})
+            threshold = {'value': 512, 'unit': 'KB'}
+            storage.updateMount({"id": cloud, "config": {"rapid_upload_threshold": threshold}})
             storage.updateMount({"id": cloud, "config": {"rapid_upload": False}})
         clear_snapshots.assert_not_called()
         self.assertEqual(mapper.getMountById(cloud)['cacheEpoch'], epoch)
         cloud_config = mapper.getMountById(cloud)["config"]
-        self.assertEqual(cloud_config['rapid_upload_min_mb'], 32)
+        self.assertEqual(cloud_config['rapid_upload_threshold'], threshold)
+        self.assertNotIn('rapid_upload_min_mb', cloud_config)
         self.assertEqual(cloud_config["drive_id"], driver.drive_id)
         self.assertEqual(cloud_config["refresh_token"], "rotated")
         self.assertFalse(cloud_config["rapid_upload"])
+        storage.updateMount({"id": cloud, "config": {"rapid_upload_min_mb": 0}})
+        legacy_config = mapper.getMountById(cloud)['config']
+        self.assertEqual(legacy_config['rapid_upload_min_mb'], 0)
+        self.assertNotIn('rapid_upload_threshold', legacy_config)
 
     def test_configuration_browsers_cannot_receive_crypt_keys(self):
         mount = self.crypt()

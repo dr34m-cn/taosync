@@ -1,39 +1,47 @@
-"""Best-effort reporting of a single completed run; never queue historical tasks."""
-from concurrent.futures import ThreadPoolExecutor
+"""Best-effort anonymous reporting; neither tasks nor shutdown wait for a report."""
+import json
+import ssl
+from contextlib import closing
+from http.client import HTTPSConnection
+from threading import BoundedSemaphore, Thread
 
-import requests
+import certifi
 
-from common.config import getConfig
-
-
-_ENDPOINT = 'https://taoapi.dr34m.cn/v1/stats'
-_sender = ThreadPoolExecutor(max_workers=2, thread_name_prefix='sync-stats')
+from common.config import anonymousStatsEnabled
 
 
-def _enabled():
-    return getConfig()['server']['anonymous_stats']
+_slots = BoundedSemaphore(2)
 
 
 def _send(files, size):
-    if not _enabled():  # A queued report must also respect a subsequent opt-out.
-        return
+    # A direct HTTPS request has no proxy credentials, redirects, retries or HTTP library logs.
+    context = ssl.create_default_context(cafile=certifi.where())
+    with closing(HTTPSConnection('taoapi.dr34m.cn', timeout=5, context=context)) as conn:
+        conn.request('POST', '/v1/stats', body=json.dumps({'files': files, 'bytes': size}),
+                     headers={'Content-Type': 'application/json'})
+        conn.getresponse().close()
+
+
+def _report(successful):
     try:
-        with requests.Session() as session:
-            session.trust_env = False  # Never attach credentials from .netrc.
-            with session.post(_ENDPOINT, json={'files': files, 'bytes': size}, timeout=(3, 5),
-                              allow_redirects=False, stream=True):
-                pass
-    except requests.RequestException:
-        pass  # Do not retry: a lost response may follow a successful increment.
+        files = size = 0
+        for entry in successful:
+            if entry['isPath'] == 0 and entry['type'] in (0, 2):
+                files += 1
+                size += entry['fileSize'] or 0
+        if files and anonymousStatsEnabled():
+            _send(files, size)
+    except Exception:
+        pass  # Discard this report, including failures in aggregation or network cleanup.
+    finally:
+        _slots.release()
 
 
 def report(successful):
-    if not _enabled():
+    if not successful or not anonymousStatsEnabled() or not _slots.acquire(blocking=False):
         return
-    files = size = 0
-    for entry in successful:
-        if entry['isPath'] == 0 and entry['type'] in (0, 2):
-            files += 1
-            size += entry['fileSize'] or 0
-    if files:
-        _sender.submit(_send, files, size)
+    try:
+        # The iterator releases the completed run's list once the worker has counted it.
+        Thread(target=_report, args=(iter(successful),), name='sync-stats', daemon=True).start()
+    except Exception:
+        _slots.release()  # Even a thread that could not start must not affect the task.

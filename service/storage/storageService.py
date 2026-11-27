@@ -211,6 +211,11 @@ def _prepareAliyunConfig(rawConfig, old=None):
         raise ValueError("invalid Aliyun auth_mode")
     sameMode = old is not None and requestedMode == oldMode
     config = {**(oldConfig if sameMode else {}), **dict(rawConfig)}
+    # An explicit threshold replaces the stored representation, including on legacy client edits.
+    if 'rapid_upload_threshold' in rawConfig:
+        config.pop('rapid_upload_min_mb', None)
+    elif 'rapid_upload_min_mb' in rawConfig:
+        config.pop('rapid_upload_threshold', None)
     config["auth_mode"] = requestedMode
     endpointChanged = False
     if sameMode:
@@ -634,7 +639,7 @@ def updateMount(data):
     # Upload preferences do not change the backing storage or the directory contents.
     changedFields = {key for key in old['config'].keys() | config.keys() if old['config'].get(key) != config.get(key)}
     uploadPolicyOnly = (driverType == 'aliyun' and enabled == old.get('enabled', 1) and changedFields
-                        and changedFields <= {'rapid_upload', 'rapid_upload_min_mb'})
+                        and changedFields <= {'rapid_upload', 'rapid_upload_min_mb', 'rapid_upload_threshold'})
     storageChanged = old['config'] != config and not uploadPolicyOnly
     mount = {
         "id": mountId,

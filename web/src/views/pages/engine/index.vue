@@ -129,9 +129,13 @@ const driverConfigKeys = {
     "root_folder_path",
     "remove_way",
     "rapid_upload",
-    "rapid_upload_min_mb",
+    "rapid_upload_threshold",
   ],
 };
+
+const rapidUploadThreshold = (config) => ({
+  ...(config?.rapid_upload_threshold ?? { value: config?.rapid_upload_min_mb ?? 10, unit: "MB" }),
+});
 
 const driverDefaults = (driverType) => {
   const defaults = {
@@ -183,7 +187,7 @@ const driverDefaults = (driverType) => {
       root_folder_path: "/",
       remove_way: "trash",
       rapid_upload: true,
-      rapid_upload_min_mb: 10,
+      rapid_upload_threshold: rapidUploadThreshold(),
     },
   };
   return { ...defaults[driverType] };
@@ -770,6 +774,7 @@ const editMount = (mount) => {
       ...(mount.config || {}),
       ...(mount.driverType === "crypt" ? { encryption_key: "", target_path: mount.config?.target_path } : {}),
       ...(mount.driverType === "aliyun" ? {
+        rapid_upload_threshold: rapidUploadThreshold(mount.config),
         auth_mode: mount.config?.auth_mode || (mount.config?.auth_service_url ? "service" : "direct"),
         root_folder_path: mount.config?.root_folder_path || (mount.config?.root_folder_id && mount.config.root_folder_id !== "root" ? "" : "/"),
       } : {}),
@@ -1637,14 +1642,18 @@ onBeforeUnmount(() => {
                     :aria-label="$t('pathSelect.title')" @click.stop="openFolderPicker" /></template>
                 </el-input>
             </el-form-item>
-            <el-form-item class="form-span-2" prop="config.rapid_upload" :label="$t('engine.rapidUpload')">
+            <el-form-item class="form-span-2 rapid-upload-field" prop="config.rapid_upload" :label="$t('engine.rapidUpload')">
               <el-switch v-model="mountData.config.rapid_upload" :aria-label="$t('engine.rapidUpload')" />
-              <label v-if="mountData.config.rapid_upload" class="rapid-upload-condition">
-                {{ $t('engine.rapidUploadLargerThan') }}
-                <el-input-number v-model="mountData.config.rapid_upload_min_mb" :min="0" :max="2147483647"
-                  :precision="0" :value-on-clear="10" :controls="false" :aria-label="$t('engine.rapidUploadMinMb')" />
-                MB
-              </label>
+              <div v-if="mountData.config.rapid_upload" class="rapid-upload-condition">
+                <span>{{ $t('engine.rapidUploadLargerThan') }}</span>
+                <div class="rapid-upload-size">
+                  <el-input-number v-model="mountData.config.rapid_upload_threshold.value" :min="0" :max="2147483647"
+                    :precision="0" :value-on-clear="10" :controls="false" :aria-label="$t('engine.rapidUploadLargerThan')" />
+                  <el-select v-model="mountData.config.rapid_upload_threshold.unit" :aria-label="$t('home.fileSizeUnit')">
+                    <el-option v-for="unit in ['KB', 'MB', 'GB']" :key="unit" :label="unit" :value="unit" />
+                  </el-select>
+                </div>
+              </div>
             </el-form-item>
             <el-form-item class="form-span-2" prop="config.remove_way" :label="$t('engine.removeWay')">
               <el-radio-group v-model="mountData.config.remove_way">
@@ -2065,15 +2074,27 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 
-:global(.mount-editor-dialog .rapid-upload-condition) {
+:global(.mount-editor-dialog .rapid-upload-field .el-form-item__content) {
+  column-gap: 12px;
+}
+
+:global(.mount-editor-dialog .rapid-upload-condition),
+:global(.mount-editor-dialog .rapid-upload-size) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-inline-start: 16px;
+}
+
+:global(.mount-editor-dialog .rapid-upload-condition) {
+  flex-wrap: wrap;
 }
 
 :global(.mount-editor-dialog .rapid-upload-condition .el-input-number) {
   width: 7em;
+}
+
+:global(.mount-editor-dialog .rapid-upload-condition .el-select) {
+  width: 5em;
 }
 
 :global(.mount-editor-dialog .crypt-locked-control) {

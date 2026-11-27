@@ -672,10 +672,16 @@ class RapidUploadTests(unittest.TestCase):
                 self.assertFalse({'pre_hash', 'content_hash', 'proof_code'} & creates[0].keys())
 
     def test_configured_boundary_for_both_rapid_paths(self):
-        for settings, min_mb in (({}, 10), ({'rapid_upload_min_mb': 1}, 1), ({'rapid_upload_min_mb': 50}, 50)):
+        for settings, threshold in (
+            ({}, 10 * 1024 ** 2), ({'rapid_upload_min_mb': 50}, 50 * 1024 ** 2),
+            ({'rapid_upload_threshold': {'value': 3, 'unit': 'KB'}}, 3 * 1024),
+            ({'rapid_upload_threshold': {'value': 7, 'unit': 'MB'}}, 7 * 1024 ** 2),
+            ({'rapid_upload_threshold': {'value': 1, 'unit': 'GB'}}, 1024 ** 3),
+        ):
             driver = make_driver(**settings)
             self.addCleanup(driver.session.close)
-            self.check_size_boundary(driver, min_mb * 1024 ** 2)
+            with self.subTest(settings=settings):
+                self.check_size_boundary(driver, threshold)
 
     def check_size_boundary(self, driver, threshold):
         for size in (0, threshold - 1, threshold, threshold + 1):
@@ -711,6 +717,12 @@ class RapidUploadTests(unittest.TestCase):
         for value in (-1, 1.5, '1', None, True, 2**31):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 make_driver(rapid_upload_min_mb=value)
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                make_driver(rapid_upload_threshold={'value': value, 'unit': 'KB'})
+        for invalid in (None, 10, {}, {'unit': 'GB'}, {'value': 1}, {'value': 1, 'unit': 'TB'},
+                        {'value': 1, 'unit': []}):
+            with self.subTest(threshold=invalid), self.assertRaises(ValueError):
+                make_driver(rapid_upload_threshold=invalid)
 
     def test_existing_sha1_recalculates_range_proof_after_token_refresh(self):
         self.expire_proof_token = True

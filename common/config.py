@@ -109,6 +109,11 @@ def getConfig():
     return sysConfig
 
 
+def anonymousStatsEnabled():
+    # Optional reporting must never initialize configuration or touch disk.
+    return sysConfig is not None and sysConfig['server'].get('anonymous_stats') is True
+
+
 def getSettings():
     with CONFIG_LOCK:
         server = getConfig()['server']

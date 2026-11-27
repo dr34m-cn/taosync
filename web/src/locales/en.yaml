@@ -422,8 +422,7 @@ engine:
   directoryCopyConcurrency: "Concurrent copies: {name}"
   copyConcurrencyValue: "Concurrency {count}"
   rapidUpload: Hash-based Rapid Upload
-  rapidUploadLargerThan: Files larger than
-  rapidUploadMinMb: Rapid upload threshold in MB (exclusive)
+  rapidUploadLargerThan: Rapid upload for files larger than
   removeWay: Delete Method
   secretPlaceholderEdit: Leave blank to keep the current value
   mountNameRule: Please enter a directory name
@@ -598,7 +597,7 @@ setting:
   saveAndApply: Save and Apply
   saved: Settings saved and applied
   anonymous_stats: Anonymous statistics
-  statsHint: Only the number and total size of files successfully synced in this run are sent. No historical data, contents, names, paths, drive details or personal information are sent. The service stores only aggregate totals, records no personal information and cannot link statistics to individuals.
+  statsHint: "When anonymous statistics are on, TaoSync sends just two numbers per run: how many files synced successfully and their total size. The report includes no user or device identifiers, file contents, names, paths, or cloud drive details. The service keeps only cumulative totals, not individual reports, so no one can tell from the statistics who sent those numbers. You can turn statistics off at any time without affecting sync. Turning them back on won’t send data from past runs."
   task_save: Task Record Retention
   task_saveHint: 0 keeps all records
   timeout: Task Timeout

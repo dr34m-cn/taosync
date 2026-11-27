@@ -60,8 +60,7 @@ def updateJobTaskStatus(taskId, status, errMsg=None, taskList=None, createTime=N
         try:
             syncStats.report(taskList[2])
         except Exception:
-            # A stopped executor or unavailable telemetry must not change a completed task.
-            logging.getLogger().debug('Could not enqueue anonymous sync statistics')
+            pass  # Optional statistics must never interrupt completion or produce a task log.
     statusName = G('task_status')[status]
     if notifyList:
         job = jobMapper.getJobByTaskId(taskId)

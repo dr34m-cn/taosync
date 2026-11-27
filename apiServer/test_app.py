@@ -160,6 +160,14 @@ class AnonymousStatsTest(tornado.testing.AsyncHTTPTestCase):
                 self.assertEqual(response.code, 400)
         self.assertEqual(self._app.settings['sync_totals'].snapshot(), (0, 0))
 
+    def test_failed_report_returns_error_without_logging(self):
+        totals = self._app.settings['sync_totals']
+        with mock.patch.object(totals, 'add', side_effect=RuntimeError('unavailable')), self.assertNoLogs(level='DEBUG'):
+            response = self.fetch('/v1/stats', method='POST', headers={'Content-Type': 'application/json'},
+                                  body=json.dumps({'files': 1, 'bytes': 2}))
+        self.assertEqual(response.code, 500)
+        self.assertEqual(totals.snapshot(), (0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

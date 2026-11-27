@@ -51,7 +51,7 @@ class PublicApplication(tornado.web.Application):
 @tornado.web.stream_request_body
 class StatsHandler(tornado.web.RequestHandler):
     def log_exception(self, typ, value, tb):
-        if not isinstance(value, tornado.web.HTTPError):
+        if self.request.method != 'POST' and not isinstance(value, tornado.web.HTTPError):
             logging.error('Anonymous statistics request failed')
 
     def prepare(self):
