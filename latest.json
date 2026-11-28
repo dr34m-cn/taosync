@@ -140,6 +140,27 @@
         "publishedAt": "2026-11-22T06:01:10Z"
       },
       {
+        "version": "v0.5.2-dev-test-build5",
+        "channel": "dev",
+        "assets": {
+          "android-arm64-v8a+armeabi-v7a": "taoSync-v0.5.2-dev-test-build5-android-debug.apk",
+          "linux-StaticX-amd64": "taoSync-v0.5.2-dev-test-build5-linux-StaticX-amd64.zip",
+          "linux-amd64": "taoSync-v0.5.2-dev-test-build5-linux-amd64.tar.gz"
+        },
+        "sources": [
+          {
+            "id": "r2",
+            "name": "Cloudflare R2",
+            "urlTemplate": "https://cdn.20240303.xyz/taosync-release/dev/{version}/{filename}",
+            "labels": {
+              "zh-CN": "Cloudflare R2",
+              "en": "Cloudflare R2"
+            }
+          }
+        ],
+        "publishedAt": "2026-11-28T05:36:45Z"
+      },
+      {
         "version": "v0.5.2-dev-test-build4",
         "channel": "dev",
         "assets": {
@@ -159,27 +180,6 @@
           }
         ],
         "publishedAt": "2026-11-27T09:54:00Z"
-      },
-      {
-        "version": "v0.5.2-dev-test-build3",
-        "channel": "dev",
-        "assets": {
-          "android-arm64-v8a+armeabi-v7a": "taoSync-v0.5.2-dev-test-build3-android-debug.apk",
-          "linux-StaticX-amd64": "taoSync-v0.5.2-dev-test-build3-linux-StaticX-amd64.zip",
-          "linux-amd64": "taoSync-v0.5.2-dev-test-build3-linux-amd64.tar.gz"
-        },
-        "sources": [
-          {
-            "id": "r2",
-            "name": "Cloudflare R2",
-            "urlTemplate": "https://cdn.20240303.xyz/taosync-release/dev/{version}/{filename}",
-            "labels": {
-              "zh-CN": "Cloudflare R2",
-              "en": "Cloudflare R2"
-            }
-          }
-        ],
-        "publishedAt": "2026-11-27T09:18:01Z"
       }
     ],
     "sources": {
