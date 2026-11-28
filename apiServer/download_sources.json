@@ -1,0 +1,33 @@
+{
+  "stable": [
+    {
+      "id": "github",
+      "name": "GitHub Release",
+      "labels": {
+        "zh-CN": "GitHub Release",
+        "en": "GitHub Release"
+      },
+      "urlTemplate": "https://github.com/dr34m-cn/taosync/releases/download/{version}/{filename}"
+    },
+    {
+      "id": "r2",
+      "name": "Cloudflare R2",
+      "labels": {
+        "zh-CN": "Cloudflare R2",
+        "en": "Cloudflare R2"
+      },
+      "urlTemplate": "https://cdn.20240303.xyz/taosync-release/{version}/{filename}"
+    }
+  ],
+  "dev": [
+    {
+      "id": "r2",
+      "name": "Cloudflare R2",
+      "labels": {
+        "zh-CN": "Cloudflare R2",
+        "en": "Cloudflare R2"
+      },
+      "urlTemplate": "https://cdn.20240303.xyz/taosync-release/dev/{version}/{filename}"
+    }
+  ]
+}

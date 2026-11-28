@@ -649,9 +649,33 @@ programUpdate:
   loading: Checking deployment…
   target: Build target
   arch: Processor architecture
+  currentVersion: Current version
+  onlineTitle: Online update
+  manualTitle: Manual update
+  onlineDesc: Choose a version and download source to update directly. The executable is verified before restarting.
+  refreshReleases: Refresh list
+  versionLabel: Target version
+  sourceLabel: Download source
+  latestStable: Latest official release
+  latestStableWithVersion: Latest official release ({version})
+  stableTag: Stable
+  currentTag: Current
+  autoSource: Auto-select source
+  autoSourceHint: Fastest reachable
+  startOnline: Start online update
+  onlineConfirm: Download and install {version} from "{source}"? TaoSync will restart and reload the page once verified. Save any unsaved settings first.
+  onlineConfirmDev: Download and install {version} from "{source}"? TaoSync will restart and reload the page once verified. DEV builds are for experienced developers only and may contain serious bugs; regular users should not install them. Save any unsaved settings first.
+  devWarning: DEV builds are for experienced developers only and may contain serious bugs. Regular users should not install them.
+  releasesError: Could not load available versions. Check your connection or use manual update.
+  noVersionForPlatform: No online update package is available for this platform yet.
+  noSourceAvailable: No online download source is available for the selected version. Use manual update instead.
+  probing: Testing sources to pick the fastest reachable one…
+  downloading: Downloading from {source} ({loaded})…
+  downloadingTotal: Downloading from {source} ({loaded} / {total})…
+  onlineFailed: Online update failed
   online: You can install development, prerelease and stable builds listed for this platform in the {registry}.
   registry: trusted build registry
-  container: Updates survive container restarts. Recreating the container uses the selected image.
+  container: Running in a Docker container. In-app updates survive container restarts, but recreating the container reverts to the selected image version and may downgrade TaoSync. Avoid recreating the container, or update by pulling a newer Docker image instead.
   unsupported: For source and mobile deployments, use the original installation method to update.
   source: 'Never upload an update file from an unknown source. Official downloads:'
   drop: Drop an executable or release archive here or

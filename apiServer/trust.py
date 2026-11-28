@@ -1,5 +1,6 @@
 import asyncio
 import hmac
+import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -7,39 +8,72 @@ from pathlib import Path
 import tornado.web
 
 if __package__:
-    from .trust_manifest import MAX_MANIFEST_BYTES, encode_manifest, parse_builds, split_builds
+    from .trust_manifest import (
+        MAX_MANIFEST_BYTES,
+        build_downloads_catalog,
+        encode_manifest,
+        load_download_sources,
+        normalize_download_sources,
+        parse_builds,
+        parse_download_sources,
+        split_builds,
+    )
 else:  # Standalone apiServer Docker image
-    from trust_manifest import MAX_MANIFEST_BYTES, encode_manifest, parse_builds, split_builds
+    from trust_manifest import (
+        MAX_MANIFEST_BYTES,
+        build_downloads_catalog,
+        encode_manifest,
+        load_download_sources,
+        normalize_download_sources,
+        parse_builds,
+        parse_download_sources,
+        split_builds,
+    )
 
 
-def snapshot(database, incoming=None, kind='stable'):
+def snapshot(database, incoming=None, kind='stable', default_sources=None):
     if kind not in ('stable', 'dev', 'latest'):
         raise ValueError('invalid manifest kind')
     with closing(sqlite3.connect(database, timeout=15)) as db, db:
         db.execute('BEGIN IMMEDIATE')
         db.execute('CREATE TABLE IF NOT EXISTS builds (version TEXT, arch TEXT, sha256 TEXT, '
                    'UNIQUE(version, arch, sha256))')
+        db.execute('CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT)')
         if 'published_at' not in {col[1] for col in db.execute('PRAGMA table_info(builds)')}:
             db.execute('ALTER TABLE builds ADD COLUMN published_at TEXT')
         if incoming is not None:
+            parsed_rows = parse_builds(incoming)
+            incoming_sources = parse_download_sources(incoming)
             db.executemany('INSERT INTO builds (version, arch, sha256, published_at) VALUES (?, ?, ?, ?) '
                            'ON CONFLICT(version, arch, sha256) DO UPDATE SET published_at=excluded.published_at '
-                           'WHERE builds.published_at IS NULL', parse_builds(incoming))
+                           'WHERE builds.published_at IS NULL', parsed_rows)
+            if incoming_sources is not None:
+                db.execute(
+                    'INSERT INTO metadata (key, value) VALUES (?, ?) '
+                    'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                    ('download_sources', json.dumps(incoming_sources, ensure_ascii=False)),
+                )
+        row = db.execute('SELECT value FROM metadata WHERE key = ?', ('download_sources',)).fetchone()
+        if row is not None:
+            sources = normalize_download_sources(json.loads(row[0]))
+        else:
+            sources = normalize_download_sources(default_sources) if default_sources is not None else load_download_sources()
         rows = db.execute('SELECT version, arch, sha256, published_at FROM builds ORDER BY rowid').fetchall()
         stable, dev, latest_version, latest = split_builds(rows)
+        downloads = build_downloads_catalog(stable, dev, sources)
         # Check every manifest's size before committing writes: never serve a truncated list.
         if incoming is not None:
             encoded = {
-                'stable': encode_manifest(stable),
-                'dev': encode_manifest(dev),
-                'latest': encode_manifest(latest, version=latest_version),
+                'stable': encode_manifest(stable, download_sources=sources),
+                'dev': encode_manifest(dev, download_sources=sources),
+                'latest': encode_manifest(latest, version=latest_version, downloads=downloads),
             }
             return encoded[kind]
         if kind == 'stable':
-            return encode_manifest(stable)
+            return encode_manifest(stable, download_sources=sources)
         if kind == 'dev':
-            return encode_manifest(dev)
-        return encode_manifest(latest, version=latest_version)
+            return encode_manifest(dev, download_sources=sources)
+        return encode_manifest(latest, version=latest_version, downloads=downloads)
 
 
 class TrustIndex(tornado.web.RequestHandler):

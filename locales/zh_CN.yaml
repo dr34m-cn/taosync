@@ -135,6 +135,12 @@ update_not_trusted: 文件不可信，请仅在可信位置下载更新包
 local_path_protected: 此本地路径受保护，请选择程序目录以外的普通文件或目录
 update_wrong_arch: 架构错误，本系统架构为{system}，更新包架构为{package}，请上传正确架构的更新包
 update_already_running: 当前已在运行这个程序
+update_version_unavailable: 未找到适用于当前平台的所选版本，请刷新后重试
+update_source_unavailable: 所选下载源不可用，请刷新后重试
+update_source_unreachable: 所有可用下载源均连接失败，请检查网络或改用手动更新
+update_download_failed: 下载更新包失败，请重试或切换其他下载源
+update_version_mismatch: 下载的文件与所选版本不一致，已中止更新
+update_cancelled: 已取消在线更新
 alist_incomplete_directory_page: "目录分页结果不完整：{}（第 {} 页）"
 destination_paths_overlap: "同一作业中的目标目录不能互相包含。"
 move_target_hash_mismatch: "移动目标的已有内容哈希不匹配：{}。"

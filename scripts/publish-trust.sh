@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fast-forward only. A concurrent winner becomes the base of our next attempt.
 set -euo pipefail
-delta=$1
+delta=${1:-}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 git config user.name 'github-actions[bot]'
@@ -24,8 +24,10 @@ for attempt in {1..10}; do
   elif [[ $? != 2 ]]; then
     exit 1
   fi
-  inputs+=("$delta")
-  python3 scripts/release-checksums.py split "$tmp/auth.json" "$tmp/auth-dev.json" "$tmp/latest.json" "${inputs[@]}"
+  if [[ -n "$delta" && "$delta" != "-" ]]; then
+    inputs+=("$delta")
+  fi
+  python3 scripts/release-checksums.py split "$tmp/auth.json" "$tmp/auth-dev.json" "$tmp/latest.json" ${inputs[@]+"${inputs[@]}"}
   auth_json=$(git hash-object -w "$tmp/auth.json")
   dev_json=$(git hash-object -w "$tmp/auth-dev.json")
   latest_json=$(git hash-object -w "$tmp/latest.json")

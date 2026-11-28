@@ -739,3 +739,44 @@ jobs:
           files: dist/*
           body_path: ${{ env.LOG_FILE }}
           prerelease: ${{ contains(env.VERSION, 'dev') || contains(env.VERSION, 'pre') || contains(env.VERSION, 'beta') }}
+
+  publish-r2:
+    name: 推送构建产物到 R2
+    runs-on: ubuntu-latest
+    needs: [get-version, build-windows, build-darwin, build-docker, build-staticx, build-android]
+    if: >-
+      always() && !cancelled() &&
+      needs.get-version.result == 'success' &&
+      needs.build-docker.result == 'success' &&
+      needs.build-staticx.result == 'success' &&
+      needs.build-android.result == 'success' &&
+      (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') &&
+      (needs.build-darwin.result == 'success' || needs.build-darwin.result == 'skipped')
+    concurrency:
+      group: r2-release-publish
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 设置python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 下载全部平台构建结果
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+
+      - name: 同步发布包到 Cloudflare R2 并按版本保留策略清理
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python3 scripts/publish-r2.py dist "$VERSION"

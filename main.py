@@ -36,6 +36,8 @@ def make_app():
         (r"/svr/settings/api-key", systemController.ApiKey),
         (r"/svr/settings/update", updateController.UpdateInfo),
         (r"/svr/settings/update/check", updateController.UpdateCheck),
+        (r"/svr/settings/update/releases", updateController.UpdateReleases),
+        (r"/svr/settings/update/online", updateController.OnlineUpdate),
         (r"/svr/settings/update/upload", updateController.ProgramUpload),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),

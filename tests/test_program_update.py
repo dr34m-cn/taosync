@@ -15,8 +15,17 @@ from unittest.mock import Mock, patch
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
-from apiServer.trust_manifest import encode_manifest, parse_builds, parse_latest, parse_manifest
-from controller.updateController import ProgramUpload, UpdateCheck
+from apiServer.trust import snapshot as trust_snapshot
+from apiServer.trust_manifest import (
+    build_downloads_catalog,
+    encode_manifest,
+    load_download_sources,
+    parse_builds,
+    parse_latest,
+    parse_latest_details,
+    parse_manifest,
+)
+from controller.updateController import OnlineUpdate, ProgramUpload, UpdateCheck, UpdateReleases
 from service.syncJob import jobClient
 from service.system import programUpdate as update, updateLauncher as launcher
 
@@ -256,6 +265,284 @@ class ReleaseTest(unittest.TestCase):
                 ('v0.5.2', 'linux-amd64', '5' * 64),
                 ('v0.5.2', 'windows-amd64', '6' * 64),
             ]))
+
+            # Verify apiServer /latest.json matches GitHub Pages static latest.json byte-for-byte.
+            db_path = root / 'trust.db'
+            trust_snapshot(db_path, stable_out.read_bytes())
+            trust_snapshot(db_path, dev_out.read_bytes())
+            self.assertEqual(trust_snapshot(db_path, kind='latest'), latest_out.read_bytes())
+            ver, _, downloads = parse_latest_details(latest_out.read_bytes())
+            self.assertEqual(ver, 'v0.5.2')
+            self.assertEqual(
+                [(item['version'], item['channel'], [s['id'] for s in item['sources']]) for item in downloads['versions']],
+                [
+                    ('v0.5.2', 'stable', ['github', 'r2']),
+                    ('v0.5.1', 'stable', ['github', 'r2']),
+                    ('v0.5.0', 'stable', ['github', 'r2']),
+                    ('v0.5.1-pre-build0', 'dev', ['r2']),
+                    ('v0.5.1-dev-test-build3', 'dev', ['r2']),
+                ],
+            )
+
+
+class PublishR2Test(unittest.TestCase):
+    def setUp(self):
+        self.mod = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts/publish-r2.py'))
+
+    def test_version_classification_and_target_prefixes(self):
+        self.assertEqual(self.mod['target_prefix']('v0.5.2'), 'taosync-release/v0.5.2/')
+        self.assertEqual(self.mod['target_prefix']('v0.5.2-dev-test-build4'), 'taosync-release/dev/v0.5.2-dev-test-build4/')
+        self.assertEqual(self.mod['target_prefix']('v0.5.2-pre-build0'), 'taosync-release/dev/v0.5.2-pre-build0/')
+        self.assertEqual(self.mod['target_prefix']('v0.5.2-beta.1'), 'taosync-release/dev/v0.5.2-beta.1/')
+        for invalid in ('dev', 'DEV', '../bad', 'a/b'):
+            with self.assertRaises(ValueError):
+                self.mod['target_prefix'](invalid)
+
+    def test_retention_keeps_latest_3_stable_and_2_dev_only(self):
+        objects = [
+            {'Key': 'taosync-release/v0.5.0/taoSync-v0.5.0-linux-amd64.tar.gz', 'LastModified': '2026-11-01T00:00:00Z'},
+            {'Key': 'taosync-release/v0.5.1/taoSync-v0.5.1-linux-amd64.tar.gz', 'LastModified': '2026-11-02T00:00:00Z'},
+            {'Key': 'taosync-release/v0.5.2/taoSync-v0.5.2-linux-amd64.tar.gz', 'LastModified': '2026-11-03T00:00:00Z'},
+            {'Key': 'taosync-release/v0.5.3/taoSync-v0.5.3-linux-amd64.tar.gz', 'LastModified': '2026-11-04T00:00:00Z'},
+            {'Key': 'taosync-release/dev/v0.5.4-dev-build1/taoSync.tar.gz', 'LastModified': '2026-11-05T00:00:00Z'},
+            {'Key': 'taosync-release/dev/v0.5.4-beta.1/taoSync.tar.gz', 'LastModified': '2026-11-06T00:00:00Z'},
+            {'Key': 'taosync-release/dev/v0.5.4-pre-build2/taoSync.tar.gz', 'LastModified': '2026-11-07T00:00:00Z'},
+            {'Key': 'other-folder/keep.txt', 'LastModified': '2026-11-01T00:00:00Z'},
+        ]
+        pruned = self.mod['select_pruned_prefixes'](objects, current_version='v0.5.4-pre-build2')
+        self.assertEqual(pruned, ['taosync-release/v0.5.0/', 'taosync-release/dev/v0.5.4-dev-build1/'])
+
+    def test_publish_to_r2_syncs_and_prunes_via_aws_cli(self):
+        calls = []
+
+        def fake_run(cmd, env=None, check=True, text=True, capture_output=False):
+            calls.append((cmd, env))
+            if 'list-objects-v2' in cmd:
+                body = json.dumps({
+                    'IsTruncated': False,
+                    'Contents': [
+                        {'Key': 'taosync-release/dev/v0.5.2-dev1/a.tar.gz', 'LastModified': '2026-11-01T00:00:00Z'},
+                        {'Key': 'taosync-release/dev/v0.5.2-dev2/a.tar.gz', 'LastModified': '2026-11-02T00:00:00Z'},
+                        {'Key': 'taosync-release/dev/v0.5.2-dev3/a.tar.gz', 'LastModified': '2026-11-03T00:00:00Z'},
+                    ],
+                })
+                return Mock(stdout=body)
+            return Mock(stdout='')
+
+        with tempfile.TemporaryDirectory() as tmp, patch('subprocess.run', side_effect=fake_run):
+            dist = Path(tmp) / 'dist'
+            dist.mkdir()
+            (dist / 'taoSync-v0.5.2-dev3-linux-amd64.tar.gz').write_bytes(b'data')
+            prefix, pruned = self.mod['publish_to_r2'](
+                dist, 'v0.5.2-dev3',
+                endpoint='https://example.r2.cloudflarestorage.com',
+                bucket='my-bucket',
+                access_key_id='key',
+                secret_access_key='secret',
+            )
+        self.assertEqual(prefix, 'taosync-release/dev/v0.5.2-dev3/')
+        self.assertEqual(pruned, ['taosync-release/dev/v0.5.2-dev1/'])
+        self.assertEqual(calls[0][0][:3], ['aws', 's3', 'sync'])
+        self.assertEqual(calls[0][0][4], 's3://my-bucket/taosync-release/dev/v0.5.2-dev3/')
+        self.assertEqual(calls[0][1]['AWS_REQUEST_CHECKSUM_CALCULATION'], 'when_required')
+        self.assertEqual(calls[2][0][:4], ['aws', 's3', 'rm', 's3://my-bucket/taosync-release/dev/v0.5.2-dev1/'])
+
+
+class OnlineUpdateTest(AsyncHTTPTestCase):
+    def setUp(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.directory = root / 'slots'
+        self.channel = root
+        self.target = 'linux-amd64'
+        self.stable_payload = b'stable-binary-v0.5.2'
+        self.stable_digest = hashlib.sha256(self.stable_payload).hexdigest()
+        self.dev_payload = b'dev-binary-v0.5.3-dev1'
+        self.dev_digest = hashlib.sha256(self.dev_payload).hexdigest()
+        self.old_payload = b'old-binary-v0.5.1'
+        self.old_digest = hashlib.sha256(self.old_payload).hexdigest()
+        self.enterContext(patch.dict(os.environ, TAO_UPDATE_CHANNEL=str(root), TAO_UPDATE_DIR=str(self.directory)))
+        self.enterContext(patch.object(update.sys, 'frozen', True, create=True))
+        self.enterContext(patch.object(update, 'platform_target', return_value=self.target))
+        self.enterContext(patch.object(update, 'current_version', return_value='v0.5.1'))
+        self.enterContext(patch.object(OnlineUpdate, 'restart_delay', 0))
+        self.enterContext(patch.object(UpdateReleases, 'authenticated_user', return_value={'id': 1, 'userName': 'admin'}))
+        self.enterContext(patch.object(OnlineUpdate, 'authenticated', return_value=True))
+        self.restart = Mock()
+        OnlineUpdate.reset()
+        self.addCleanup(OnlineUpdate.reset)
+        self.addCleanup(jobClient.cancelProgramUpdate)
+        super().setUp()
+
+    def get_app(self):
+        return Application(
+            [('/releases', UpdateReleases), ('/online', OnlineUpdate), ('/upload', ProgramUpload)],
+            restart_for_update=self.restart,
+        )
+
+    def _manifest_fetcher(self, download_sources=None):
+        sources = download_sources or load_download_sources()
+        stable_rows = [
+            ('v0.5.1', self.target, self.old_digest, '2026-11-20T00:00:00Z'),
+            ('v0.5.2', self.target, self.stable_digest, '2026-11-25T00:00:00Z'),
+            ('v0.5.2', 'windows-amd64', 'f' * 64, '2026-11-25T00:00:00Z'),
+        ]
+        dev_rows = [
+            ('v0.5.3-dev1', self.target, self.dev_digest, '2026-11-27T00:00:00Z'),
+            ('v0.5.3-dev2', 'windows-amd64', 'e' * 64, '2026-11-28T00:00:00Z'),
+        ]
+        latest_rows = [row for row in stable_rows if row[0] == 'v0.5.2']
+        downloads = build_downloads_catalog(stable_rows, dev_rows, sources)
+        docs = {
+            'latest.json': encode_manifest(latest_rows, version='v0.5.2', downloads=downloads),
+            'auth.json': encode_manifest(stable_rows, download_sources=sources),
+            'auth-dev.json': encode_manifest(dev_rows, download_sources=sources),
+        }
+
+        async def fetch(url):
+            name = url.rsplit('/', 1)[-1]
+            return docs[name]
+
+        return fetch
+
+    def _wait_online_done(self):
+        async def wait_task():
+            if OnlineUpdate.active_task is not None:
+                await OnlineUpdate.active_task
+        self.io_loop.run_sync(wait_task)
+
+    def test_releases_endpoint_filters_by_platform_and_returns_channel_sources(self):
+        with patch.object(update, 'fetch_manifest_bytes', self._manifest_fetcher()):
+            res = self.fetch('/releases')
+        self.assertEqual(res.code, 200, res.body)
+        data = json.loads(res.body)['data']
+        self.assertEqual(data['latestVersion'], 'v0.5.2')
+        self.assertTrue(data['latestAvailable'])
+        self.assertEqual([v['version'] for v in data['versions']], ['v0.5.2', 'v0.5.1', 'v0.5.3-dev1'])
+        self.assertEqual([s['id'] for s in data['versions'][0]['sources']], ['github', 'r2'])
+        self.assertEqual(
+            data['versions'][0]['sources'][1]['url'],
+            'https://cdn.20240303.xyz/taosync-release/v0.5.2/taoSync-v0.5.2-linux-amd64.tar.gz',
+        )
+        self.assertEqual([s['id'] for s in data['versions'][2]['sources']], ['r2'])
+        self.assertEqual(
+            data['versions'][2]['sources'][0]['url'],
+            'https://cdn.20240303.xyz/taosync-release/dev/v0.5.3-dev1/taoSync-v0.5.3-dev1-linux-amd64.tar.gz',
+        )
+
+    def test_online_update_auto_source_races_cancels_slower_and_installs_latest(self):
+        slow_started = asyncio.Event()
+        slow_cancelled = asyncio.Event()
+        downloaded_urls = []
+        archive = release_archive('tar.gz', ('taoSync', self.stable_payload))
+
+        async def fake_probe(source, **_kwargs):
+            if source['id'] == 'github':
+                slow_started.set()
+                try:
+                    await asyncio.Future()
+                finally:
+                    slow_cancelled.set()
+            await slow_started.wait()
+            return source, 42
+
+        async def fake_download(url, destination, *, limit=update.MAX_BYTES, on_progress=None):
+            downloaded_urls.append(url)
+            Path(destination).write_bytes(archive)
+            if on_progress:
+                on_progress(len(archive), len(archive))
+            return hashlib.sha256(archive).hexdigest()
+
+        with patch.object(update, 'fetch_manifest_bytes', self._manifest_fetcher()), \
+                patch.object(update, 'probe_source', fake_probe), \
+                patch.object(update, 'download_package', fake_download):
+            res = self.fetch(
+                '/online', method='POST',
+                headers={'X-TaoSync-Update': '1', 'Content-Type': 'application/json'},
+                body=json.dumps({'version': 'latest', 'source': 'auto'}),
+            )
+            self.assertEqual(res.code, 200, res.body)
+            started = json.loads(res.body)['data']
+            self.assertEqual(started['version'], 'v0.5.2')
+            self._wait_online_done()
+
+        self.assertTrue(slow_cancelled.is_set())
+        self.assertEqual(downloaded_urls, [
+            'https://cdn.20240303.xyz/taosync-release/v0.5.2/taoSync-v0.5.2-linux-amd64.tar.gz',
+        ])
+        slot = launcher.slot(self.directory, self.stable_digest)
+        self.assertEqual(slot.read_bytes(), self.stable_payload)
+        self.assertEqual(launcher.read_json(self.channel / 'request'),
+                         {'id': started['id'], 'digest': self.stable_digest})
+        self.restart.assert_called_once()
+
+    def test_online_update_dev_version_uses_r2_and_rejects_version_mismatch(self):
+        dev_archive = release_archive('tar.gz', ('taoSync', self.dev_payload))
+        wrong_archive = release_archive('tar.gz', ('taoSync', self.old_payload))
+
+        async def download_wrong(url, destination, **_kwargs):
+            Path(destination).write_bytes(wrong_archive)
+            return hashlib.sha256(wrong_archive).hexdigest()
+
+        with patch.object(update, 'fetch_manifest_bytes', self._manifest_fetcher()), \
+                patch.object(update, 'download_package', download_wrong):
+            res = self.fetch(
+                '/online', method='POST',
+                headers={'X-TaoSync-Update': '1', 'Content-Type': 'application/json'},
+                body=json.dumps({'version': 'v0.5.3-dev1', 'source': 'r2'}),
+            )
+            self.assertEqual(res.code, 200)
+            self._wait_online_done()
+            status = json.loads(self.fetch('/online', headers={'Accept-Language': 'en'}).body)['data']
+        self.assertEqual(status['phase'], 'error')
+        self.assertIn('does not match the selected version', status['message'])
+        self.restart.assert_not_called()
+
+        async def download_dev(url, destination, **_kwargs):
+            self.assertIn('/taosync-release/dev/v0.5.3-dev1/', url)
+            Path(destination).write_bytes(dev_archive)
+            return hashlib.sha256(dev_archive).hexdigest()
+
+        with patch.object(update, 'fetch_manifest_bytes', self._manifest_fetcher()), \
+                patch.object(update, 'download_package', download_dev):
+            res = self.fetch(
+                '/online', method='POST',
+                headers={'X-TaoSync-Update': '1', 'Content-Type': 'application/json'},
+                body=json.dumps({'version': 'v0.5.3-dev1', 'source': 'auto'}),
+            )
+            self.assertEqual(res.code, 200)
+            self._wait_online_done()
+        self.assertEqual(launcher.slot(self.directory, self.dev_digest).read_bytes(), self.dev_payload)
+        self.restart.assert_called_once()
+
+    def test_online_update_can_be_cancelled_and_blocks_concurrent_start(self):
+        started = asyncio.Event()
+
+        async def slow_download(url, destination, **_kwargs):
+            started.set()
+            await asyncio.Future()
+
+        with patch.object(update, 'fetch_manifest_bytes', self._manifest_fetcher()), \
+                patch.object(update, 'download_package', slow_download):
+            res = self.fetch(
+                '/online', method='POST',
+                headers={'X-TaoSync-Update': '1', 'Content-Type': 'application/json'},
+                body=json.dumps({'version': 'v0.5.3-dev1', 'source': 'r2'}),
+            )
+            self.assertEqual(res.code, 200)
+            self.io_loop.run_sync(started.wait)
+            busy = self.fetch(
+                '/online', method='POST',
+                headers={'X-TaoSync-Update': '1', 'Content-Type': 'application/json'},
+                body=json.dumps({'version': 'latest', 'source': 'auto'}),
+            )
+            self.assertEqual(busy.code, 409)
+            cancel = self.fetch('/online', method='DELETE', headers={'X-TaoSync-Update': '1'})
+            self.assertEqual(cancel.code, 200)
+            self._wait_online_done()
+            status = json.loads(self.fetch('/online').body)['data']
+        self.assertEqual(status['phase'], 'cancelled')
+        self.assertEqual(list(self.directory.iterdir()), [])
+        self.restart.assert_not_called()
 
 
 class TrustRaceTest(unittest.IsolatedAsyncioTestCase):

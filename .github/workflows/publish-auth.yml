@@ -1,6 +1,12 @@
 name: 登记构建授信
 
 on:
+  workflow_dispatch:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'apiServer/download_sources.json'
+      - 'apiServer/index.html'
   workflow_run:
     workflows: ['构建']
     types: [completed]
@@ -9,8 +15,12 @@ jobs:
   publish-auth:
     name: 汇总并登记实际构建的程序
     if: >-
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+      )
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -20,7 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Read the built revision's version file; run scripts only from the default branch.
-      - uses: actions/checkout@v4
+      - if: github.event_name == 'workflow_run'
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           path: build-metadata
@@ -30,7 +41,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - uses: actions/download-artifact@v4
+      - if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
@@ -39,10 +51,14 @@ jobs:
           merge-multiple: true
       - id: publish
         run: |
-          VERSION=$(head -n 1 build-metadata/version.txt | cut -d, -f1 | tr -d '\r')
-          python3 scripts/release-checksums.py collect dist "$VERSION" "$RUNNER_TEMP/delta.json"
-          if [[ -f "$RUNNER_TEMP/delta.json" ]]; then
-            bash scripts/publish-trust.sh "$RUNNER_TEMP/delta.json"
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            VERSION=$(head -n 1 build-metadata/version.txt | cut -d, -f1 | tr -d '\r')
+            python3 scripts/release-checksums.py collect dist "$VERSION" "$RUNNER_TEMP/delta.json"
+            if [[ -f "$RUNNER_TEMP/delta.json" ]]; then
+              bash scripts/publish-trust.sh "$RUNNER_TEMP/delta.json"
+            fi
+          else
+            bash scripts/publish-trust.sh -
           fi
 
   mirror-auth:

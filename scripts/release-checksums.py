@@ -7,7 +7,14 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from apiServer.trust_manifest import LABEL, encode_manifest, parse_builds, split_builds
+from apiServer.trust_manifest import (
+    LABEL,
+    build_downloads_catalog,
+    encode_manifest,
+    load_download_sources,
+    parse_builds,
+    split_builds,
+)
 
 
 def manifest(directory, tag, include_apk=False):
@@ -44,15 +51,22 @@ if __name__ == '__main__':
         old = parse_builds(Path(previous).read_bytes()) if previous != '-' else []
         Path(output).write_bytes(encode_manifest(old + parse_builds(Path(addition).read_bytes())))
     elif sys.argv[1] == 'split':
-        _, _, stable_out, dev_out, latest_out, *sources = sys.argv
+        args = sys.argv[2:]
+        sources_path = None
+        if len(args) >= 2 and args[0] == '--sources':
+            sources_path = args[1]
+            args = args[2:]
+        stable_out, dev_out, latest_out, *sources = args
         combined = []
         for source in sources:
             if source != '-':
                 combined.extend(parse_builds(Path(source).read_bytes()))
         stable, dev, latest_version, latest = split_builds(combined)
-        Path(stable_out).write_bytes(encode_manifest(stable))
-        Path(dev_out).write_bytes(encode_manifest(dev))
-        Path(latest_out).write_bytes(encode_manifest(latest, version=latest_version))
+        download_sources = load_download_sources(sources_path)
+        downloads = build_downloads_catalog(stable, dev, download_sources)
+        Path(stable_out).write_bytes(encode_manifest(stable, download_sources=download_sources))
+        Path(dev_out).write_bytes(encode_manifest(dev, download_sources=download_sources))
+        Path(latest_out).write_bytes(encode_manifest(latest, version=latest_version, downloads=downloads))
     else:
         for digest, target in manifest(Path(sys.argv[1]), sys.argv[2]):
             print(digest, target)

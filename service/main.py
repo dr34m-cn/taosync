@@ -464,7 +464,7 @@ LOG_PORT = 8024
 
 
 def make_business_app(server_cfg):
-    from controller.updateController import UpdateCheck, UpdateInfo
+    from controller.updateController import UpdateCheck, UpdateInfo, UpdateReleases
     # 8023：业务接口 + taoSync 前端（0.0.0.0，允许外部设备访问）
     return Application([
         (r"/svr/noAuth/login", systemController.Login),
@@ -474,6 +474,7 @@ def make_business_app(server_cfg):
         (r"/svr/settings/api-key", systemController.ApiKey),
         (r"/svr/settings/update", UpdateInfo),
         (r"/svr/settings/update/check", UpdateCheck),
+        (r"/svr/settings/update/releases", UpdateReleases),
         (r"/svr/language", systemController.Language),
         (r"/svr/alist", jobController.Alist),
         (r"/svr/storage", jobController.Storage),

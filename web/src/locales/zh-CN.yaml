@@ -649,9 +649,33 @@ programUpdate:
   loading: 正在读取运行环境…
   target: 发布平台
   arch: 处理器架构
+  currentVersion: 当前版本
+  onlineTitle: 在线更新
+  manualTitle: 手动更新
+  onlineDesc: 选择版本与下载源直接在线更新，下载完成后将自动校验可执行文件并重启服务。
+  refreshReleases: 刷新列表
+  versionLabel: 目标版本
+  sourceLabel: 更新源
+  latestStable: 最新正式版
+  latestStableWithVersion: 最新正式版（{version}）
+  stableTag: 正式版
+  currentTag: 当前
+  autoSource: 自动选择源
+  autoSourceHint: 测速选最快
+  startOnline: 开始在线更新
+  onlineConfirm: 将通过「{source}」在线下载并安装 {version}，完成后自动重启 TaoSync 并刷新页面。请先保存尚未提交的设置。
+  onlineConfirmDev: 将通过「{source}」在线下载并安装 {version}，完成后自动重启 TaoSync 并刷新页面。DEV 版本仅限经验丰富的开发者尝鲜，可能存在严重错误，普通用户请勿使用。请先保存尚未提交的设置。
+  devWarning: DEV 版本仅限经验丰富的开发者尝鲜，可能存在严重错误，普通用户请勿使用。
+  releasesError: 无法获取可更新版本列表，请检查网络或使用手动更新。
+  noVersionForPlatform: 暂未找到适用于当前平台的在线更新版本。
+  noSourceAvailable: 当前所选版本暂无可用在线下载源，请改用手动更新。
+  probing: 正在测速并选择最快可用源…
+  downloading: 正在从 {source} 下载（已下载 {loaded}）…
+  downloadingTotal: 正在从 {source} 下载（{loaded} / {total}）…
+  onlineFailed: 在线更新失败
   online: 允许安装{registry}中与当前平台匹配的开发版、预发布版和正式版。
   registry: 授信清单
-  container: 更新在当前容器重启后保留；重建容器会使用所选镜像的版本。
+  container: 当前运行在 Docker 容器中。程序内更新在重启容器后保留，但重建容器会恢复为所选镜像的版本，可能导致版本降级。建议不要操作重建，或者通过更新 Docker 镜像的方式来更新。
   unsupported: 当前为源码或移动端部署，请通过原安装方式更新。
   source: 切勿上传来历不明的更新文件。官方下载：
   drop: 将可执行文件或发布包拖到此处，或
