@@ -255,6 +255,11 @@ I originally created this project to preserve photos of Taotao as she grows up, 
 
 ## Before You Begin
 
+> [!CAUTION]
+> **Android Upgrade Notice**: Due to Android platform constraints and an earlier design flaw in the Android build, **upgrading from an Android version earlier than v0.5.2 will clear TaoSync's configuration data** (fixed in v0.5.2 so future in-place upgrades preserve data). Please back up before updating; because of Android's storage isolation, there is currently no convenient built-in backup method, so please record important settings manually beforehand (such as encrypted directory keys, jobs, and storage settings).
+>
+> **Rest assured, your cloud drive files and local files will NOT be affected or lost**—only TaoSync's own configuration data is reset. **All other platforms (Windows, macOS, Linux, Docker, etc.) are completely unaffected and safe to update.**
+
 > [!IMPORTANT]
 > The built-in TaoSync engine is currently in **Beta** and connects directly to local directories, SMB, FTP, SFTP, and Aliyun Drive without OpenList. **External engines such as OpenList/AList are still recommended**; deploy [OpenList](https://docs.oplist.org/)/AList separately and add it as an external engine.
 
@@ -295,7 +300,7 @@ You can create a one-time job by specifying the year, month, day, hour, minute, 
 * Responsive interface for both desktop and mobile devices
 * Clean removal: simply delete TaoSync when you no longer need it; it leaves no residual files or dependencies and does not affect other applications
 * Login passwords are stored in the database as salted PBKDF2 hashes, and password resets are supported. If you set the initial password through a configuration file or environment variable, protect that configuration carefully
-* Runs locally and connects to configured storage, external engines, and notification services. Aliyun Drive QR authorization and token refresh use an authorization service; file transfers connect directly to Aliyun Drive
+* Runs locally and connects to configured storage, external engines, and notification services. Aliyun Drive QR authorization and token refresh use an authorization service; file transfers connect directly to Aliyun Drive. Optional anonymous sync statistics are enabled by default (reporting only the synced file count and total byte size per run, with no user, device, or file information; can be disabled anytime in System Settings)
 * Comprehensive error handling for stable, reliable, and internally consistent operation. Errors may happen, but crashes never do (or so I think)
 * Detailed logging: all errors are recorded
 * The built-in TaoSync engine supports local directories, SMB, FTP, SFTP, and Aliyun Drive; external `OpenList/AList` engines can also be managed
@@ -384,7 +389,7 @@ Current OpenList images no longer use the `PUID` and `PGID` environment variable
 
 Open `http://127.0.0.1:8023`.
 
-The default username is `admin`. If the initial password is configured as `RANDOM`, find the generated password in the logs. If you configured a password manually, use that value to sign in. After signing in, change the password immediately through the user menu, which also lets you change your username.
+The default username is `admin`. If the initial password is configured as `RANDOM`, find the generated password in the logs. If you configured a password manually, use that value to sign in. After signing in, change the password immediately through the user menu, which also lets you change your username. If you forget your password, reset it on the sign-in page using `data/secret.key`; on Android, you can also tap **Reset Password** in the in-app log toolbar to generate and copy a new random password directly.
 
 > [!NOTE]
 > If the password does not appear in the console output, check `data/log/sys_xxx.log` in the same directory. It is usually on the first line.
@@ -395,13 +400,14 @@ You can create subdirectories directly in the source and destination pickers, ex
 
 ### Built-in Storage and Concurrency
 
-* For local storage, select a path accessible to the TaoSync process. Its program and runtime data directories are protected. SMB supports device discovery, share selection, and manual entry. SFTP supports password and key authentication.
-* Aliyun Drive uses QR authorization through the public service by default. You can also use a **[self-hosted authorization service](./apiServer/README.md) (preferred for greater security)** or supply your own application credentials. It supports directory selection and cloud renames and moves. When rapid upload is enabled, TaoSync attempts it only for files larger than 10 MiB. You can filter successful rapid uploads in task details and see their count and size in task history.
+* For local storage, select a path accessible to the TaoSync process. Its program and runtime data directories are protected. SMB supports device discovery, share selection, and manual entry; SMB, FTP, and SFTP all support browsing and selecting root directories through the folder picker. SFTP supports password and key authentication.
+* Aliyun Drive uses QR authorization through the public service by default. You can also use a **[self-hosted authorization service](./apiServer/README.md) (preferred for greater security)** or supply your own application credentials. It supports directory selection, creating subdirectories in the picker, and cloud renames and moves. When rapid upload is enabled, you can configure the file-size threshold in `KB`, `MB`, or `GB` (default `10 MB`; `0` enables attempts for all non-empty files). You can filter successful rapid uploads in task details and see their count and size in task history.
+* Each built-in storage mount caches directory listings for 30 days by default (`0` disables and clears immediately; `-1` never expires). Cached listings are reused across jobs and restarts to reduce remote listing queries, while scheduled full comparisons and full-sync mirror deletions still check live storage. External changes outside TaoSync require cache expiration, disabling the cache, or a fresh scan to be detected.
 * Concurrent copies default to 5, with a range of 1 to 100. For the built-in engine, configure each destination storage directory in directory management. For OpenList/AList, configure the external engine. Jobs share the corresponding limit.
 
 ### Encrypted Backups and Recovery
 
-In the built-in engine’s **Directory Management**, add an **Encrypted Directory**. Select a dedicated backup folder on an existing storage mount, set an encryption key, and choose whether to encrypt directory names. Save it and select the encrypted directory as your job’s destination. TaoSync encrypts file contents and filenames on write. Existing plaintext files stay as they are. To restore, use the encrypted directory as the source and copy to a regular directory to recover the original names and contents.
+In the built-in engine’s **Directory Management**, add an **Encrypted Directory**. Select a dedicated backup folder on an existing storage mount (you can create subdirectories directly in the picker), set an encryption key, and choose whether to encrypt directory names. Save it and select the encrypted directory as your job’s destination. TaoSync encrypts file contents and filenames on write. Existing plaintext files stay as they are. To restore, use the encrypted directory as the source and copy to a regular directory to recover the original names and contents.
 
 **Back up the encryption key separately. If you lose both the key and the TaoSync database, you cannot decrypt the backup.** Saving locks the key, the underlying path, and the directory-name encryption setting. When migrating the underlying backup, copy the entire directory, including the companion name records for long file and directory names.
 
@@ -425,9 +431,11 @@ To trigger syncs from a script, generate a **Job execution key** in **System Set
 
 ### Upgrading from Older Versions
 
-Back up the entire `data` directory before upgrading. **For your first upgrade from v0.5.0 or earlier to v0.5.1, use your original installation method.** For Docker, pull the new image and recreate the container with the original data volume. For a standalone installation, stop TaoSync and replace the executable. When upgrading from a version before v0.5.0, sign in again to migrate the old password hash to PBKDF2. To downgrade, restore both the old program and the data backup made before upgrading.
+Back up the entire `data` directory before upgrading. **For your first upgrade from v0.5.1 or earlier to v0.5.2, use manual update or your original installation method.** For Docker, pull the new image and recreate the container with the original data volume. For a standalone installation, stop TaoSync and replace the executable (v0.5.1 can also upload the release archive manually under **System Settings → Program update**). When upgrading from a version before v0.5.0, sign in again to migrate the old password hash to PBKDF2. To downgrade, restore both the old program and the data backup made before upgrading.
 
-Starting with v0.5.1, Docker and standalone installations show their build target under **System Settings → Program update**. Download the matching executable, ZIP, or tar.gz archive from GitHub Releases. Once sync jobs have finished, drop the file onto the page and confirm. TaoSync verifies the platform and the executable’s SHA-256 against the official trusted build registry before restarting. If the new program fails to start, TaoSync restores the previous version. In Docker, a page-installed update survives a container restart. Recreating the container uses the version in the selected image. For source and mobile installations, keep using the original update method.
+Opening **System Settings** automatically checks for the latest official release and shows a banner when a newer version is available. Starting with v0.5.2, Docker and standalone installations can use **Online update** directly under **System Settings → Program update** (defaulting to the latest official release and automatic source selection, while allowing selection of official or development/prerelease builds and download sources, with live progress and cancellation) or **Manual update** by uploading the matching executable, ZIP, or tar.gz archive. TaoSync verifies the platform, version, and executable SHA-256 against the official trusted build registry before restarting, and rolls back automatically if the new program fails to start. In Docker, a page-installed update survives a container restart, whereas recreating the container uses the image version; pulling a newer image is recommended for persistent upgrades.
+
+Starting with v0.5.2, official Android APKs use a fixed signing key and store runtime data in a persistent private directory so future releases can upgrade in place while preserving all data. When upgrading from v0.5.1 or earlier to v0.5.2, back up any needed data and uninstall the older version first. For source installations, keep using your original update method.
 
 ## Configuration
 
@@ -436,7 +444,7 @@ Starting with v0.5.1, Docker and standalone installations show their build targe
 
 Configuration precedence applies to each option: `data/config.ini` > `environment variables` > `default values`. Options absent from the file still use environment variables. Invalid numeric settings are logged and retain the lower-priority value already loaded. Restart TaoSync or its container after manually changing configuration files or environment variables.
 
-System Settings lets you edit task record retention, task timeout, the source directory full comparison interval, and the Aliyun Drive authorization service URL without restarting. Saving writes the current values of all four settings to `data/config.ini`; these saved values take precedence over environment variables on subsequent starts.
+System Settings lets you edit task record retention, task timeout, the source directory full comparison interval, the Aliyun Drive authorization service URL, and anonymous sync statistics without restarting. Saving writes the current values of all five settings to `data/config.ini`; these saved values take precedence over environment variables on subsequent starts.
 
 Example `data/config.ini` file (when present, this file has the **highest priority**):
 
@@ -465,6 +473,9 @@ task_timeout=72
 source_full_scan_days=15
 # Aliyun Drive QR authorization and token refresh service URL.
 aliyun_auth_server=https://taoapi.dr34m.cn
+# Optional anonymous sync statistics: true to enable, false to disable.
+# Reports only the synced file count and total bytes per run.
+anonymous_stats=true
 ```
 
 This file is not required on first startup. Create a UTF-8 `config.ini` under `data` in the program's working directory, or let System Settings create it. Inside Docker, the path is `/app/data/config.ini`.
@@ -485,13 +496,14 @@ The timeout also accepts `timeout`, which is the key saved by System Settings. I
 | task_timeout / timeout | TAO_TASK_TIMEOUT | Task execution timeout, in hours; 0 disables it | 72 |
 | source_full_scan_days | TAO_SOURCE_FULL_SCAN_DAYS | Full comparison interval for Source directory mode, in days; fractions are allowed, and 0 disables periodic comparisons | 15 |
 | aliyun_auth_server | TAO_ALIYUN_AUTH_SERVER | Aliyun Drive QR authorization and token refresh service URL; supports a **self-hosted HTTPS service (preferred for greater security)** | https://taoapi.dr34m.cn |
+| anonymous_stats | TAO_ANONYMOUS_STATS | Optional anonymous sync statistics (reports only synced file count and total bytes in the background, with no user or file details) | true |
 | -             | TZ                          | Time zone | Asia/Shanghai |
 
 </details>
 
 ## Development Status
 
-[v0.5.1 release notes](./doc/changelog/v0.5.1.md#-features) · [All changelogs](./doc/changelog/)
+[v0.5.2 release notes](./doc/changelog/v0.5.2.md#-features) · [All changelogs](./doc/changelog/)
 
 To try a development build, look for the latest tag containing `dev` or `pre` on [Docker Hub](https://hub.docker.com/r/dr34m/tao-sync) or [Releases](https://github.com/dr34m-cn/taosync/releases), such as `v0.1.0-dev-build0`. Development builds may contain obvious errors or serious bugs and are not recommended for beginners.
 
