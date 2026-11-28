@@ -405,6 +405,21 @@
       "version": "v0.5.2-dev-test-build6",
       "arch": "linux-amd64",
       "sha256": "e33c8d866ba1a7f4a824d67c297152f3fbd2be1565ccb03e9eb8476a3f55ee7c"
+    },
+    {
+      "version": "v0.5.2-dev-test-build7",
+      "arch": "android-arm64-v8a+armeabi-v7a",
+      "sha256": "88c94b996bb47c3facfd10ae146c67de11c8272a8d849a9c39a72d4095444416"
+    },
+    {
+      "version": "v0.5.2-dev-test-build7",
+      "arch": "linux-StaticX-amd64",
+      "sha256": "0401a49359b25fba215f834595bca623fb7ace8cbecd86301b2b9044f7dbed76"
+    },
+    {
+      "version": "v0.5.2-dev-test-build7",
+      "arch": "linux-amd64",
+      "sha256": "a7206f1e21cfae68d4e90faa20ac376da9d588bde89d50484b8df70835fb5880"
     }
   ],
   "publishedAt": {
@@ -478,7 +493,10 @@
     "v0.5.2-dev-test-build5/linux-StaticX-amd64/9a825c12ed3b71b8614a2b3cd385ecbd988247c45c9c7e34f8721059c8e96478": "2026-11-28T05:36:45Z",
     "v0.5.2-dev-test-build5/linux-amd64/0fcedc1b0d2d4770350ebc84b60ae33ee9b6a6fac3d44135dc63c47cb9173802": "2026-11-28T05:36:45Z",
     "v0.5.2-dev-test-build6/linux-StaticX-amd64/c215e33361896224d86d60d9a789b3284d4458e1b46abc04783aad0eabde6d1b": "2026-11-28T08:31:37Z",
-    "v0.5.2-dev-test-build6/linux-amd64/e33c8d866ba1a7f4a824d67c297152f3fbd2be1565ccb03e9eb8476a3f55ee7c": "2026-11-28T08:31:37Z"
+    "v0.5.2-dev-test-build6/linux-amd64/e33c8d866ba1a7f4a824d67c297152f3fbd2be1565ccb03e9eb8476a3f55ee7c": "2026-11-28T08:31:37Z",
+    "v0.5.2-dev-test-build7/android-arm64-v8a+armeabi-v7a/88c94b996bb47c3facfd10ae146c67de11c8272a8d849a9c39a72d4095444416": "2026-11-28T08:42:19Z",
+    "v0.5.2-dev-test-build7/linux-StaticX-amd64/0401a49359b25fba215f834595bca623fb7ace8cbecd86301b2b9044f7dbed76": "2026-11-28T08:42:19Z",
+    "v0.5.2-dev-test-build7/linux-amd64/a7206f1e21cfae68d4e90faa20ac376da9d588bde89d50484b8df70835fb5880": "2026-11-28T08:42:19Z"
   },
   "downloadSources": {
     "stable": [
