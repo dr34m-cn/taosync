@@ -18,12 +18,15 @@ import warnings
 warnings.filterwarnings('ignore', message='.*character detection dependency.*')
 
 # ======================================================================
-# 路径设置：服务进程需显式将 app 目录加入 sys.path
+# 路径设置：代码位于 p4a 解包目录 files/app（升级 APK 时会被 p4a 清空），
+# 运行时数据目录切换至持久化私有根目录 ANDROID_PRIVATE（files/），确保覆盖升级保留数据。
 # ======================================================================
 _app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _app_dir not in sys.path:
     sys.path.insert(0, _app_dir)
-os.chdir(_app_dir)
+from common.androidPaths import prepare_android_data_root
+_data_root = prepare_android_data_root(_app_dir)
+os.chdir(_data_root)
 os.makedirs('data', exist_ok=True)
 os.makedirs('data/log', exist_ok=True)
 
@@ -138,6 +141,7 @@ class _FileLogHandler(logging.Handler):
 _file_log('INFO', '=== taoSync 服务进程启动 ===')
 _file_log('INFO', f'Python: {sys.version}')
 _file_log('INFO', f'app_dir: {_app_dir}')
+_file_log('INFO', f'data_root: {_data_root}')
 _file_log('INFO', f'cwd: {os.getcwd()}')
 
 _logger = logging.getLogger()
@@ -904,7 +908,7 @@ async def main():
 
     # 在监听 8024 前写入仅本应用 UID 可读的握手令牌，供 main_android.py 认证壳 WebView
     shell_auth = ShellAuthManager.create_with_token_file(
-        os.path.join(_app_dir, 'data', SHELL_TOKEN_FILENAME)
+        os.path.join(_data_root, 'data', SHELL_TOKEN_FILENAME)
     )
     # 8024 日记页仅绑定 127.0.0.1，仅供本机应用内 WebView 访问，不对外暴露
     log_app = make_log_app(shell_auth)

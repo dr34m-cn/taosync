@@ -104,7 +104,11 @@ def _wait_port(host, port, timeout=30):
 
 
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
-_SHELL_TOKEN_PATH = os.path.join(_APP_DIR, 'data', '.shell_token')
+if _APP_DIR not in sys.path:
+    sys.path.insert(0, _APP_DIR)
+from common.androidPaths import SHELL_TOKEN_FILENAME, resolve_android_data_root
+_DATA_ROOT = resolve_android_data_root(_APP_DIR)
+_SHELL_TOKEN_PATH = os.path.join(_DATA_ROOT, 'data', SHELL_TOKEN_FILENAME)
 
 
 def _read_shell_token(path=_SHELL_TOKEN_PATH, timeout=5.0):

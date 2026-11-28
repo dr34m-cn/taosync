@@ -66,6 +66,6 @@ python scripts/run-backend-tests.py --shuffle-seed 42
 - Return only one Markdown fenced code block with exactly two content lines, no blank line between them, and no text outside the code block.
 - Line 1 is one short Chinese sentence summarizing the changes, without a category prefix.
 - Line 2 lists the categorized changes using only these prefixes: `add 增加了`, `update 更新了`, `fix 修复了`, and `remove 移除了`. Join every item with ` && ` and do not insert line breaks within Line 2.
-- Exclude acknowledgements, explanations, verification, tests, runtime status, memory or preference updates, environment details, and other non-code-change work.
+- Only summarize product code changes such as feature updates and bug fixes; exclude release notes, changelogs, README or documentation authoring, acknowledgements, explanations, verification, tests, runtime status, memory or preference updates, environment details, and other non-product-code work.
 - Each valid two-line summary becomes the new checkpoint for subsequent summaries; earlier valid checkpoints (including those created before format changes) remain valid.
 

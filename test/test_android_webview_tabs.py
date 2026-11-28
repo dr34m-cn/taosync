@@ -114,6 +114,17 @@ class AndroidWebViewTabsTest(unittest.TestCase):
         self.assertIn(json.dumps('Reset Password', ensure_ascii=False), en_html)
         self.assertIn(json.dumps('Copied', ensure_ascii=False), en_html)
 
+    def test_android_entrypoints_use_persistent_data_root_outside_app_dir(self):
+        service_src = SERVICE_MAIN.read_text(encoding='utf-8')
+        android_src = ANDROID_MAIN.read_text(encoding='utf-8')
+        self.assertIn('prepare_android_data_root(_app_dir)', service_src)
+        self.assertIn('os.chdir(_data_root)', service_src)
+        self.assertNotIn('os.chdir(_app_dir)', service_src)
+        self.assertIn('FRONTEND_PATH = _app_dir', service_src)
+        self.assertIn("os.path.join(_data_root, 'data', SHELL_TOKEN_FILENAME)", service_src)
+        self.assertIn('resolve_android_data_root(_APP_DIR)', android_src)
+        self.assertIn("os.path.join(_DATA_ROOT, 'data', SHELL_TOKEN_FILENAME)", android_src)
+
 
 if __name__ == '__main__':
     unittest.main()

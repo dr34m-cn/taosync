@@ -2,6 +2,7 @@ from http.cookies import SimpleCookie
 import json
 import os
 import re
+import shutil
 import sqlite3
 import stat
 import tempfile
@@ -13,10 +14,11 @@ from unittest import mock
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application, RequestHandler
 
-from common import LNG, commonUtils, config, locales, sqlBase
+from common import LNG, androidPaths, commonUtils, config, locales, sqlBase
 from controller import baseController
 from mapper import userMapper
-from service.system import androidShell, userService
+from service.storage import localAccess
+from service.system import androidShell, programUpdate, userService
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -453,6 +455,108 @@ class AndroidLocalResetHttpTest(_IsolatedDbMixin, AsyncHTTPTestCase):
         body = response.body.decode('utf-8')
         self.assertIn('<html lang="en">', body)
         self.assertIn('Reset Password', body)
+
+
+class AndroidDataPersistenceTest(unittest.TestCase):
+    def test_data_root_survives_p4a_app_dir_wipe_on_apk_upgrade(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            files_dir = Path(tmpdir) / 'files'
+            app_dir = files_dir / 'app'
+            app_dir.mkdir(parents=True)
+            env = {'ANDROID_PRIVATE': str(files_dir)}
+
+            data_root = androidPaths.prepare_android_data_root(str(app_dir), env=env)
+            self.assertEqual(Path(data_root).resolve(), files_dir.resolve())
+
+            data_dir = Path(data_root) / 'data'
+            (data_dir / 'taoSync.db').write_bytes(b'sqlite-db-v1')
+            (data_dir / 'secret.key').write_text('secret-key-v1', encoding='utf-8')
+            (data_dir / 'config.ini').write_text('[tao]\nport=8023\n', encoding='utf-8')
+            (data_dir / 'https.pem').write_text('pem-data', encoding='utf-8')
+
+            # Simulate p4a PythonUtil.unpackAsset(..., cleanup_on_version_update=true)
+            shutil.rmtree(app_dir)
+            app_dir.mkdir(parents=True)
+
+            data_root_after = androidPaths.prepare_android_data_root(str(app_dir), env=env)
+            self.assertEqual(Path(data_root_after).resolve(), files_dir.resolve())
+            self.assertEqual((data_dir / 'taoSync.db').read_bytes(), b'sqlite-db-v1')
+            self.assertEqual((data_dir / 'secret.key').read_text(encoding='utf-8'), 'secret-key-v1')
+            self.assertEqual((data_dir / 'config.ini').read_text(encoding='utf-8'), '[tao]\nport=8023\n')
+            self.assertEqual((data_dir / 'https.pem').read_text(encoding='utf-8'), 'pem-data')
+
+    def test_resolve_android_data_root_fallbacks_and_safety(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            files_dir = Path(tmpdir) / 'files'
+            app_dir = files_dir / 'app'
+            app_dir.mkdir(parents=True)
+
+            # Rejects ANDROID_PRIVATE pointing to app_dir or inside app_dir
+            self.assertEqual(
+                Path(androidPaths.resolve_android_data_root(str(app_dir), env={'ANDROID_PRIVATE': str(app_dir)})).resolve(),
+                files_dir.resolve(),
+            )
+            self.assertEqual(
+                Path(androidPaths.resolve_android_data_root(str(app_dir), env={'ANDROID_PRIVATE': str(app_dir / 'sub')})).resolve(),
+                files_dir.resolve(),
+            )
+            # Falls back to parent of .../app when ANDROID_PRIVATE is absent
+            self.assertEqual(
+                Path(androidPaths.resolve_android_data_root(str(app_dir), env={})).resolve(),
+                files_dir.resolve(),
+            )
+            # Non-app directory without ANDROID_PRIVATE stays unchanged
+            other_dir = Path(tmpdir) / 'workspace'
+            other_dir.mkdir()
+            self.assertEqual(
+                Path(androidPaths.resolve_android_data_root(str(other_dir), env={})).resolve(),
+                other_dir.resolve(),
+            )
+
+    def test_legacy_data_migration_moves_files_and_never_overwrites_existing_data(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            files_dir = Path(tmpdir) / 'files'
+            app_dir = files_dir / 'app'
+            legacy_log = app_dir / 'data' / 'log'
+            legacy_log.mkdir(parents=True)
+            (app_dir / 'data' / 'taoSync.db').write_bytes(b'legacy-db')
+            (app_dir / 'data' / 'secret.key').write_text('legacy-secret', encoding='utf-8')
+            (app_dir / 'data' / androidPaths.SHELL_TOKEN_FILENAME).write_text('ephemeral-token', encoding='utf-8')
+            (legacy_log / 'sys_2026-11-28.log').write_text('log-entry', encoding='utf-8')
+
+            migrated = androidPaths.migrate_legacy_android_data(str(app_dir), str(files_dir))
+            self.assertTrue(migrated)
+            self.assertEqual((files_dir / 'data' / 'taoSync.db').read_bytes(), b'legacy-db')
+            self.assertEqual((files_dir / 'data' / 'secret.key').read_text(encoding='utf-8'), 'legacy-secret')
+            self.assertEqual((files_dir / 'data' / 'log' / 'sys_2026-11-28.log').read_text(encoding='utf-8'), 'log-entry')
+            self.assertFalse((files_dir / 'data' / androidPaths.SHELL_TOKEN_FILENAME).exists())
+            self.assertFalse((app_dir / 'data').exists())
+
+            # If persistent data already exists, legacy data must never overwrite it
+            (app_dir / 'data').mkdir(parents=True)
+            (app_dir / 'data' / 'taoSync.db').write_bytes(b'stale-db')
+            self.assertFalse(androidPaths.migrate_legacy_android_data(str(app_dir), str(files_dir)))
+            self.assertEqual((files_dir / 'data' / 'taoSync.db').read_bytes(), b'legacy-db')
+
+    def test_locales_version_and_local_boundary_work_when_cwd_is_android_private(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            files_dir = Path(tmpdir) / 'files'
+            (files_dir / 'data').mkdir(parents=True)
+            (files_dir / 'data' / 'secret.key').write_text('key', encoding='utf-8')
+            orig_cwd = os.getcwd()
+            os.chdir(files_dir)
+            try:
+                self.assertTrue(Path(locales._get_locales_path()).is_dir())
+                self.assertTrue(bool(programUpdate.current_version()))
+
+                with mock.patch.dict(os.environ, {'ANDROID_PRIVATE': str(files_dir)}):
+                    boundary = localAccess.LocalBoundary()
+                    with self.assertRaises(localAccess.LocalPathError):
+                        boundary.check(files_dir.resolve())
+                    with self.assertRaises(localAccess.LocalPathError):
+                        boundary.check((files_dir / 'data' / 'secret.key').resolve())
+            finally:
+                os.chdir(orig_cwd)
 
 
 if __name__ == '__main__':

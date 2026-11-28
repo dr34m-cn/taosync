@@ -20,13 +20,13 @@ from tornado.concurrent import run_on_executor
 from tornado.web import RequestHandler
 
 from common import LNG, locales
+from common.androidPaths import SHELL_TOKEN_FILENAME
 from service.system import userService
 
 SHELL_LOCAL_HEADER = 'X-TaoSync-Local'
 SHELL_LOCAL_HEADER_VALUE = '1'
 SHELL_TOKEN_HEADER = 'X-TaoSync-Shell-Token'
 SHELL_COOKIE_NAME = 'taosync_shell'
-SHELL_TOKEN_FILENAME = '.shell_token'
 SHELL_I18N_PLACEHOLDER = '/*__SHELL_I18N__*/null'
 SHELL_TOKEN_PLACEHOLDER = '/*__SHELL_TOKEN__*/""'
 MAX_SHELL_SESSIONS = 16

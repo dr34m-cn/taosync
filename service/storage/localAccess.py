@@ -28,6 +28,8 @@ def denied():
 
 def protected_paths():
     roots = [Path(__file__).resolve().parents[2], Path.cwd() / 'data']
+    if os.getenv('ANDROID_PRIVATE'):
+        roots.append(Path(os.getenv('ANDROID_PRIVATE')))
     if getattr(sys, 'frozen', False):
         roots.append(Path(os.environ.get('STATICX_PROG_PATH') or sys.executable).resolve().parent)
         if os.getenv('TAO_UPDATE_DIR'):
