@@ -675,8 +675,14 @@ jobs:
           ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.android"
-          keystore_path="$HOME/.android/debug.keystore"
+          # ubuntu-24.04 Runner 默认设置了 XDG_CONFIG_HOME=$HOME/.config；
+          # AGP 8.1.1 在未设置 ANDROID_USER_HOME 时会优先使用 $XDG_CONFIG_HOME/.android/debug.keystore，
+          # 从而忽略 $HOME/.android/debug.keystore 并重新生成临时随机密钥。
+          # 显式导出 ANDROID_USER_HOME 强制 AGP 读取固定 keystore。
+          android_user_home="$HOME/.android"
+          mkdir -p "$android_user_home"
+          echo "ANDROID_USER_HOME=$android_user_home" >> "$GITHUB_ENV"
+          keystore_path="$android_user_home/debug.keystore"
           if [ -n "${ANDROID_DEBUG_KEYSTORE_BASE64:-}" ]; then
             printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$keystore_path"
             chmod 600 "$keystore_path"
@@ -688,7 +694,7 @@ jobs:
               exit 1
             fi
             echo "EXPECTED_APK_CERT_SHA256=$expected_sha256" >> "$GITHUB_ENV"
-            echo "已载入固定 Android Debug 签名密钥 (SHA256: $expected_sha256)"
+            echo "已载入固定 Android Debug 签名密钥: $keystore_path (SHA256: $expected_sha256)"
           elif [[ "$VERSION" != *dev* ]]; then
             echo "::error::缺少 ANDROID_DEBUG_KEYSTORE_BASE64 Secret，正式/预发布版本禁止使用临时随机密钥签名"
             exit 1
@@ -713,6 +719,8 @@ jobs:
           echo "APK 签名证书 SHA256: ${actual_sha256:-unknown}"
           if [ -n "${EXPECTED_APK_CERT_SHA256:-}" ]; then
             if [ -z "$actual_sha256" ] || [ "$actual_sha256" != "$EXPECTED_APK_CERT_SHA256" ]; then
+              echo "ANDROID_USER_HOME=${ANDROID_USER_HOME:-} XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-}"
+              find "$HOME" -maxdepth 3 -name 'debug.keystore' 2>/dev/null || true
               echo "::error::APK 签名证书指纹 (${actual_sha256:-empty}) 与固定密钥 ($EXPECTED_APK_CERT_SHA256) 不一致"
               exit 1
             fi
@@ -721,7 +729,7 @@ jobs:
 
       - name: 清理Android签名密钥
         if: always()
-        run: rm -f "$HOME/.android/debug.keystore"
+        run: rm -f "$HOME/.android/debug.keystore" "${XDG_CONFIG_HOME:-$HOME/.config}/.android/debug.keystore"
 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
