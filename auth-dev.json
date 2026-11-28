@@ -450,6 +450,21 @@
       "version": "v0.5.2-dev-test-build9",
       "arch": "linux-amd64",
       "sha256": "f6c64df12924b3fa9472d62e0473453414b183a75d4594f561315e883c26abe5"
+    },
+    {
+      "version": "v0.5.2-dev-test-build10",
+      "arch": "android-arm64-v8a+armeabi-v7a",
+      "sha256": "f4d8a6bd5541d60085f6e22d7f3b6de893b5c6f03dc37643f8d4be39e49c8da6"
+    },
+    {
+      "version": "v0.5.2-dev-test-build10",
+      "arch": "linux-StaticX-amd64",
+      "sha256": "320fdf3d2a035654b2133a1af0fc696f5e5dec185339cae8bee2f051d2ad0b58"
+    },
+    {
+      "version": "v0.5.2-dev-test-build10",
+      "arch": "linux-amd64",
+      "sha256": "423831e1f4fbf5297be6940dca8d84abc724daa2bcdd9ec290483e456b9115dc"
     }
   ],
   "publishedAt": {
@@ -532,7 +547,10 @@
     "v0.5.2-dev-test-build8/linux-amd64/fd058cf47c62fd4dc34c8f71d88a1ea437eeadce1e94204e40c72f67910b115d": "2026-11-28T13:08:39Z",
     "v0.5.2-dev-test-build9/android-arm64-v8a+armeabi-v7a/cf9846500f1b268a93f099a236c071bc2c63ba8c5c8c5e4fbba88fc7f2850440": "2026-11-28T14:01:37Z",
     "v0.5.2-dev-test-build9/linux-StaticX-amd64/37a61f0143454e343cc62d6b48c7b52f068caf897fb797248658290651888f37": "2026-11-28T14:01:37Z",
-    "v0.5.2-dev-test-build9/linux-amd64/f6c64df12924b3fa9472d62e0473453414b183a75d4594f561315e883c26abe5": "2026-11-28T14:01:37Z"
+    "v0.5.2-dev-test-build9/linux-amd64/f6c64df12924b3fa9472d62e0473453414b183a75d4594f561315e883c26abe5": "2026-11-28T14:01:37Z",
+    "v0.5.2-dev-test-build10/android-arm64-v8a+armeabi-v7a/f4d8a6bd5541d60085f6e22d7f3b6de893b5c6f03dc37643f8d4be39e49c8da6": "2026-11-28T14:54:09Z",
+    "v0.5.2-dev-test-build10/linux-StaticX-amd64/320fdf3d2a035654b2133a1af0fc696f5e5dec185339cae8bee2f051d2ad0b58": "2026-11-28T14:54:09Z",
+    "v0.5.2-dev-test-build10/linux-amd64/423831e1f4fbf5297be6940dca8d84abc724daa2bcdd9ec290483e456b9115dc": "2026-11-28T14:54:09Z"
   },
   "downloadSources": {
     "stable": [
@@ -565,6 +583,33 @@
           "en": "Cloudflare R2"
         }
       }
+    ]
+  },
+  "versionSources": {
+    "v0.5.1": [
+      "github"
+    ],
+    "v0.5.1-dev-build6": [],
+    "v0.5.1-dev-build8": [],
+    "v0.5.1-dev-test-build3": [],
+    "v0.5.1-dev-test-build4": [],
+    "v0.5.1-dev-test-build5": [],
+    "v0.5.1-dev-test-build7": [],
+    "v0.5.1-pre-build0": [],
+    "v0.5.2-dev-build0": [],
+    "v0.5.2-dev-test-build1": [],
+    "v0.5.2-dev-test-build10": [
+      "r2"
+    ],
+    "v0.5.2-dev-test-build2": [],
+    "v0.5.2-dev-test-build3": [],
+    "v0.5.2-dev-test-build4": [],
+    "v0.5.2-dev-test-build5": [],
+    "v0.5.2-dev-test-build6": [],
+    "v0.5.2-dev-test-build7": [],
+    "v0.5.2-dev-test-build8": [],
+    "v0.5.2-dev-test-build9": [
+      "r2"
     ]
   }
 }
