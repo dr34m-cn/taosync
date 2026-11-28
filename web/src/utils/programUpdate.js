@@ -41,6 +41,52 @@ export function resolveSelectedVersionEntry(releases, selectedVersion = LATEST_S
   return versions.find(item => item.version === selectedVersion) || null;
 }
 
+export function isCurrentVersionSelected(releases, selectedVersion = LATEST_STABLE_OPTION, currentVersion = '') {
+  const current = String(currentVersion || releases?.currentVersion || '').trim();
+  if (!current) return false;
+  const entry = resolveSelectedVersionEntry(releases, selectedVersion);
+  return Boolean(entry?.version && entry.version === current);
+}
+
+export function resolveOnlinePollAction(state, activeId = null) {
+  const phase = state?.phase || 'idle';
+  if (phase === 'restarting') {
+    return { action: 'wait_restart', receiptId: state?.id || activeId || null, alreadyRestarted: false };
+  }
+  if (phase === 'idle') {
+    if (activeId) {
+      return { action: 'wait_restart', receiptId: activeId, alreadyRestarted: true };
+    }
+    return { action: 'idle', message: state?.message || '' };
+  }
+  if (phase === 'error') {
+    return { action: 'error', message: state?.message || '' };
+  }
+  if (phase === 'cancelled') {
+    return { action: 'cancelled', message: state?.message || '' };
+  }
+  return { action: 'continue' };
+}
+
+export function resolveOnlinePollErrorAction(
+  lastPhase,
+  error,
+  activeId = null,
+  consecutiveNetworkErrors = 1,
+  maxReconnectAttempts = 15,
+) {
+  if (error?.response || error?.isApiError || !activeId) {
+    return { action: 'error' };
+  }
+  if (['verifying', 'restarting'].includes(lastPhase)) {
+    return { action: 'wait_restart', receiptId: activeId };
+  }
+  if (lastPhase === 'downloading' && consecutiveNetworkErrors <= maxReconnectAttempts) {
+    return { action: 'retry' };
+  }
+  return { action: 'error' };
+}
+
 export function buildSourceOptions(releases, selectedVersion = LATEST_STABLE_OPTION) {
   const entry = resolveSelectedVersionEntry(releases, selectedVersion);
   const sources = Array.isArray(entry?.sources) ? entry.sources : [];

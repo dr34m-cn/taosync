@@ -8,7 +8,10 @@ import {
   buildVersionOptions,
   formatByteSize,
   formatSourceLabel,
+  isCurrentVersionSelected,
   reconcileSelectedSource,
+  resolveOnlinePollAction,
+  resolveOnlinePollErrorAction,
 } from '../src/utils/programUpdate.js';
 
 const sampleReleases = {
@@ -88,4 +91,64 @@ test('formatByteSize formats readable binary units', () => {
   assert.equal(formatByteSize(512), '512 B');
   assert.equal(formatByteSize(2048), '2.0 KB');
   assert.equal(formatByteSize(15.5 * 1024 * 1024), '15.5 MB');
+});
+
+test('isCurrentVersionSelected detects when selected target matches running version', () => {
+  assert.equal(isCurrentVersionSelected(sampleReleases, LATEST_STABLE_OPTION, 'v0.5.1'), false);
+  assert.equal(isCurrentVersionSelected(sampleReleases, LATEST_STABLE_OPTION, 'v0.5.2'), true);
+  assert.equal(isCurrentVersionSelected(sampleReleases, 'v0.5.2', 'v0.5.2'), true);
+  assert.equal(isCurrentVersionSelected(sampleReleases, 'v0.5.3-dev1', 'v0.5.2'), false);
+  assert.equal(isCurrentVersionSelected(sampleReleases, 'v0.5.3-dev1', 'v0.5.3-dev1'), true);
+  assert.equal(isCurrentVersionSelected({ ...sampleReleases, currentVersion: 'v0.5.2' }, LATEST_STABLE_OPTION), true);
+  assert.equal(isCurrentVersionSelected({ ...sampleReleases, currentVersion: '' }, LATEST_STABLE_OPTION, ''), false);
+});
+
+test('resolveOnlinePollAction handles restarting and already-restarted idle processes', () => {
+  assert.deepEqual(
+    resolveOnlinePollAction({ id: 'abc', phase: 'restarting' }, 'abc'),
+    { action: 'wait_restart', receiptId: 'abc', alreadyRestarted: false },
+  );
+  assert.deepEqual(
+    resolveOnlinePollAction({ id: null, phase: 'idle', message: '' }, 'abc'),
+    { action: 'wait_restart', receiptId: 'abc', alreadyRestarted: true },
+  );
+  assert.deepEqual(
+    resolveOnlinePollAction({ id: null, phase: 'idle', message: '' }, null),
+    { action: 'idle', message: '' },
+  );
+  assert.deepEqual(
+    resolveOnlinePollAction({ id: 'abc', phase: 'cancelled', message: 'canceled' }, 'abc'),
+    { action: 'cancelled', message: 'canceled' },
+  );
+  assert.deepEqual(
+    resolveOnlinePollAction({ id: 'abc', phase: 'error', message: 'boom' }, 'abc'),
+    { action: 'error', message: 'boom' },
+  );
+  assert.deepEqual(
+    resolveOnlinePollAction({ id: 'abc', phase: 'downloading' }, 'abc'),
+    { action: 'continue' },
+  );
+});
+
+test('resolveOnlinePollErrorAction retries transient drops during download and waits on restart errors', () => {
+  const networkError = new Error('Network Error');
+  const httpError = Object.assign(new Error('Unauthorized'), { response: { status: 401 } });
+  const apiError = Object.assign(new Error('Login expired'), { isApiError: true });
+
+  assert.deepEqual(resolveOnlinePollErrorAction('verifying', networkError, 'abc', 1), {
+    action: 'wait_restart',
+    receiptId: 'abc',
+  });
+  assert.deepEqual(resolveOnlinePollErrorAction('restarting', networkError, 'abc', 1), {
+    action: 'wait_restart',
+    receiptId: 'abc',
+  });
+  assert.deepEqual(resolveOnlinePollErrorAction('downloading', networkError, 'abc', 1), { action: 'retry' });
+  assert.deepEqual(resolveOnlinePollErrorAction('downloading', networkError, 'abc', 15), { action: 'retry' });
+  assert.deepEqual(resolveOnlinePollErrorAction('downloading', networkError, 'abc', 16), { action: 'error' });
+  assert.deepEqual(resolveOnlinePollErrorAction('downloading', httpError, 'abc', 1), { action: 'error' });
+  assert.deepEqual(resolveOnlinePollErrorAction('verifying', httpError, 'abc', 1), { action: 'error' });
+  assert.deepEqual(resolveOnlinePollErrorAction('downloading', apiError, 'abc', 1), { action: 'error' });
+  assert.deepEqual(resolveOnlinePollErrorAction('verifying', apiError, 'abc', 1), { action: 'error' });
+  assert.deepEqual(resolveOnlinePollErrorAction('probing', networkError, 'abc', 1), { action: 'error' });
 });

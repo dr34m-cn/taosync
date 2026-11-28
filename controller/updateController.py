@@ -93,7 +93,7 @@ class UpdateReleases(BaseHandler):
 class OnlineUpdate(BaseHandler):
     state_lock = threading.Lock()
     active_task = None
-    restart_delay = 0.4
+    restart_delay = 1.5
     state = {
         'id': None,
         'phase': 'idle',

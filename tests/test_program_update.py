@@ -544,6 +544,27 @@ class OnlineUpdateTest(AsyncHTTPTestCase):
         self.assertEqual(list(self.directory.iterdir()), [])
         self.restart.assert_not_called()
 
+    def test_online_update_rejects_currently_running_version_before_downloading(self):
+        probe = Mock(side_effect=AssertionError('should not probe current version'))
+        download = Mock(side_effect=AssertionError('should not download current version'))
+        with patch.object(update, 'current_version', return_value='v0.5.2'), \
+                patch.object(update, 'fetch_manifest_bytes', self._manifest_fetcher()), \
+                patch.object(update, 'probe_source', probe), \
+                patch.object(update, 'download_package', download):
+            for version_choice, source_choice in (('latest', 'auto'), ('v0.5.2', 'r2')):
+                with self.subTest(version=version_choice, source=source_choice):
+                    res = self.fetch(
+                        '/online', method='POST',
+                        headers={'X-TaoSync-Update': '1', 'Content-Type': 'application/json', 'Accept-Language': 'en'},
+                        body=json.dumps({'version': version_choice, 'source': source_choice}),
+                    )
+                    self.assertEqual(res.code, 400, res.body)
+                    self.assertIn('already running', json.loads(res.body)['msg'])
+        self.assertFalse(ProgramUpload.lock.locked())
+        probe.assert_not_called()
+        download.assert_not_called()
+        self.restart.assert_not_called()
+
 
 class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
     async def test_latest_match_closes_other_origin_and_skips_history(self):
@@ -670,6 +691,68 @@ class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(Path, 'exists', guarded_exists):
             self.assertFalse(update.info()['container'])
+
+    async def test_fetch_manifest_bytes_configures_httpx_timeout(self):
+        import sys
+        import types
+
+        captured = {}
+
+        class FakeTimeout:
+            def __init__(self, *, connect, read, write, pool):
+                self.connect = connect
+                self.read = read
+                self.write = write
+                self.pool = pool
+
+        class FakeResponse:
+            def raise_for_status(self):
+                pass
+
+            async def aiter_bytes(self, chunk_size=65536):
+                yield b'{"schema":1,"entries":[]}'
+
+        class FakeStream:
+            async def __aenter__(self):
+                return FakeResponse()
+
+            async def __aexit__(self, *_exc):
+                return False
+
+        class FakeAsyncClient:
+            def __init__(self, *, follow_redirects, timeout=None):
+                captured['follow_redirects'] = follow_redirects
+                captured['timeout'] = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_exc):
+                return False
+
+            def stream(self, method, url, headers=None):
+                captured['request'] = (method, url, headers)
+                return FakeStream()
+
+        fake_httpx = types.SimpleNamespace(
+            AsyncClient=FakeAsyncClient,
+            Timeout=FakeTimeout,
+            HTTPError=OSError,
+        )
+        with patch.dict(sys.modules, {'httpx': fake_httpx}):
+            data = await update.fetch_manifest_bytes('https://taoapi.dr34m.cn/latest.json')
+
+        self.assertEqual(data, b'{"schema":1,"entries":[]}')
+        self.assertFalse(captured['follow_redirects'])
+        self.assertIsInstance(captured['timeout'], FakeTimeout)
+        self.assertEqual(
+            (captured['timeout'].connect, captured['timeout'].read,
+             captured['timeout'].write, captured['timeout'].pool),
+            (update.MANIFEST_TIMEOUT,) * 4,
+        )
+
+    def test_online_update_restart_delay_exceeds_poll_interval(self):
+        self.assertGreaterEqual(OnlineUpdate.restart_delay, 1.0)
 
 
 class LauncherTest(unittest.TestCase):

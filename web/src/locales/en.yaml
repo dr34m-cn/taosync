@@ -666,6 +666,7 @@ programUpdate:
   onlineConfirm: Download and install {version} from "{source}"? TaoSync will restart and reload the page once verified. Save any unsaved settings first.
   onlineConfirmDev: Download and install {version} from "{source}"? TaoSync will restart and reload the page once verified. DEV builds are for experienced developers only and may contain serious bugs; regular users should not install them. Save any unsaved settings first.
   devWarning: DEV builds are for experienced developers only and may contain serious bugs. Regular users should not install them.
+  alreadyCurrent: Already running {version}. No update needed.
   releasesError: Could not load available versions. Check your connection or use manual update.
   noVersionForPlatform: No online update package is available for this platform yet.
   noSourceAvailable: No online download source is available for the selected version. Use manual update instead.

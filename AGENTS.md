@@ -25,9 +25,13 @@ Always review and update README.md and README_EN.md together. Keep their user-fa
 
 Write `doc/changelog/` entries from the perspective of a user upgrading from the previous released version. When extending an existing entry, review commits since its last edit and merge related changes into the existing items. Use the previous release, not the individual commit messages, to classify the result: describe a feature introduced in this release once in its final form under 特性, including any refinements made before release. Use 优化 for improvements to previously released behavior and 修复 only for defects present in the previous release.
 
-Within each category, give every item a short Markdown level-three heading (`###`) that says what changed in a few words. Use normal paragraph text beneath it for the specific behavior, upgrade notes, and related issue links.
+Before finalizing a release changelog, perform a full check of `https://github.com/dr34m-cn/taosync/issues` (including open and closed issues, plus related PRs) to identify every issue associated with the release's changes.
 
-Write the complete Simplified Chinese changelog first, then append the complete English translation. Separate them with a single Markdown horizontal rule (`---`) and omit language headings. Keep the categories, item order, upgrade notes, and issue links aligned across both languages. Exclude build-related changes, including CI, packaging workflows, and build matrices.
+Within each category, present every item as a collapsible `<details>` block: put a short summary of a few words inside `<summary><strong>...</strong></summary>`, and place any related issue/PR links directly after the summary text inside `<summary>` using HTML anchor tags (`<a href="https://github.com/dr34m-cn/taosync/issues/<id>">#<id></a>` / `<a href="https://github.com/dr34m-cn/taosync/pull/<id>">#<id></a>`, because Markdown links inside raw HTML `<summary>` lines are not parsed in GFM). Leave a blank line after `</summary>`, and place the detailed behavior and upgrade notes in normal paragraph text inside the collapsed body.
+
+Include an uncollapsed download section (`## 📦 下载` / `## 📦 Downloads`) grouped concisely as one bullet line per platform with short, plain-language link labels separated by ` · ` (e.g. `- **Windows**：[64位（常见电脑）](https://github.com/dr34m-cn/taosync/releases/download/<version>/...) · [ARM64](...)`), rather than a verbose table. Cover every release asset published by `.github/workflows/build.yml` via direct GitHub Release hyperlinks (`https://github.com/dr34m-cn/taosync/releases/download/<version>/<filename>`), along with Docker image tags and the checksum file.
+
+Write the complete Simplified Chinese changelog first, then append the complete English translation. Separate them with a single Markdown horizontal rule (`---`) and omit language headings. Keep the categories, item order, upgrade notes, issue links, and download links aligned across both languages. Exclude build-related changes, including CI, packaging workflows, and build matrices.
 
 # Frontend Preferences
 

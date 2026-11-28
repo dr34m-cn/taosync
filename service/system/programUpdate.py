@@ -21,6 +21,7 @@ from service.system import updateLauncher as launcher
 
 MAX_BYTES = 256 * 1024 * 1024
 TRUST_ORIGINS = ('https://taoapi.dr34m.cn', 'https://dr34m-cn.github.io/taosync')
+MANIFEST_TIMEOUT = 20
 PROBE_TIMEOUT = 15
 DOWNLOAD_CONNECT_TIMEOUT = 20
 DOWNLOAD_READ_TIMEOUT = 60
@@ -82,10 +83,10 @@ async def _fetch_manifest_bytes_tornado(url):
     try:
         request = HTTPRequest(
             url, method='GET', headers={'Accept-Encoding': 'identity'},
-            follow_redirects=False, connect_timeout=20, request_timeout=20,
+            follow_redirects=False, connect_timeout=MANIFEST_TIMEOUT, request_timeout=MANIFEST_TIMEOUT,
             ca_certs=certifi.where(),
         )
-        async with asyncio.timeout(20):
+        async with asyncio.timeout(MANIFEST_TIMEOUT):
             res = await client.fetch(request)
         if len(res.body) > MAX_MANIFEST_BYTES:
             raise ValueError('manifest too large')
@@ -104,7 +105,15 @@ async def fetch_manifest_bytes(url):
         return await _fetch_manifest_bytes_tornado(url)
 
     try:
-        async with asyncio.timeout(20), httpx.AsyncClient(follow_redirects=False) as client:
+        timeout = httpx.Timeout(
+            connect=MANIFEST_TIMEOUT,
+            read=MANIFEST_TIMEOUT,
+            write=MANIFEST_TIMEOUT,
+            pool=MANIFEST_TIMEOUT,
+        )
+        async with asyncio.timeout(MANIFEST_TIMEOUT), httpx.AsyncClient(
+            follow_redirects=False, timeout=timeout
+        ) as client:
             async with client.stream('GET', url, headers={'Accept-Encoding': 'identity'}) as res:
                 res.raise_for_status()
                 raw = bytearray()
@@ -232,6 +241,9 @@ def resolve_online_selection(catalog, version_choice='latest', source_choice='au
         selected = next((item for item in versions if item.get('version') == version_key), None)
     if selected is None:
         raise ValueError('update_version_unavailable')
+    current = (catalog.get('currentVersion') or '').strip()
+    if current and selected.get('version') == current:
+        raise ValueError('update_already_running')
     sources = selected.get('sources') or []
     if not sources:
         raise ValueError('update_source_unavailable')

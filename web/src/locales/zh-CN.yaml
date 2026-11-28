@@ -666,6 +666,7 @@ programUpdate:
   onlineConfirm: 将通过「{source}」在线下载并安装 {version}，完成后自动重启 TaoSync 并刷新页面。请先保存尚未提交的设置。
   onlineConfirmDev: 将通过「{source}」在线下载并安装 {version}，完成后自动重启 TaoSync 并刷新页面。DEV 版本仅限经验丰富的开发者尝鲜，可能存在严重错误，普通用户请勿使用。请先保存尚未提交的设置。
   devWarning: DEV 版本仅限经验丰富的开发者尝鲜，可能存在严重错误，普通用户请勿使用。
+  alreadyCurrent: 当前已在运行 {version}，无需重复更新。
   releasesError: 无法获取可更新版本列表，请检查网络或使用手动更新。
   noVersionForPlatform: 暂未找到适用于当前平台的在线更新版本。
   noSourceAvailable: 当前所选版本暂无可用在线下载源，请改用手动更新。

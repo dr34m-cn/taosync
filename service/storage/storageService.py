@@ -472,11 +472,24 @@ def _networkRequestConfig(data, driverType):
         else:
             config["password"] = ""
     mountConfig.checkDriverFields(driverType, rawConfig)
-    if driverType == 'smb' and config.get('share'):
-        visible = discoveryService.list_smb_shares(config)
-        if not any(str(item.get('name') or '').casefold() == str(config['share']).casefold() for item in visible):
-            raise ValueError(t('picker_smb_share_unavailable', get_context_lang()))
+    if driverType == 'smb' and str(config.get('share') or '').strip().strip('\\/').casefold() == 'ipc$':
+        raise ValueError(t('picker_smb_share_unavailable', get_context_lang()))
     return config
+
+
+def _is_smb_share_unavailable(exc):
+    seen = set()
+    current = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ in ('BadNetworkName', 'NetworkNameDeleted'):
+            return True
+        if getattr(current, 'status', None) in (0xC00000CC, 0xC00000C9):
+            return True
+        if getattr(current, 'ntstatus', None) in (0xC00000CC, 0xC00000C9):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def discoverSmbShares(data):
@@ -507,6 +520,10 @@ def remoteFolder(data, create=False):
             return {'directory': {'name': name, 'path': path}}
         return {'directories': [{'name': entry['name'], 'path': child_path(parent, entry['name'])}
                                 for entry in entries if entry['is_dir']]}
+    except Exception as exc:
+        if kind == 'smb' and _is_smb_share_unavailable(exc):
+            raise ValueError(t('picker_smb_share_unavailable', get_context_lang())) from exc
+        raise
     finally:
         if kind == 'smb':
             driver.close()

@@ -8,7 +8,10 @@ class FolderPickerTest(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(storage, '_requireTaoSync'))
         self.create = self.enterContext(patch.object(storage, 'createDriver'))
-        self.enterContext(patch.object(storage.discoveryService, 'list_smb_shares', return_value=[{'name': 'Share'}]))
+        self.list_shares = self.enterContext(patch.object(
+            storage.discoveryService, 'list_smb_shares',
+            side_effect=AssertionError('remoteFolder should not enumerate SMB shares via IPC$'),
+        ))
         self.driver = self.create.return_value
         self.client = self.enterContext(patch('service.engine.engineService.getClientById')).return_value
 
@@ -43,13 +46,33 @@ class FolderPickerTest(unittest.TestCase):
         self.assertEqual(cfg['password'], '')
 
     def test_unavailable_smb_share_returns_localized_error(self):
+        class BadNetworkName(Exception):
+            status = 0xC00000CC
+
         req = dict(engineId=1, driverType='smb', path='/', config=dict(host='server', share='Missing'))
+        self.driver.list_filtered.side_effect = BadNetworkName('STATUS_BAD_NETWORK_NAME')
         for lang, fragment in (('en', 'unavailable'), ('zh_CN', '不可用')):
             with self.subTest(lang=lang), patch.object(storage, 'get_context_lang', return_value=lang):
                 with self.assertRaises(ValueError) as caught:
                     storage.remoteFolder(req)
                 self.assertIn(fragment, str(caught.exception))
                 self.assertNotIn('picker_smb_share_unavailable', str(caught.exception))
+        self.list_shares.assert_not_called()
+
+    def test_smb_picker_allows_hidden_share_and_rejects_ipc_share(self):
+        self.driver.list_filtered.return_value = [dict(name='docs', is_dir=True)]
+        hidden = dict(engineId=1, driverType='smb', path='/', config=dict(host='server', share='Backup$'))
+        self.assertEqual(storage.remoteFolder(hidden), {'directories': [{'name': 'docs', 'path': '/docs'}]})
+        self.list_shares.assert_not_called()
+
+        self.create.reset_mock()
+        for share in ('IPC$', '/IPC$/', '\\IPC$\\'):
+            with self.subTest(share=share), patch.object(storage, 'get_context_lang', return_value='en'):
+                ipc = dict(engineId=1, driverType='smb', path='/', config=dict(host='server', share=share))
+                with self.assertRaises(ValueError) as caught:
+                    storage.remoteFolder(ipc)
+                self.assertIn('unavailable', str(caught.exception))
+        self.create.assert_not_called()
 
     def test_existing_mount_can_browse_from_root_while_reusing_stored_credentials(self):
         for kind, extra in (

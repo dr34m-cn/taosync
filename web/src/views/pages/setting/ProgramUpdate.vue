@@ -11,7 +11,10 @@ import {
   buildVersionOptions,
   formatByteSize,
   formatSourceLabel,
+  isCurrentVersionSelected,
   reconcileSelectedSource,
+  resolveOnlinePollAction,
+  resolveOnlinePollErrorAction,
   resolveSelectedVersionEntry,
 } from '@/utils/programUpdate';
 
@@ -39,12 +42,13 @@ let refreshTimer;
 const versionOptions = computed(() => buildVersionOptions(releases.value));
 const selectedVersionEntry = computed(() => resolveSelectedVersionEntry(releases.value, selectedVersion.value));
 const isDevSelected = computed(() => selectedVersionEntry.value?.channel === 'dev');
+const isCurrentSelected = computed(() => isCurrentVersionSelected(releases.value, selectedVersion.value, info.value?.version));
 const sourceOptions = computed(() => buildSourceOptions(releases.value, selectedVersion.value));
 const onlineBusy = computed(() => ['probing', 'downloading', 'verifying', 'restarting'].includes(onlineState.value?.phase));
 const onlineCanCancel = computed(() => ['probing', 'downloading'].includes(onlineState.value?.phase));
 const busy = computed(() => ['confirm', 'upload', 'restart'].includes(phase.value) || onlineBusy.value);
 const canStartOnline = computed(() => {
-  if (busy.value || phase.value === 'unknown' || releasesLoading.value) return false;
+  if (busy.value || phase.value === 'unknown' || releasesLoading.value || isCurrentSelected.value) return false;
   return Boolean(selectedVersionEntry.value && selectedVersionEntry.value.sources?.length);
 });
 
@@ -115,7 +119,12 @@ async function fetchOnlineState() {
     timeout: 5000,
     headers: { 'Accept-Language': locale.value },
   });
-  if (data.code !== 200) throw new Error(data.msg || t('programUpdate.readError'));
+  if (data.code !== 200) {
+    const error = new Error(data.msg || t('programUpdate.readError'));
+    error.isApiError = true;
+    error.response = { status: data.code, data };
+    throw error;
+  }
   return data.data;
 }
 
@@ -140,11 +149,12 @@ async function loadReleases() {
   }
 }
 
-async function waitForStart(id) {
+async function waitForStart(id, { alreadyRestarted = false } = {}) {
   phase.value = 'restart';
   message.value = t('programUpdate.restarting');
   onlineState.value = null;
   const deadline = Date.now() + 180000;
+  let unmatchedHealthyPolls = 0;
   while (!signal.aborted && Date.now() < deadline) {
     try {
       info.value = await status();
@@ -157,6 +167,15 @@ async function waitForStart(id) {
         if (result.status === 'started') refreshTimer = setTimeout(() => reloadFrontend(id), 1000);
         return;
       }
+      if (alreadyRestarted) {
+        unmatchedHealthyPolls += 1;
+        if (unmatchedHealthyPolls >= 4) {
+          sessionStorage.removeItem(receiptKey);
+          phase.value = 'error';
+          message.value = t('programUpdate.onlineFailed');
+          return;
+        }
+      }
     } catch { /* Service may be between processes. */ }
     await new Promise(resolve => setTimeout(resolve, 1500));
   }
@@ -168,35 +187,43 @@ async function waitForStart(id) {
 
 async function pollOnlineUpdate(activeId) {
   let lastPhase = onlineState.value?.phase || 'probing';
+  let consecutiveNetworkErrors = 0;
   while (!signal.aborted) {
     try {
       const current = await fetchOnlineState();
+      consecutiveNetworkErrors = 0;
+      const decision = resolveOnlinePollAction(current, activeId);
       onlineState.value = current;
-      lastPhase = current.phase;
-      if (current.phase === 'restarting') {
-        const receiptId = current.id || activeId;
-        if (receiptId) {
-          sessionStorage.setItem(receiptKey, receiptId);
-          await waitForStart(receiptId);
+      if (decision.action === 'wait_restart') {
+        if (decision.receiptId) {
+          sessionStorage.setItem(receiptKey, decision.receiptId);
+          await waitForStart(decision.receiptId, { alreadyRestarted: decision.alreadyRestarted });
         }
         return;
       }
-      if (current.phase === 'error') {
+      lastPhase = current.phase;
+      if (decision.action === 'error') {
         phase.value = 'error';
-        message.value = current.message || t('programUpdate.onlineFailed');
+        message.value = decision.message || t('programUpdate.onlineFailed');
         return;
       }
-      if (current.phase === 'cancelled' || current.phase === 'idle') {
+      if (decision.action === 'cancelled' || decision.action === 'idle') {
         phase.value = 'idle';
-        message.value = current.message || '';
+        message.value = decision.message || '';
         return;
       }
     } catch (error) {
       if (signal.aborted) return;
-      if (['verifying', 'restarting'].includes(lastPhase) && activeId) {
-        sessionStorage.setItem(receiptKey, activeId);
-        await waitForStart(activeId);
+      consecutiveNetworkErrors += 1;
+      const errorDecision = resolveOnlinePollErrorAction(lastPhase, error, activeId, consecutiveNetworkErrors);
+      if (errorDecision.action === 'wait_restart') {
+        sessionStorage.setItem(receiptKey, errorDecision.receiptId);
+        await waitForStart(errorDecision.receiptId);
         return;
+      }
+      if (errorDecision.action === 'retry') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
       }
       phase.value = 'error';
       message.value = error.response?.data?.msg || error.message;
@@ -459,6 +486,15 @@ onBeforeUnmount(() => { clearTimeout(refreshTimer); controller.abort(); });
             show-icon
             class="panel-alert"
             :description="t('programUpdate.devWarning')"
+          />
+
+          <el-alert
+            v-if="isCurrentSelected && selectedVersionEntry"
+            type="info"
+            :closable="false"
+            show-icon
+            class="panel-alert"
+            :description="t('programUpdate.alreadyCurrent', { version: selectedVersionEntry.version })"
           />
 
           <p v-if="releasesError" class="panel-error">{{ releasesError }}</p>
