@@ -395,6 +395,16 @@
       "version": "v0.5.2-dev-test-build5",
       "arch": "linux-amd64",
       "sha256": "0fcedc1b0d2d4770350ebc84b60ae33ee9b6a6fac3d44135dc63c47cb9173802"
+    },
+    {
+      "version": "v0.5.2-dev-test-build6",
+      "arch": "linux-StaticX-amd64",
+      "sha256": "c215e33361896224d86d60d9a789b3284d4458e1b46abc04783aad0eabde6d1b"
+    },
+    {
+      "version": "v0.5.2-dev-test-build6",
+      "arch": "linux-amd64",
+      "sha256": "e33c8d866ba1a7f4a824d67c297152f3fbd2be1565ccb03e9eb8476a3f55ee7c"
     }
   ],
   "publishedAt": {
@@ -466,7 +476,9 @@
     "v0.5.2-dev-test-build4/linux-amd64/fb6482a0180eb91d20eb497b7a1bb52d8fdfe51b20f2992b96e1673409de1207": "2026-11-27T09:54:00Z",
     "v0.5.2-dev-test-build5/android-arm64-v8a+armeabi-v7a/8de1589e8968147d3ba2fa3b553913e0c34010fbdb161482d85c088f03ef3ba1": "2026-11-28T05:36:45Z",
     "v0.5.2-dev-test-build5/linux-StaticX-amd64/9a825c12ed3b71b8614a2b3cd385ecbd988247c45c9c7e34f8721059c8e96478": "2026-11-28T05:36:45Z",
-    "v0.5.2-dev-test-build5/linux-amd64/0fcedc1b0d2d4770350ebc84b60ae33ee9b6a6fac3d44135dc63c47cb9173802": "2026-11-28T05:36:45Z"
+    "v0.5.2-dev-test-build5/linux-amd64/0fcedc1b0d2d4770350ebc84b60ae33ee9b6a6fac3d44135dc63c47cb9173802": "2026-11-28T05:36:45Z",
+    "v0.5.2-dev-test-build6/linux-StaticX-amd64/c215e33361896224d86d60d9a789b3284d4458e1b46abc04783aad0eabde6d1b": "2026-11-28T08:31:37Z",
+    "v0.5.2-dev-test-build6/linux-amd64/e33c8d866ba1a7f4a824d67c297152f3fbd2be1565ccb03e9eb8476a3f55ee7c": "2026-11-28T08:31:37Z"
   },
   "downloadSources": {
     "stable": [
