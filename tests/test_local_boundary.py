@@ -80,3 +80,19 @@ class LocalBoundaryTest(unittest.TestCase):
                           lambda: self.driver.mkdir('/public/alias/new')):
             with self.assertRaises((OSError, ValueError)):
                 operation()
+
+    def test_inaccessible_protected_root_stat_keeps_lexical_protection(self):
+        real_stat = Path.stat
+        protected = self.private
+
+        def guarded_stat(path_self, *args, **kwargs):
+            if path_self == protected:
+                raise PermissionError('SELinux denied')
+            return real_stat(path_self, *args, **kwargs)
+
+        with patch.object(Path, 'stat', guarded_stat):
+            boundary = localAccess.LocalBoundary()
+        with self.assertRaises(localAccess.LocalPathError):
+            boundary.check(protected)
+        with self.assertRaises(localAccess.LocalPathError):
+            boundary.check(protected / 'test.db')

@@ -1,11 +1,21 @@
 import io
+import os
+import subprocess
+import sys
 import threading
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM, AESSIV
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+from service.storage import backupCipher
 from service.storage.backupCipher import (
     BackupCipher, ForeignBackupName, InvalidBackupData, InvalidBackupName,
-    decrypted_size, encrypted_size,
+    _CompatAESSIV, decrypted_size, encrypted_size,
 )
 from service.storage.drivers.base import TransferCancelled
 
@@ -256,3 +266,156 @@ class BackupCipherTests(unittest.TestCase):
         cancel.clear()
         with self.assertRaises(ValueError):
             writer.finish()
+
+    def test_compat_aes_siv_matches_rfc5297_and_native_aessiv(self):
+        # RFC 5297 Appendix A.1 (deterministic authenticated encryption)
+        key_a1 = bytes.fromhex(
+            'fffefdfcfbfaf9f8f7f6f5f4f3f2f1f0'
+            'f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff'
+        )
+        aad_a1 = [bytes.fromhex(
+            '101112131415161718191a1b1c1d1e1f'
+            '2021222324252627'
+        )]
+        pt_a1 = bytes.fromhex('112233445566778899aabbccddee')
+        ct_a1 = bytes.fromhex(
+            '85632d07c6e8f37f950acd320a2ecc93'
+            '40c02b9690c4dc04daef7f6afe5c'
+        )
+        compat_a1 = _CompatAESSIV(key_a1)
+        self.assertEqual(compat_a1.encrypt(pt_a1, aad_a1), ct_a1)
+        self.assertEqual(compat_a1.decrypt(ct_a1, aad_a1), pt_a1)
+
+        # RFC 5297 Appendix A.2 (multi-component AD + nonce)
+        key_a2 = bytes.fromhex(
+            '7f7e7d7c7b7a79787776757473727170'
+            '404142434445464748494a4b4c4d4e4f'
+        )
+        aad_a2 = [
+            bytes.fromhex(
+                '00112233445566778899aabbccddeeff'
+                'deaddadadeaddadaffeeddccbbaa9988'
+                '7766554433221100'
+            ),
+            bytes.fromhex('102030405060708090a0'),
+            bytes.fromhex('09f911029d74e35bd84156c5635688c0'),
+        ]
+        pt_a2 = bytes.fromhex(
+            '7468697320697320736f6d6520706c61'
+            '696e7465787420746f20656e63727970'
+            '74207573696e67205349562d414553'
+        )
+        ct_a2 = bytes.fromhex(
+            '7bdb6e3b432667eb06f4d14bff2fbd0f'
+            'cb900f2fddbe404326601965c889bf17'
+            'dba77ceb094fa663b7a3f748ba8af829'
+            'ea64ad544a272e9c485b62a3fd5c0d'
+        )
+        compat_a2 = _CompatAESSIV(key_a2)
+        self.assertEqual(compat_a2.encrypt(pt_a2, aad_a2), ct_a2)
+        self.assertEqual(compat_a2.decrypt(ct_a2, aad_a2), pt_a2)
+
+        for key_len in (32, 48, 64):
+            key = bytes(range(key_len))
+            native = AESSIV(key)
+            compat = _CompatAESSIV(key)
+            for data in (b'', b'a', b'a' * 15, b'a' * 16, b'a' * 17, bytes(range(200))):
+                for aad in (None, [], [b''], [b'TaoSync backup name v1'], [b'one', b'two', b'three']):
+                    expected = native.encrypt(data, aad)
+                    actual = compat.encrypt(data, aad)
+                    self.assertEqual(actual, expected)
+                    self.assertEqual(compat.decrypt(expected, aad), data)
+                    self.assertEqual(native.decrypt(actual, aad), data)
+
+        with self.assertRaises(InvalidTag):
+            compat_a1.decrypt(bytes(flip(ct_a1, 0)), aad_a1)
+        with self.assertRaises(InvalidTag):
+            compat_a1.decrypt(bytes(flip(ct_a1, len(ct_a1) - 1)), aad_a1)
+        with self.assertRaises(InvalidTag):
+            compat_a1.decrypt(ct_a1, [b'wrong'])
+        with self.assertRaises(InvalidTag):
+            compat_a1.decrypt(ct_a1[:15], aad_a1)
+        with self.assertRaises(ValueError):
+            _CompatAESSIV(b'short')
+
+    def test_legacy_cryptography_28_compatibility(self):
+        # Android p4a v2024.01.21 ships cryptography 2.8: no AESSIV, required backend
+        # on Scrypt/HKDF, and strict isinstance(..., bytes) checks in AESGCM.
+        def strict_scrypt(*args, **kwargs):
+            if kwargs.get('backend') is None:
+                raise TypeError('Scrypt requires backend in cryptography 2.8')
+            return Scrypt(*args, **kwargs)
+
+        def strict_hkdf(*args, **kwargs):
+            if kwargs.get('backend') is None:
+                raise TypeError('HKDF requires backend in cryptography 2.8')
+            return HKDF(*args, **kwargs)
+
+        class StrictBytesAESGCM:
+            def __init__(self, key):
+                self._inner = AESGCM(key)
+
+            def encrypt(self, nonce, data, associated_data):
+                if not isinstance(data, bytes):
+                    raise TypeError('data must be bytes')
+                if associated_data is not None and not isinstance(associated_data, bytes):
+                    raise TypeError('associated_data must be bytes')
+                return self._inner.encrypt(nonce, data, associated_data)
+
+            def decrypt(self, nonce, data, associated_data):
+                if not isinstance(data, bytes):
+                    raise TypeError('data must be bytes')
+                if associated_data is not None and not isinstance(associated_data, bytes):
+                    raise TypeError('associated_data must be bytes')
+                return self._inner.decrypt(nonce, data, associated_data)
+
+        with (
+            patch.object(backupCipher, 'AESSIV', None),
+            patch.object(backupCipher, 'Scrypt', strict_scrypt),
+            patch.object(backupCipher, 'HKDF', strict_hkdf),
+            patch.object(backupCipher, 'AESGCM', StrictBytesAESGCM),
+        ):
+            compat_cipher = BackupCipher('codec tests')
+            expected_name = 'tsb-1-j7dfhi4icyrbhlvv7dzcurwhqe2w3h3l3znbhgwnvk6q'
+            self.assertEqual(compat_cipher.encode_name('example.txt', False), expected_name)
+            self.assertEqual(compat_cipher.decode_name(expected_name, True), 'example.txt')
+
+            long_name = '长文件名-' + 'a' * 160 + '.bin'
+            physical, record = compat_cipher.storage_name(long_name)
+            self.assertEqual(compat_cipher.decode_record(physical, record), long_name)
+
+            for payload in (b'', b'abc', b'x' * (CHUNK + 99)):
+                wire = drain(compat_cipher.encrypt_reader(io.BytesIO(payload), len(payload)))
+                compat_cipher.authenticate_prefix(wire[:backupCipher.OWNERSHIP_PREFIX_SIZE])
+                target = io.BytesIO()
+                writer = compat_cipher.decrypt_writer(target)
+                writer.write(wire)
+                writer.finish()
+                self.assertEqual(target.getvalue(), payload)
+                # Ciphertext produced under legacy fallback must also decrypt with native cipher.
+                native_target = io.BytesIO()
+                native_writer = self.cipher.decrypt_writer(native_target)
+                native_writer.write(wire)
+                native_writer.finish()
+                self.assertEqual(native_target.getvalue(), payload)
+
+    def test_android_startup_import_chain_without_aessiv(self):
+        repo_root = str(Path(__file__).resolve().parents[1])
+        script = (
+            'import cryptography.hazmat.primitives.ciphers.aead as aead\n'
+            'if hasattr(aead, "AESSIV"):\n'
+            '    delattr(aead, "AESSIV")\n'
+            'import controller.jobController\n'
+            'import controller.notifyController\n'
+            'import controller.systemController\n'
+            'import controller.updateController\n'
+            'from service.storage import backupCipher\n'
+            'assert backupCipher.AESSIV is None\n'
+            'c = backupCipher.BackupCipher("codec tests")\n'
+            'assert c.encode_name("example.txt", False) == '
+            '"tsb-1-j7dfhi4icyrbhlvv7dzcurwhqe2w3h3l3znbhgwnvk6q"\n'
+        )
+        env = os.environ.copy()
+        env['PYTHONPATH'] = repo_root + (os.pathsep + env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
+        result = subprocess.run([sys.executable, '-c', script], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, msg=result.stderr)

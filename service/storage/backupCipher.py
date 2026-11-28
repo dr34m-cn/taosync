@@ -19,10 +19,17 @@ import os
 from operator import index
 
 from cryptography.exceptions import InvalidTag
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM, AESSIV
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import cmac, constant_time, hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESSIV
+except ImportError:  # Android (p4a v2024.01.21) bundles cryptography 2.8 without AESSIV.
+    AESSIV = None
 
 from .drivers.base import check_cancel
 from common.fileRetryReason import FileRetryError
@@ -102,8 +109,81 @@ def _base32(data):
     return base64.b32encode(data).rstrip(b'=').decode('ascii').lower()
 
 
+def _dbl(block):
+    value = int.from_bytes(block, 'big')
+    doubled = ((value << 1) & ((1 << 128) - 1)) ^ (0x87 if (value >> 127) else 0)
+    return doubled.to_bytes(16, 'big')
+
+
+def _xor(left, right):
+    return bytes(a ^ b for a, b in zip(left, right))
+
+
+class _CompatAESSIV:
+    """RFC 5297 AES-SIV fallback for older cryptography builds lacking AESSIV."""
+
+    def __init__(self, key):
+        key = bytes(key)
+        if len(key) not in (32, 48, 64):
+            raise ValueError('AESSIV key must be 256, 384, or 512 bits.')
+        half = len(key) // 2
+        self._mac_key = key[:half]
+        self._enc_key = key[half:]
+
+    def _cmac(self, data):
+        mac = cmac.CMAC(algorithms.AES(self._mac_key), backend=default_backend())
+        mac.update(bytes(data))
+        return mac.finalize()
+
+    def _s2v(self, data, associated_data):
+        aad = () if associated_data is None else tuple(associated_data)
+        if len(aad) > 126:
+            raise ValueError('AESSIV supports at most 126 associated data items.')
+        digest = self._cmac(b'\x00' * 16)
+        for item in aad:
+            digest = _xor(_dbl(digest), self._cmac(item))
+        if len(data) >= 16:
+            final_input = data[:-16] + _xor(data[-16:], digest)
+        else:
+            padded = data + b'\x80' + b'\x00' * (15 - len(data))
+            final_input = _xor(_dbl(digest), padded)
+        return self._cmac(final_input)
+
+    def _ctr(self, synthetic_iv, data):
+        if not data:
+            return b''
+        iv = bytearray(synthetic_iv)
+        iv[8] &= 0x7F
+        iv[12] &= 0x7F
+        cipher = Cipher(algorithms.AES(self._enc_key), modes.CTR(bytes(iv)), backend=default_backend())
+        ctx = cipher.encryptor()
+        return ctx.update(data) + ctx.finalize()
+
+    def encrypt(self, data, associated_data):
+        data = bytes(data)
+        synthetic_iv = self._s2v(data, associated_data)
+        return synthetic_iv + self._ctr(synthetic_iv, data)
+
+    def decrypt(self, data, associated_data):
+        data = bytes(data)
+        if len(data) < 16:
+            raise InvalidTag()
+        synthetic_iv, ciphertext = data[:16], data[16:]
+        plaintext = self._ctr(synthetic_iv, ciphertext)
+        expected = self._s2v(plaintext, associated_data)
+        if not constant_time.bytes_eq(synthetic_iv, expected):
+            raise InvalidTag()
+        return plaintext
+
+
 def _file_cipher(key, header):
-    file_key = HKDF(hashes.SHA256(), 32, header[len(_MAGIC):], b'TaoSync backup file v1').derive(key)
+    file_key = HKDF(
+        hashes.SHA256(),
+        32,
+        bytes(header[len(_MAGIC):]),
+        b'TaoSync backup file v1',
+        backend=default_backend(),
+    ).derive(key)
     return AESGCM(file_key)
 
 
@@ -127,8 +207,9 @@ class BackupCipher:
         # The fixed v1 domain salt makes names portable without a vault header.
         # Split the KDF output into independent name and file root keys.
         keys = Scrypt(salt=b'TaoSync backup passphrase v1', length=96,
-                      n=2**17, r=8, p=1).derive(passphrase)
-        self._names = AESSIV(keys[:64])
+                      n=2**17, r=8, p=1, backend=default_backend()).derive(passphrase)
+        siv_cls = AESSIV or _CompatAESSIV
+        self._names = siv_cls(keys[:64])
         self._files = keys[64:]
 
     def encode_name(self, name, is_dir):
@@ -188,7 +269,7 @@ class BackupCipher:
         final = len(data) < OWNERSHIP_PREFIX_SIZE
         block = data[_HEADER:] if final else data[_HEADER:-1]
         try:
-            _file_cipher(self._files, header).decrypt(_nonce(0, final), block, header)
+            _file_cipher(self._files, header).decrypt(_nonce(0, final), bytes(block), bytes(header))
         except InvalidTag as exc:
             raise BackupNamespaceError('crypt_name_conflict') from exc
 
@@ -214,11 +295,11 @@ class BackupCipher:
                 if remaining < 0 or (not data and remaining):
                     raise ValueError('source length differs from plaintext_size')
             if not data:
-                yield cipher.encrypt(_nonce(number, True), block, header)
+                yield cipher.encrypt(_nonce(number, True), bytes(block), header)
                 return
             block.extend(data)
             if len(block) > _CHUNK:
-                yield cipher.encrypt(_nonce(number, False), memoryview(block)[:_CHUNK], header)
+                yield cipher.encrypt(_nonce(number, False), bytes(memoryview(block)[:_CHUNK]), header)
                 number += 1
                 block = block[_CHUNK:]
 
@@ -278,7 +359,7 @@ class _Writer:
         if len(self._buffer) < _TAG or (self._number and len(self._buffer) == _TAG):
             raise InvalidBackupData('missing final record')
         try:
-            data = self._cipher.decrypt(_nonce(self._number, final), self._buffer, self._header)
+            data = self._cipher.decrypt(_nonce(self._number, final), bytes(self._buffer), self._header)
         except InvalidTag as exc:
             raise InvalidBackupData('record authentication failed') from exc
         view = memoryview(data)

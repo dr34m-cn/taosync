@@ -6,7 +6,7 @@ package.domain = com.github
 
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,html,js,css,ttf,otf,svg,ico,json,gif,woff,woff2,map,yaml
-source.include_patterns = front/**,locales/**,common/**,controller/**,mapper/**,service/**,doc/config.ini,version.txt
+source.include_patterns = front/**,locales/**,common/**,controller/**,mapper/**,service/**,apiServer/__init__.py,apiServer/trust_manifest.py,doc/config.ini,version.txt
 
 version = 0.3.2
 

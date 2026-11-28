@@ -99,7 +99,7 @@ class LocalBoundary:
         for root in self.roots:
             try:
                 info = root.stat()
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError, NotADirectoryError):
                 continue
             self.identities.add((info.st_dev, info.st_ino))
 

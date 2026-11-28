@@ -670,18 +670,58 @@ jobs:
           sed -i "/^version[[:space:]]*=/a android.numeric_version = $numeric_version" "$BUILDOZER_SPEC"
           grep -E "^(version|android.numeric_version)" "$BUILDOZER_SPEC"
 
+      - name: 准备Android签名密钥
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          keystore_path="$HOME/.android/debug.keystore"
+          if [ -n "${ANDROID_DEBUG_KEYSTORE_BASE64:-}" ]; then
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > "$keystore_path"
+            chmod 600 "$keystore_path"
+            LC_ALL=C keytool -certreq -keystore "$keystore_path" -alias androiddebugkey -storepass android -keypass android >/dev/null
+            expected_sha256=$(LC_ALL=C keytool -list -v -keystore "$keystore_path" -alias androiddebugkey -storepass android \
+              | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1)
+            if [ -z "$expected_sha256" ]; then
+              echo "::error::无法从 ANDROID_DEBUG_KEYSTORE_BASE64 读取 androiddebugkey 证书指纹"
+              exit 1
+            fi
+            echo "EXPECTED_APK_CERT_SHA256=$expected_sha256" >> "$GITHUB_ENV"
+            echo "已载入固定 Android Debug 签名密钥 (SHA256: $expected_sha256)"
+          elif [[ "$VERSION" != *dev* ]]; then
+            echo "::error::缺少 ANDROID_DEBUG_KEYSTORE_BASE64 Secret，正式/预发布版本禁止使用临时随机密钥签名"
+            exit 1
+          else
+            echo "::warning::未配置 ANDROID_DEBUG_KEYSTORE_BASE64，dev 构建将使用临时随机 debug.keystore，无法覆盖升级已安装版本"
+          fi
+
       - name: 编译Android Debug APK
         run: PYTHONWARNINGS="ignore:Unable to find acceptable character detection:UserWarning" buildozer -v android debug
 
       - name: 整理Android产物
         run: |
+          set -euo pipefail
           mkdir -p dist
           apk_path=$(find bin -maxdepth 1 -name '*.apk' -print -quit)
           if [ -z "$apk_path" ]; then
             echo "::error::未找到编译产物 APK"
             exit 1
           fi
+          actual_sha256=$(LC_ALL=C keytool -printcert -jarfile "$apk_path" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1)
+          echo "APK 签名证书 SHA256: ${actual_sha256:-unknown}"
+          if [ -n "${EXPECTED_APK_CERT_SHA256:-}" ]; then
+            if [ -z "$actual_sha256" ] || [ "$actual_sha256" != "$EXPECTED_APK_CERT_SHA256" ]; then
+              echo "::error::APK 签名证书指纹 (${actual_sha256:-empty}) 与固定密钥 ($EXPECTED_APK_CERT_SHA256) 不一致"
+              exit 1
+            fi
+          fi
           cp "$apk_path" "dist/${APP_NAME}-${VERSION}-android-debug.apk"
+
+      - name: 清理Android签名密钥
+        if: always()
+        run: rm -f "$HOME/.android/debug.keystore"
 
       - name: 上传artifact
         uses: actions/upload-artifact@v4

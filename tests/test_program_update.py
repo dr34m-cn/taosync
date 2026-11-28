@@ -660,6 +660,17 @@ class TrustRaceTest(unittest.IsolatedAsyncioTestCase):
             'checked': True,
         })
 
+    def test_info_handles_permission_error_checking_dockerenv(self):
+        real_exists = Path.exists
+
+        def guarded_exists(path_self):
+            if str(path_self).replace('\\', '/') == '/.dockerenv':
+                raise PermissionError('SELinux denied')
+            return real_exists(path_self)
+
+        with patch.object(Path, 'exists', guarded_exists):
+            self.assertFalse(update.info()['container'])
+
 
 class LauncherTest(unittest.TestCase):
     def simulate(self, fail=False, corrupt=False):

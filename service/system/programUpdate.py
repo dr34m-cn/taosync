@@ -58,12 +58,19 @@ def supported():
     return bool(getattr(sys, 'frozen', False) and os.getenv('TAO_UPDATE_CHANNEL') and os.getenv('TAO_UPDATE_DIR'))
 
 
+def _is_container():
+    try:
+        return Path('/.dockerenv').exists()
+    except OSError:
+        return False
+
+
 def info():
     enabled = supported()
     return {'architecture': platform.machine(), 'target': platform_target(),
             'version': current_version(),
             'supported': enabled, 'maxBytes': MAX_BYTES,
-            'container': Path('/.dockerenv').exists(),
+            'container': _is_container(),
             'result': launcher.read_json(Path(os.environ['TAO_UPDATE_CHANNEL']) / 'result') if enabled else {}}
 
 
