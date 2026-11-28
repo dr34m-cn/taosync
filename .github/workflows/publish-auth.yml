@@ -50,13 +50,22 @@ jobs:
           pattern: dist-*
           path: dist
           merge-multiple: true
+      - if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: publish-receipt-*
+          path: ${{ runner.temp }}/receipts
+          merge-multiple: true
       - id: publish
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             VERSION=$(head -n 1 build-metadata/version.txt | cut -d, -f1 | tr -d '\r')
             python3 scripts/release-checksums.py collect dist "$VERSION" "$RUNNER_TEMP/delta.json"
             if [[ -f "$RUNNER_TEMP/delta.json" ]]; then
-              bash scripts/publish-trust.sh "$RUNNER_TEMP/delta.json"
+              bash scripts/publish-trust.sh "$RUNNER_TEMP/delta.json" "$RUNNER_TEMP/receipts"
             fi
           else
             bash scripts/publish-trust.sh -

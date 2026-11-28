@@ -27,7 +27,7 @@ def target_prefix(version, base_prefix=BASE_PREFIX):
     return f'{base}/dev/{version}/'
 
 
-def select_pruned_prefixes(objects, *, current_version=None, keep_stable=KEEP_STABLE, keep_dev=KEEP_DEV,
+def select_retention_state(objects, *, current_version=None, keep_stable=KEEP_STABLE, keep_dev=KEEP_DEV,
                            base_prefix=BASE_PREFIX):
     base = base_prefix.strip('/')
     root = f'{base}/'
@@ -50,6 +50,12 @@ def select_pruned_prefixes(objects, *, current_version=None, keep_stable=KEEP_ST
             if ver not in stable_versions or stamp > stable_versions[ver]:
                 stable_versions[ver] = stamp
 
+    if current_version:
+        if is_stable_version(current_version):
+            stable_versions.setdefault(current_version, '')
+        else:
+            dev_versions.setdefault(current_version, '')
+
     stable_ordered = sorted(
         stable_versions,
         key=lambda ver: (stable_version_key(ver), stable_versions[ver], ver),
@@ -61,8 +67,23 @@ def select_pruned_prefixes(objects, *, current_version=None, keep_stable=KEEP_ST
         key=lambda ver: (ver == current_dev, dev_versions[ver], natural_version_key(ver), ver),
         reverse=True,
     )
+    kept_stable = stable_ordered[:keep_stable]
+    kept_dev = dev_ordered[:keep_dev]
     pruned = [f'{base}/{ver}/' for ver in stable_ordered[keep_stable:]]
     pruned.extend(f'{base}/dev/{ver}/' for ver in dev_ordered[keep_dev:])
+    present_versions = kept_stable + kept_dev
+    return pruned, present_versions
+
+
+def select_pruned_prefixes(objects, *, current_version=None, keep_stable=KEEP_STABLE, keep_dev=KEEP_DEV,
+                           base_prefix=BASE_PREFIX):
+    pruned, _present = select_retention_state(
+        objects,
+        current_version=current_version,
+        keep_stable=keep_stable,
+        keep_dev=keep_dev,
+        base_prefix=base_prefix,
+    )
     return pruned
 
 
@@ -115,7 +136,7 @@ def list_objects(bucket, endpoint, prefix, env):
 
 
 def publish_to_r2(dist_dir, version, *, endpoint, bucket, access_key_id, secret_access_key,
-                  base_prefix=BASE_PREFIX, keep_stable=KEEP_STABLE, keep_dev=KEEP_DEV):
+                  base_prefix=BASE_PREFIX, keep_stable=KEEP_STABLE, keep_dev=KEEP_DEV, receipt_path=None):
     dist_path = Path(dist_dir)
     if not dist_path.is_dir() or not any(dist_path.iterdir()):
         raise ValueError(f'No release files found in {dist_dir}')
@@ -139,7 +160,7 @@ def publish_to_r2(dist_dir, version, *, endpoint, bucket, access_key_id, secret_
     ], env)
 
     objects = list_objects(bucket, endpoint, f'{base_prefix.strip("/")}/', env)
-    pruned = select_pruned_prefixes(
+    pruned, present_versions = select_retention_state(
         objects,
         current_version=version,
         keep_stable=keep_stable,
@@ -153,13 +174,29 @@ def publish_to_r2(dist_dir, version, *, endpoint, bucket, access_key_id, secret_
             '--recursive',
             '--endpoint-url', endpoint,
         ], env)
+    if receipt_path:
+        target = Path(receipt_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        receipt = {
+            'source': 'r2',
+            'version': version,
+            'presentVersions': present_versions,
+        }
+        target.write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     return prefix, pruned
 
 
 def main(argv=None):
-    args = sys.argv[1:] if argv is None else argv
+    args = list(sys.argv[1:] if argv is None else argv)
+    receipt_path = None
+    if '--receipt' in args:
+        idx = args.index('--receipt')
+        if idx + 1 >= len(args):
+            raise SystemExit('Usage: publish-r2.py <dist_dir> <version> [--receipt <path>]')
+        receipt_path = args[idx + 1]
+        del args[idx:idx + 2]
     if len(args) != 2:
-        raise SystemExit('Usage: publish-r2.py <dist_dir> <version>')
+        raise SystemExit('Usage: publish-r2.py <dist_dir> <version> [--receipt <path>]')
     dist_dir, version = args
     publish_to_r2(
         dist_dir,
@@ -168,6 +205,7 @@ def main(argv=None):
         bucket=os.environ.get('R2_BUCKET', ''),
         access_key_id=os.environ.get('R2_ACCESS_KEY_ID', ''),
         secret_access_key=os.environ.get('R2_SECRET_ACCESS_KEY', ''),
+        receipt_path=receipt_path,
     )
 
 

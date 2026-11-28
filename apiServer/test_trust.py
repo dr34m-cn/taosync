@@ -16,6 +16,7 @@ try:
         parse_latest,
         parse_latest_details,
         parse_manifest,
+        parse_version_sources,
     )
 except ImportError:  # pragma: no cover - unittest discovery may import this as a script module
     from app import make_app
@@ -27,6 +28,7 @@ except ImportError:  # pragma: no cover - unittest discovery may import this as 
         parse_latest,
         parse_latest_details,
         parse_manifest,
+        parse_version_sources,
     )
 
 
@@ -119,28 +121,50 @@ class TrustServiceTest(AsyncHTTPTestCase):
             ('v0.5.4-beta.1', 'linux-amd64', '8' * 64, '2026-11-18T00:00:00Z'),
             ('v0.5.4-pre-build2', 'linux-amd64', '9' * 64, '2026-11-19T00:00:00Z'),
         ]
+        # Without explicit versionSources, legacy stable releases expose GitHub only (never unverified R2),
+        # and unrecorded dev builds are omitted until confirmed uploaded.
         self.assertEqual(self.push(encode_manifest(rows)).code, 204)
         version, entries, downloads = parse_latest_details(self.fetch('/latest.json').body)
         self.assertEqual(version, 'v0.5.3')
         self.assertEqual(len(entries), 2)
         self.assertEqual(
-            [(item['version'], item['channel']) for item in downloads['versions']],
+            [(item['version'], item['channel'], [s['id'] for s in item['sources']]) for item in downloads['versions']],
             [
-                ('v0.5.3', 'stable'),
-                ('v0.5.2', 'stable'),
-                ('v0.5.1', 'stable'),
-                ('v0.5.4-pre-build2', 'dev'),
-                ('v0.5.4-beta.1', 'dev'),
+                ('v0.5.3', 'stable', ['github']),
+                ('v0.5.2', 'stable', ['github']),
+                ('v0.5.1', 'stable', ['github']),
+            ],
+        )
+
+        # Record real uploaded sources per version: v0.5.1 never uploaded to R2; dev1 pruned from R2.
+        recorded_sources = {
+            'v0.5.3': ['github', 'r2'],
+            'v0.5.2': ['github', 'r2'],
+            'v0.5.1': ['github'],
+            'v0.5.4-pre-build2': ['r2'],
+            'v0.5.4-beta.1': ['r2'],
+            'v0.5.4-dev-build1': [],
+        }
+        self.assertEqual(self.push(encode_manifest([], version_sources=recorded_sources)).code, 204)
+        self.assertEqual(parse_version_sources(self.fetch('/auth.json').body), recorded_sources)
+        self.assertEqual(parse_version_sources(self.fetch('/auth-dev.json').body), recorded_sources)
+        version, entries, downloads = parse_latest_details(self.fetch('/latest.json').body)
+        self.assertEqual(
+            [(item['version'], item['channel'], [s['id'] for s in item['sources']]) for item in downloads['versions']],
+            [
+                ('v0.5.3', 'stable', ['github', 'r2']),
+                ('v0.5.2', 'stable', ['github', 'r2']),
+                ('v0.5.1', 'stable', ['github']),
+                ('v0.5.4-pre-build2', 'dev', ['r2']),
+                ('v0.5.4-beta.1', 'dev', ['r2']),
             ],
         )
         stable_item = downloads['versions'][0]
-        self.assertEqual([src['id'] for src in stable_item['sources']], ['github', 'r2'])
         self.assertEqual(stable_item['assets'], {
             'linux-StaticX-amd64': 'taoSync-v0.5.3-linux-StaticX-amd64.zip',
             'linux-amd64': 'taoSync-v0.5.3-linux-amd64.tar.gz',
         })
         dev_item = downloads['versions'][3]
-        self.assertEqual([src['id'] for src in dev_item['sources']], ['r2'])
         self.assertEqual(dev_item['assets'], {'linux-amd64': 'taoSync-v0.5.4-pre-build2-linux-amd64.tar.gz'})
 
         # Push updated source list dynamically without changing client or server code.
@@ -156,19 +180,35 @@ class TrustServiceTest(AsyncHTTPTestCase):
                 {'id': 'dev-mirror', 'name': 'Dev Mirror', 'urlTemplate': 'https://dev.example.com/{version}/{filename}'},
             ],
         }
-        self.assertEqual(self.push(encode_manifest([], download_sources=custom_sources)).code, 204)
-        # Re-pushing legacy payload without downloadSources keeps stored sources intact.
+        updated_version_sources = {
+            **recorded_sources,
+            'v0.5.3': ['github', 'mirror', 'r2'],
+            'v0.5.4-pre-build2': ['dev-mirror', 'r2'],
+        }
+        self.assertEqual(
+            self.push(encode_manifest([], download_sources=custom_sources, version_sources=updated_version_sources)).code,
+            204,
+        )
+        # Re-pushing legacy payload without downloadSources/versionSources keeps stored metadata intact.
         self.assertEqual(self.push(encode_manifest([])).code, 204)
         _, _, updated_downloads = parse_latest_details(self.fetch('/latest.json').body)
         self.assertEqual([src['id'] for src in updated_downloads['versions'][0]['sources']], ['r2', 'mirror', 'github'])
+        self.assertEqual([src['id'] for src in updated_downloads['versions'][2]['sources']], ['github'])
         self.assertEqual([src['id'] for src in updated_downloads['versions'][3]['sources']], ['r2', 'dev-mirror'])
         self.assertEqual(parse_download_sources(self.fetch('/auth.json').body)['stable'][1]['labels']['zh-CN'], '备用镜像')
 
-        # Invalid downloadSources payloads must be rejected atomically.
+        # Invalid downloadSources and versionSources payloads must be rejected atomically.
         for bad_sources in (
             {'stable': [{'id': 'auto', 'name': 'Reserved', 'urlTemplate': 'https://a.example/{filename}'}], 'dev': []},
             {'stable': [{'id': 'http', 'name': 'Insecure', 'urlTemplate': 'http://a.example/{filename}'}], 'dev': []},
             {'stable': [{'id': 'bad', 'name': 'Missing Placeholder', 'urlTemplate': 'https://a.example/static.zip'}], 'dev': []},
         ):
             payload = json.dumps({'schema': 1, 'entries': [], 'downloadSources': bad_sources}).encode('utf-8')
+            self.assertEqual(self.push(payload).code, 400)
+        for bad_vs in (
+            {'v0.5.3': ['auto']},
+            {'../bad': ['github']},
+            {'v0.5.3': 'github'},
+        ):
+            payload = json.dumps({'schema': 1, 'entries': [], 'versionSources': bad_vs}).encode('utf-8')
             self.assertEqual(self.push(payload).code, 400)

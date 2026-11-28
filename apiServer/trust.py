@@ -14,8 +14,10 @@ if __package__:
         encode_manifest,
         load_download_sources,
         normalize_download_sources,
+        normalize_version_sources,
         parse_builds,
         parse_download_sources,
+        parse_version_sources,
         split_builds,
     )
 else:  # Standalone apiServer Docker image
@@ -25,8 +27,10 @@ else:  # Standalone apiServer Docker image
         encode_manifest,
         load_download_sources,
         normalize_download_sources,
+        normalize_version_sources,
         parse_builds,
         parse_download_sources,
+        parse_version_sources,
         split_builds,
     )
 
@@ -44,6 +48,7 @@ def snapshot(database, incoming=None, kind='stable', default_sources=None):
         if incoming is not None:
             parsed_rows = parse_builds(incoming)
             incoming_sources = parse_download_sources(incoming)
+            incoming_version_sources = parse_version_sources(incoming)
             db.executemany('INSERT INTO builds (version, arch, sha256, published_at) VALUES (?, ?, ?, ?) '
                            'ON CONFLICT(version, arch, sha256) DO UPDATE SET published_at=excluded.published_at '
                            'WHERE builds.published_at IS NULL', parsed_rows)
@@ -53,26 +58,38 @@ def snapshot(database, incoming=None, kind='stable', default_sources=None):
                     'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
                     ('download_sources', json.dumps(incoming_sources, ensure_ascii=False)),
                 )
+            if incoming_version_sources is not None:
+                db.execute(
+                    'INSERT INTO metadata (key, value) VALUES (?, ?) '
+                    'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                    ('version_sources', json.dumps(incoming_version_sources, ensure_ascii=False)),
+                )
         row = db.execute('SELECT value FROM metadata WHERE key = ?', ('download_sources',)).fetchone()
         if row is not None:
             sources = normalize_download_sources(json.loads(row[0]))
         else:
             sources = normalize_download_sources(default_sources) if default_sources is not None else load_download_sources()
+        version_sources_row = db.execute('SELECT value FROM metadata WHERE key = ?', ('version_sources',)).fetchone()
+        version_sources = (
+            normalize_version_sources(json.loads(version_sources_row[0]))
+            if version_sources_row is not None
+            else None
+        )
         rows = db.execute('SELECT version, arch, sha256, published_at FROM builds ORDER BY rowid').fetchall()
         stable, dev, latest_version, latest = split_builds(rows)
-        downloads = build_downloads_catalog(stable, dev, sources)
+        downloads = build_downloads_catalog(stable, dev, sources, version_sources=version_sources)
         # Check every manifest's size before committing writes: never serve a truncated list.
         if incoming is not None:
             encoded = {
-                'stable': encode_manifest(stable, download_sources=sources),
-                'dev': encode_manifest(dev, download_sources=sources),
+                'stable': encode_manifest(stable, download_sources=sources, version_sources=version_sources),
+                'dev': encode_manifest(dev, download_sources=sources, version_sources=version_sources),
                 'latest': encode_manifest(latest, version=latest_version, downloads=downloads),
             }
             return encoded[kind]
         if kind == 'stable':
-            return encode_manifest(stable, download_sources=sources)
+            return encode_manifest(stable, download_sources=sources, version_sources=version_sources)
         if kind == 'dev':
-            return encode_manifest(dev, download_sources=sources)
+            return encode_manifest(dev, download_sources=sources, version_sources=version_sources)
         return encode_manifest(latest, version=latest_version, downloads=downloads)
 
 

@@ -10,6 +10,8 @@ MAX_MANIFEST_BYTES = 16 * 1024 * 1024
 STABLE_DOWNLOAD_RETENTION = 3
 DEV_DOWNLOAD_RETENTION = 2
 MAX_DOWNLOAD_SOURCES = 32
+MAX_VERSION_SOURCES = 512
+LEGACY_STABLE_FALLBACK_SOURCES = frozenset({'github'})
 LABEL = re.compile(r'[A-Za-z0-9][A-Za-z0-9._+-]{0,127}')
 LOCALE_KEY = re.compile(r'[A-Za-z0-9_-]{2,32}')
 STABLE_VERSION = re.compile(r'v?\d+(?:\.\d+)*')
@@ -154,6 +156,27 @@ def normalize_download_sources(raw):
     return result
 
 
+def normalize_version_sources(raw):
+    if not isinstance(raw, dict) or len(raw) > MAX_VERSION_SOURCES:
+        raise ValueError('invalid version sources')
+    result = {}
+    for version, source_ids in sorted(raw.items()):
+        if not isinstance(version, str) or not LABEL.fullmatch(version):
+            raise ValueError('invalid version sources')
+        if not isinstance(source_ids, list) or len(source_ids) > MAX_DOWNLOAD_SOURCES:
+            raise ValueError('invalid version sources')
+        cleaned = []
+        seen = set()
+        for source_id in source_ids:
+            if not isinstance(source_id, str) or not LABEL.fullmatch(source_id) or source_id.lower() == 'auto':
+                raise ValueError('invalid version sources')
+            if source_id not in seen:
+                seen.add(source_id)
+                cleaned.append(source_id)
+        result[version] = sorted(cleaned)
+    return result
+
+
 def load_download_sources(path=None):
     source_path = Path(path) if path is not None else Path(__file__).with_name('download_sources.json')
     if path is None and not source_path.is_file():
@@ -176,7 +199,7 @@ def artifact_filename(version, arch):
     return None
 
 
-def _group_channel_versions(rows, channel, sources, limit):
+def group_channel_builds(rows, channel):
     grouped = {}
     for version, arch, _sha, *date in rows:
         stamp = next(iter(date), None)
@@ -191,36 +214,73 @@ def _group_channel_versions(rows, channel, sources, limit):
             grouped,
             key=lambda ver: (stable_version_key(ver), grouped[ver]['publishedAt'] or '', ver),
             reverse=True,
-        )[:limit]
+        )
     else:
         ordered_versions = sorted(
             grouped,
             key=lambda ver: (grouped[ver]['publishedAt'] or '', natural_version_key(ver), ver),
             reverse=True,
-        )[:limit]
+        )
+    return ordered_versions, grouped
+
+
+def _resolve_sources_for_version(version, channel, channel_sources, version_sources):
+    if version_sources is not None and version in version_sources:
+        allowed = set(version_sources[version])
+        return [
+            dict(source, labels=dict(source['labels'])) if 'labels' in source else dict(source)
+            for source in channel_sources
+            if source['id'] in allowed
+        ]
+    # Unrecorded historical versions must never advertise R2 or custom mirrors without proof;
+    # legacy stable releases were published to GitHub Releases only.
+    if channel == 'stable':
+        return [
+            dict(source, labels=dict(source['labels'])) if 'labels' in source else dict(source)
+            for source in channel_sources
+            if source['id'] in LEGACY_STABLE_FALLBACK_SOURCES
+        ]
+    return []
+
+
+def _group_channel_versions(rows, channel, sources, limit, version_sources=None):
+    ordered_versions, grouped = group_channel_builds(rows, channel)
     items = []
     for version in ordered_versions:
         info = grouped[version]
+        if not info['assets']:
+            continue
+        matched_sources = _resolve_sources_for_version(version, channel, sources, version_sources)
+        if not matched_sources:
+            continue
         item = {
             'version': version,
             'channel': channel,
             'assets': dict(sorted(info['assets'].items())),
-            'sources': [dict(source, labels=dict(source['labels'])) if 'labels' in source else dict(source)
-                        for source in sources],
+            'sources': matched_sources,
         }
         if info['publishedAt'] is not None:
             item['publishedAt'] = info['publishedAt']
         items.append(item)
+        if len(items) >= limit:
+            break
     return items
 
 
-def build_downloads_catalog(stable_rows, dev_rows, download_sources=None):
+def build_downloads_catalog(stable_rows, dev_rows, download_sources=None, version_sources=None):
     sources = normalize_download_sources(
         DEFAULT_DOWNLOAD_SOURCES if download_sources is None else download_sources
     )
+    normalized_version_sources = (
+        normalize_version_sources(version_sources) if version_sources is not None else None
+    )
     versions = (
-        _group_channel_versions(stable_rows, 'stable', sources['stable'], STABLE_DOWNLOAD_RETENTION)
-        + _group_channel_versions(dev_rows, 'dev', sources['dev'], DEV_DOWNLOAD_RETENTION)
+        _group_channel_versions(
+            stable_rows, 'stable', sources['stable'], STABLE_DOWNLOAD_RETENTION, normalized_version_sources
+        )
+        + _group_channel_versions(
+            dev_rows, 'dev', sources['dev'], DEV_DOWNLOAD_RETENTION, normalized_version_sources
+        )
     )
     return {'sources': sources, 'versions': versions}
 
@@ -321,6 +381,18 @@ def parse_download_sources(raw):
     return normalize_download_sources(doc['downloadSources'])
 
 
+def parse_version_sources(raw):
+    if len(raw) > MAX_MANIFEST_BYTES:
+        raise ValueError('manifest too large')
+    try:
+        doc = json.loads(raw.decode('utf-8'))
+    except RecursionError as exc:
+        raise ValueError('invalid manifest') from exc
+    if not isinstance(doc, dict) or 'versionSources' not in doc:
+        return None
+    return normalize_version_sources(doc['versionSources'])
+
+
 def parse_latest_details(raw):
     rows = parse_builds(raw)
     doc = json.loads(raw.decode('utf-8'))
@@ -378,7 +450,7 @@ def parse_builds(raw):
     return rows
 
 
-def encode_manifest(rows, *, version=None, download_sources=None, downloads=None):
+def encode_manifest(rows, *, version=None, download_sources=None, version_sources=None, downloads=None):
     builds = {}
     for item_version, arch, sha, *date in rows:
         key = (item_version, arch, sha)
@@ -393,6 +465,8 @@ def encode_manifest(rows, *, version=None, download_sources=None, downloads=None
     doc['publishedAt'] = {'/'.join(key): date for key, date in builds.items() if date}
     if download_sources is not None:
         doc['downloadSources'] = normalize_download_sources(download_sources)
+    if version_sources is not None:
+        doc['versionSources'] = normalize_version_sources(version_sources)
     if downloads is not None:
         doc['downloads'] = normalize_downloads_catalog(downloads)
     raw = (json.dumps(doc, indent=2, ensure_ascii=False) + '\n').encode('utf-8')

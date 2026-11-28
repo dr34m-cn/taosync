@@ -81,6 +81,7 @@ class _IsolatedDbMixin:
         orig_users = userMapper.users
         orig_errors = userService.ERR_PWD
         orig_sys_lang = LNG.sysLanguage
+        orig_context_lang = LNG.get_context_lang()
 
         config.sysConfig = {
             'db': {'dbname': self._db_path},
@@ -99,6 +100,7 @@ class _IsolatedDbMixin:
             userMapper.users = orig_users
             userService.ERR_PWD = orig_errors
             LNG.sysLanguage = orig_sys_lang
+            LNG._local.lang = orig_context_lang
 
         self.addCleanup(_restore)
 

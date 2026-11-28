@@ -239,17 +239,35 @@ class ReleaseTest(unittest.TestCase):
             stable_out = root / 'auth.json'
             dev_out = root / 'auth-dev.json'
             latest_out = root / 'latest.json'
+            receipts_dir = root / 'receipts'
+            receipts_dir.mkdir()
+            (receipts_dir / 'receipt-github.json').write_text(
+                json.dumps({'source': 'github', 'version': 'v0.5.2'}), encoding='utf-8'
+            )
+            (receipts_dir / 'receipt-r2.json').write_text(
+                json.dumps({
+                    'source': 'r2',
+                    'version': 'v0.5.2',
+                    'presentVersions': ['v0.5.2', 'v0.5.1-pre-build0'],
+                }),
+                encoding='utf-8',
+            )
             legacy.write_bytes(encode_manifest([
                 ('v0.5.1-dev-test-build3', 'linux-amd64', '1' * 64, '2026-11-20T01:00:00Z'),
                 ('v0.5.1-pre-build0', 'linux-amd64', '2' * 64, '2026-11-21T01:00:00Z'),
                 ('v0.5.0', 'linux-amd64', '3' * 64, '2026-11-18T01:00:00Z'),
                 ('v0.5.1', 'linux-amd64', '4' * 64, '2026-11-22T01:00:00Z'),
-            ]))
+            ], version_sources={
+                'v0.5.1': ['github'],
+                'v0.5.0': ['github'],
+                'v0.5.1-pre-build0': ['r2'],
+                'v0.5.1-dev-test-build3': ['r2'],
+            }))
             delta.write_bytes(encode_manifest([
                 ('v0.5.2', 'linux-amd64', '5' * 64, '2026-11-27T01:00:00Z'),
                 ('v0.5.2', 'windows-amd64', '6' * 64, '2026-11-27T01:00:00Z'),
             ]))
-            subprocess.run([sys.executable, str(script), 'split',
+            subprocess.run([sys.executable, str(script), 'split', '--receipts', str(receipts_dir),
                             str(stable_out), str(dev_out), str(latest_out), str(legacy), str(delta)], check=True)
             self.assertEqual(parse_manifest(stable_out.read_bytes()), [
                 ('v0.5.0', 'linux-amd64', '3' * 64),
@@ -273,16 +291,76 @@ class ReleaseTest(unittest.TestCase):
             self.assertEqual(trust_snapshot(db_path, kind='latest'), latest_out.read_bytes())
             ver, _, downloads = parse_latest_details(latest_out.read_bytes())
             self.assertEqual(ver, 'v0.5.2')
+            # v0.5.1 and v0.5.0 were never uploaded to R2; v0.5.1-dev-test-build3 was pruned from R2.
             self.assertEqual(
                 [(item['version'], item['channel'], [s['id'] for s in item['sources']]) for item in downloads['versions']],
                 [
                     ('v0.5.2', 'stable', ['github', 'r2']),
-                    ('v0.5.1', 'stable', ['github', 'r2']),
-                    ('v0.5.0', 'stable', ['github', 'r2']),
+                    ('v0.5.1', 'stable', ['github']),
+                    ('v0.5.0', 'stable', ['github']),
                     ('v0.5.1-pre-build0', 'dev', ['r2']),
-                    ('v0.5.1-dev-test-build3', 'dev', ['r2']),
                 ],
             )
+
+    def test_resolve_version_sources_probes_live_availability_and_respects_receipts(self):
+        mod = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts/release-checksums.py'))
+        sources = load_download_sources()
+        stable_rows = [
+            ('v0.5.1', 'linux-amd64', '1' * 64, '2026-11-12T00:00:00Z'),
+            ('v0.5.2', 'linux-amd64', '2' * 64, '2026-11-28T00:00:00Z'),
+        ]
+        dev_rows = [
+            ('v0.5.3-dev1', 'linux-amd64', '3' * 64, '2026-11-27T00:00:00Z'),
+            ('v0.5.3-dev2', 'linux-amd64', '4' * 64, '2026-11-28T00:00:00Z'),
+        ]
+        probed_urls = []
+
+        def fake_probe(url):
+            probed_urls.append(url)
+            if 'github.com' in url and '/v0.5.1/' in url:
+                return True
+            if 'cdn.20240303.xyz' in url and '/v0.5.1/' in url:
+                return False
+            if 'cdn.20240303.xyz' in url and '/v0.5.3-dev2/' in url:
+                return True
+            if 'cdn.20240303.xyz' in url and '/v0.5.3-dev1/' in url:
+                return False
+            return None  # simulate transient timeout on v0.5.2 github without receipt
+
+        # 1. Pure live probe (workflow_dispatch): detects v0.5.1 missing on R2, dev1 pruned on R2.
+        probed = mod['resolve_version_sources'](
+            stable_rows,
+            dev_rows,
+            sources,
+            prior_version_sources={'v0.5.2': ['github', 'r2'], 'v0.5.3-dev1': ['r2']},
+            probe=True,
+            probe_fn=fake_probe,
+        )
+        self.assertEqual(probed['v0.5.1'], ['github'])
+        self.assertEqual(probed['v0.5.2'], ['github', 'r2'])  # preserved on transient None
+        self.assertEqual(probed['v0.5.3-dev2'], ['r2'])
+        self.assertEqual(probed['v0.5.3-dev1'], [])
+        self.assertTrue(any('cdn.20240303.xyz/taosync-release/v0.5.1/' in u for u in probed_urls))
+
+        # 2. Authoritative R2 receipt overrides stale CDN cache without probing R2 URLs.
+        probed_urls.clear()
+        with_receipt = mod['resolve_version_sources'](
+            stable_rows,
+            dev_rows,
+            sources,
+            prior_version_sources={'v0.5.1': ['github', 'r2'], 'v0.5.3-dev1': ['r2']},
+            receipts=[
+                {'source': 'github', 'version': 'v0.5.2'},
+                {'source': 'r2', 'version': 'v0.5.2', 'presentVersions': ['v0.5.2', 'v0.5.3-dev2']},
+            ],
+            probe=True,
+            probe_fn=fake_probe,
+        )
+        self.assertEqual(with_receipt['v0.5.2'], ['github', 'r2'])
+        self.assertEqual(with_receipt['v0.5.1'], ['github'])
+        self.assertEqual(with_receipt['v0.5.3-dev2'], ['r2'])
+        self.assertEqual(with_receipt['v0.5.3-dev1'], [])
+        self.assertFalse(any('cdn.20240303.xyz' in u for u in probed_urls))
 
 
 class PublishR2Test(unittest.TestCase):
@@ -333,15 +411,23 @@ class PublishR2Test(unittest.TestCase):
             dist = Path(tmp) / 'dist'
             dist.mkdir()
             (dist / 'taoSync-v0.5.2-dev3-linux-amd64.tar.gz').write_bytes(b'data')
+            receipt = Path(tmp) / 'receipt-r2.json'
             prefix, pruned = self.mod['publish_to_r2'](
                 dist, 'v0.5.2-dev3',
                 endpoint='https://example.r2.cloudflarestorage.com',
                 bucket='my-bucket',
                 access_key_id='key',
                 secret_access_key='secret',
+                receipt_path=receipt,
             )
+            receipt_data = json.loads(receipt.read_text(encoding='utf-8'))
         self.assertEqual(prefix, 'taosync-release/dev/v0.5.2-dev3/')
         self.assertEqual(pruned, ['taosync-release/dev/v0.5.2-dev1/'])
+        self.assertEqual(receipt_data, {
+            'source': 'r2',
+            'version': 'v0.5.2-dev3',
+            'presentVersions': ['v0.5.2-dev3', 'v0.5.2-dev2'],
+        })
         self.assertEqual(calls[0][0][:3], ['aws', 's3', 'sync'])
         self.assertEqual(calls[0][0][4], 's3://my-bucket/taosync-release/dev/v0.5.2-dev3/')
         self.assertEqual(calls[0][1]['AWS_REQUEST_CHECKSUM_CALCULATION'], 'when_required')
@@ -379,7 +465,7 @@ class OnlineUpdateTest(AsyncHTTPTestCase):
             restart_for_update=self.restart,
         )
 
-    def _manifest_fetcher(self, download_sources=None):
+    def _manifest_fetcher(self, download_sources=None, version_sources=None):
         sources = download_sources or load_download_sources()
         stable_rows = [
             ('v0.5.1', self.target, self.old_digest, '2026-11-20T00:00:00Z'),
@@ -390,12 +476,18 @@ class OnlineUpdateTest(AsyncHTTPTestCase):
             ('v0.5.3-dev1', self.target, self.dev_digest, '2026-11-27T00:00:00Z'),
             ('v0.5.3-dev2', 'windows-amd64', 'e' * 64, '2026-11-28T00:00:00Z'),
         ]
+        v_sources = {
+            'v0.5.2': ['github', 'r2'],
+            'v0.5.1': ['github'],
+            'v0.5.3-dev1': ['r2'],
+            'v0.5.3-dev2': ['r2'],
+        } if version_sources is None else version_sources
         latest_rows = [row for row in stable_rows if row[0] == 'v0.5.2']
-        downloads = build_downloads_catalog(stable_rows, dev_rows, sources)
+        downloads = build_downloads_catalog(stable_rows, dev_rows, sources, version_sources=v_sources)
         docs = {
             'latest.json': encode_manifest(latest_rows, version='v0.5.2', downloads=downloads),
-            'auth.json': encode_manifest(stable_rows, download_sources=sources),
-            'auth-dev.json': encode_manifest(dev_rows, download_sources=sources),
+            'auth.json': encode_manifest(stable_rows, download_sources=sources, version_sources=v_sources),
+            'auth-dev.json': encode_manifest(dev_rows, download_sources=sources, version_sources=v_sources),
         }
 
         async def fetch(url):
@@ -419,6 +511,7 @@ class OnlineUpdateTest(AsyncHTTPTestCase):
         self.assertTrue(data['latestAvailable'])
         self.assertEqual([v['version'] for v in data['versions']], ['v0.5.2', 'v0.5.1', 'v0.5.3-dev1'])
         self.assertEqual([s['id'] for s in data['versions'][0]['sources']], ['github', 'r2'])
+        self.assertEqual([s['id'] for s in data['versions'][1]['sources']], ['github'])
         self.assertEqual(
             data['versions'][0]['sources'][1]['url'],
             'https://cdn.20240303.xyz/taosync-release/v0.5.2/taoSync-v0.5.2-linux-amd64.tar.gz',
@@ -428,6 +521,20 @@ class OnlineUpdateTest(AsyncHTTPTestCase):
             data['versions'][2]['sources'][0]['url'],
             'https://cdn.20240303.xyz/taosync-release/dev/v0.5.3-dev1/taoSync-v0.5.3-dev1-linux-amd64.tar.gz',
         )
+
+    def test_releases_legacy_manifest_without_downloads_falls_back_to_github_only(self):
+        legacy_latest = encode_manifest([('v0.5.1', self.target, self.old_digest)], version='v0.5.1')
+
+        async def fetch_legacy(_url):
+            return legacy_latest
+
+        with patch.object(update, 'fetch_manifest_bytes', fetch_legacy):
+            res = self.fetch('/releases')
+        self.assertEqual(res.code, 200, res.body)
+        data = json.loads(res.body)['data']
+        self.assertEqual(len(data['versions']), 1)
+        self.assertEqual(data['versions'][0]['version'], 'v0.5.1')
+        self.assertEqual([s['id'] for s in data['versions'][0]['sources']], ['github'])
 
     def test_online_update_auto_source_races_cancels_slower_and_installs_latest(self):
         slow_started = asyncio.Event()

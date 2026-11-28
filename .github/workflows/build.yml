@@ -788,6 +788,18 @@ jobs:
           body_path: ${{ env.LOG_FILE }}
           prerelease: ${{ contains(env.VERSION, 'dev') || contains(env.VERSION, 'pre') || contains(env.VERSION, 'beta') }}
 
+      - name: 生成 GitHub Release 上传回执
+        run: |
+          python3 -c 'import json, os, pathlib; pathlib.Path(os.environ["RUNNER_TEMP"], "receipt-github.json").write_text(json.dumps({"source": "github", "version": os.environ["VERSION"]}, ensure_ascii=False) + "\n", encoding="utf-8")'
+
+      - name: 上传 GitHub Release 回执
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-receipt-github
+          path: ${{ runner.temp }}/receipt-github.json
+          if-no-files-found: error
+          retention-days: 1
+
   publish-r2:
     name: 推送构建产物到 R2
     runs-on: ubuntu-latest
@@ -827,4 +839,12 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        run: python3 scripts/publish-r2.py dist "$VERSION"
+        run: python3 scripts/publish-r2.py dist "$VERSION" --receipt "$RUNNER_TEMP/receipt-r2.json"
+
+      - name: 上传 R2 发布回执
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-receipt-r2
+          path: ${{ runner.temp }}/receipt-r2.json
+          if-no-files-found: error
+          retention-days: 1

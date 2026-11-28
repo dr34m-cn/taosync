@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlsplit
 
 from apiServer.trust_manifest import (
     DEFAULT_DOWNLOAD_SOURCES,
+    LEGACY_STABLE_FALLBACK_SOURCES,
     MAX_MANIFEST_BYTES,
     artifact_filename,
     parse_latest_details,
@@ -190,6 +191,9 @@ def build_online_releases(latest_version, latest_rows, downloads, *, target=None
             filename = item.get('assets', {}).get(target)
             if not filename:
                 continue
+            resolved_sources = _resolve_version_sources(item, filename, target)
+            if not resolved_sources:
+                continue
             versions.append({
                 'version': item['version'],
                 'channel': item['channel'],
@@ -198,7 +202,7 @@ def build_online_releases(latest_version, latest_rows, downloads, *, target=None
                 ),
                 'publishedAt': item.get('publishedAt'),
                 'filename': filename,
-                'sources': _resolve_version_sources(item, filename, target),
+                'sources': resolved_sources,
             })
     elif latest_version and any(arch == target for _ver, arch, _sha in latest_rows):
         filename = artifact_filename(latest_version, target)
@@ -206,7 +210,10 @@ def build_online_releases(latest_version, latest_rows, downloads, *, target=None
             fallback_item = {
                 'version': latest_version,
                 'channel': 'stable',
-                'sources': DEFAULT_DOWNLOAD_SOURCES['stable'],
+                'sources': [
+                    source for source in DEFAULT_DOWNLOAD_SOURCES['stable']
+                    if source['id'] in LEGACY_STABLE_FALLBACK_SOURCES
+                ],
             }
             versions.append({
                 'version': latest_version,
