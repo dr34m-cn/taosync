@@ -1,102 +1,144 @@
 {
   "schema": 1,
-  "version": "v0.5.1",
+  "version": "v0.5.2",
   "entries": [
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "android-arm64-v8a+armeabi-v7a",
-      "sha256": "31e4046461de7d888b9e141e10fdb988be949184811b18ac89935992aa614f61"
+      "sha256": "0bcb94ac5ecf0ec2a32e397236dad120b4df25dd52bf9836d0a5373fb50e3183"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "darwin-amd64",
-      "sha256": "6698c3ada0b019610b8eac1671158236699edddab1d8810457395f8b18a6f023"
+      "sha256": "bda393c4404914f6eefa83651d3bd9fa50c5cb59f570c8a03c5f027e18097b98"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "darwin-arm64",
-      "sha256": "948441b36b8f005c60bf3f8c3e2c198d977c897dc10cb73826c6f61fe0569913"
+      "sha256": "33874c5384d70821e04f7d35d449d33961f239c23c3f42c70a245b31eea53bb8"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-386",
-      "sha256": "35e92e825ba1e7ba446b62608be63f7ad51d3be593552211a6b7ed8130781511"
+      "sha256": "3d4608e3b36841895f8fe8473f527b9f2551470d0a2926650bcce6fc24fb60a6"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-StaticX-amd64",
-      "sha256": "c25dd472468f221c65f138eed5c71d916e487c483853aa268908663bb1e5e981"
+      "sha256": "0d8c453b43ad0f1f931d6c6fcad4696a400c505273f614725a68016334784db5"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-StaticX-arm32",
-      "sha256": "7dd40a142ad1b4369c6a3724a7d6f580445a5baeefb7fa2aa725930e970bcdf6"
+      "sha256": "f9ad7dcb2f8a94928898b567d41f942f6dcfbe0069cd0e6db37a4200ac25bdb2"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-StaticX-arm64",
-      "sha256": "e556dd888d74554483e4f4c842e9ed4bb3f734995771e56c7013fc0a686bc291"
+      "sha256": "22e295efe40c58b7115e126e507f13d12577bed3971930bce0a52da9e21c767f"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-amd64",
-      "sha256": "e2b97d52fde61ff64eacd1c906d56addc4267392c0db5211f0761b9c77f6f640"
+      "sha256": "3026b7b50c16cf8893b9afbdaf47ff6bb8176f126171c43a27d8545ce8d92b9c"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-arm-v6",
-      "sha256": "50cdbd31d40eaf38c4759eaa9dc5ee2f99e87784fc71e2796195c3bce5637db0"
+      "sha256": "92743cd5ca5d16e1df1e5c6a039b4a7c89f5b0d746426fa909b8136b55b64ebd"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-arm-v7",
-      "sha256": "3caf957001edb9847c16601c4c4e5a35f48cf9358403decb5c60478a6d3c2c3c"
+      "sha256": "2847aa40ebdff000d0d73b019ab3b681f13c7db513c545133c53512fe4b052f0"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-arm64",
-      "sha256": "25cb814db48b993d3e015e002271bf2bcec3d07ab5fbb0d8be9c282e12641ce2"
+      "sha256": "0f37df96fc4f61de3ce5f8c1ad55d4d066fd7dae735d751b5b99bc9109a35548"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-ppc64le",
-      "sha256": "2a1c558faaddfa9e48b9f10070a1f400049c67b82fa08a925bcc60066fa744ed"
+      "sha256": "34bcd85a022ee5defc7f980437df5edd6a2787207ebfd80b2439021f99e99d4b"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "linux-s390x",
-      "sha256": "f2b54218b2a9f45e80d5442a61de5717c6dbba3630376647869ab448fe7c26a3"
+      "sha256": "b60cddf33b0001db3176bbf318fc836baf9505a914c8b7ac8042e515226c7644"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "windows-amd64",
-      "sha256": "d30f4e01d7348a575034450d883d54cc0993ae56fc408ea15dbb81cfa78e6c83"
+      "sha256": "657f83f292d43d338e6093c88fcf62b85c4dce8b7eefb91f32b13a152ed79d57"
     },
     {
-      "version": "v0.5.1",
+      "version": "v0.5.2",
       "arch": "windows-arm64",
-      "sha256": "578310269422814e050e1754228fff2f908022238f1042a1f537895ff8abe021"
+      "sha256": "a9dcb823043d4d901d52a7aa5266ca887d383dfb190c0354a7d52a2e500bc08b"
     }
   ],
   "publishedAt": {
-    "v0.5.1/android-arm64-v8a+armeabi-v7a/31e4046461de7d888b9e141e10fdb988be949184811b18ac89935992aa614f61": "2026-11-22T06:01:10Z",
-    "v0.5.1/darwin-amd64/6698c3ada0b019610b8eac1671158236699edddab1d8810457395f8b18a6f023": "2026-11-22T06:01:10Z",
-    "v0.5.1/darwin-arm64/948441b36b8f005c60bf3f8c3e2c198d977c897dc10cb73826c6f61fe0569913": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-386/35e92e825ba1e7ba446b62608be63f7ad51d3be593552211a6b7ed8130781511": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-StaticX-amd64/c25dd472468f221c65f138eed5c71d916e487c483853aa268908663bb1e5e981": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-StaticX-arm32/7dd40a142ad1b4369c6a3724a7d6f580445a5baeefb7fa2aa725930e970bcdf6": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-StaticX-arm64/e556dd888d74554483e4f4c842e9ed4bb3f734995771e56c7013fc0a686bc291": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-amd64/e2b97d52fde61ff64eacd1c906d56addc4267392c0db5211f0761b9c77f6f640": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-arm-v6/50cdbd31d40eaf38c4759eaa9dc5ee2f99e87784fc71e2796195c3bce5637db0": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-arm-v7/3caf957001edb9847c16601c4c4e5a35f48cf9358403decb5c60478a6d3c2c3c": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-arm64/25cb814db48b993d3e015e002271bf2bcec3d07ab5fbb0d8be9c282e12641ce2": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-ppc64le/2a1c558faaddfa9e48b9f10070a1f400049c67b82fa08a925bcc60066fa744ed": "2026-11-22T06:01:10Z",
-    "v0.5.1/linux-s390x/f2b54218b2a9f45e80d5442a61de5717c6dbba3630376647869ab448fe7c26a3": "2026-11-22T06:01:10Z",
-    "v0.5.1/windows-amd64/d30f4e01d7348a575034450d883d54cc0993ae56fc408ea15dbb81cfa78e6c83": "2026-11-22T06:01:10Z",
-    "v0.5.1/windows-arm64/578310269422814e050e1754228fff2f908022238f1042a1f537895ff8abe021": "2026-11-22T06:01:10Z"
+    "v0.5.2/android-arm64-v8a+armeabi-v7a/0bcb94ac5ecf0ec2a32e397236dad120b4df25dd52bf9836d0a5373fb50e3183": "2026-11-28T15:08:42Z",
+    "v0.5.2/darwin-amd64/bda393c4404914f6eefa83651d3bd9fa50c5cb59f570c8a03c5f027e18097b98": "2026-11-28T15:08:42Z",
+    "v0.5.2/darwin-arm64/33874c5384d70821e04f7d35d449d33961f239c23c3f42c70a245b31eea53bb8": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-386/3d4608e3b36841895f8fe8473f527b9f2551470d0a2926650bcce6fc24fb60a6": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-StaticX-amd64/0d8c453b43ad0f1f931d6c6fcad4696a400c505273f614725a68016334784db5": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-StaticX-arm32/f9ad7dcb2f8a94928898b567d41f942f6dcfbe0069cd0e6db37a4200ac25bdb2": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-StaticX-arm64/22e295efe40c58b7115e126e507f13d12577bed3971930bce0a52da9e21c767f": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-amd64/3026b7b50c16cf8893b9afbdaf47ff6bb8176f126171c43a27d8545ce8d92b9c": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-arm-v6/92743cd5ca5d16e1df1e5c6a039b4a7c89f5b0d746426fa909b8136b55b64ebd": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-arm-v7/2847aa40ebdff000d0d73b019ab3b681f13c7db513c545133c53512fe4b052f0": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-arm64/0f37df96fc4f61de3ce5f8c1ad55d4d066fd7dae735d751b5b99bc9109a35548": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-ppc64le/34bcd85a022ee5defc7f980437df5edd6a2787207ebfd80b2439021f99e99d4b": "2026-11-28T15:08:42Z",
+    "v0.5.2/linux-s390x/b60cddf33b0001db3176bbf318fc836baf9505a914c8b7ac8042e515226c7644": "2026-11-28T15:08:42Z",
+    "v0.5.2/windows-amd64/657f83f292d43d338e6093c88fcf62b85c4dce8b7eefb91f32b13a152ed79d57": "2026-11-28T15:08:42Z",
+    "v0.5.2/windows-arm64/a9dcb823043d4d901d52a7aa5266ca887d383dfb190c0354a7d52a2e500bc08b": "2026-11-28T15:08:42Z"
   },
   "downloads": {
     "versions": [
+      {
+        "version": "v0.5.2",
+        "channel": "stable",
+        "assets": {
+          "android-arm64-v8a+armeabi-v7a": "taoSync-v0.5.2-android-debug.apk",
+          "darwin-amd64": "taoSync-v0.5.2-darwin-amd64.tar.gz",
+          "darwin-arm64": "taoSync-v0.5.2-darwin-arm64.tar.gz",
+          "linux-386": "taoSync-v0.5.2-linux-386.tar.gz",
+          "linux-StaticX-amd64": "taoSync-v0.5.2-linux-StaticX-amd64.zip",
+          "linux-StaticX-arm32": "taoSync-v0.5.2-linux-StaticX-arm32.zip",
+          "linux-StaticX-arm64": "taoSync-v0.5.2-linux-StaticX-arm64.zip",
+          "linux-amd64": "taoSync-v0.5.2-linux-amd64.tar.gz",
+          "linux-arm-v6": "taoSync-v0.5.2-linux-arm-v6.tar.gz",
+          "linux-arm-v7": "taoSync-v0.5.2-linux-arm-v7.tar.gz",
+          "linux-arm64": "taoSync-v0.5.2-linux-arm64.tar.gz",
+          "linux-ppc64le": "taoSync-v0.5.2-linux-ppc64le.tar.gz",
+          "linux-s390x": "taoSync-v0.5.2-linux-s390x.tar.gz",
+          "windows-amd64": "taoSync-v0.5.2-windows-amd64.zip",
+          "windows-arm64": "taoSync-v0.5.2-windows-arm64.zip"
+        },
+        "sources": [
+          {
+            "id": "github",
+            "name": "GitHub Release",
+            "urlTemplate": "https://github.com/dr34m-cn/taosync/releases/download/{version}/{filename}",
+            "labels": {
+              "zh-CN": "GitHub Release",
+              "en": "GitHub Release"
+            }
+          },
+          {
+            "id": "r2",
+            "name": "Cloudflare R2",
+            "urlTemplate": "https://cdn.20240303.xyz/taosync-release/{version}/{filename}",
+            "labels": {
+              "zh-CN": "Cloudflare R2",
+              "en": "Cloudflare R2"
+            }
+          }
+        ],
+        "publishedAt": "2026-11-28T15:08:42Z"
+      },
       {
         "version": "v0.5.1",
         "channel": "stable",

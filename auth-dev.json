@@ -596,6 +596,10 @@
     "v0.5.1-dev-test-build5": [],
     "v0.5.1-dev-test-build7": [],
     "v0.5.1-pre-build0": [],
+    "v0.5.2": [
+      "github",
+      "r2"
+    ],
     "v0.5.2-dev-build0": [],
     "v0.5.2-dev-test-build1": [],
     "v0.5.2-dev-test-build10": [
