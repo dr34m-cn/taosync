@@ -154,3 +154,20 @@ picker_mount_type_mismatch: "所选挂载与目录类型不符。"
 picker_invalid_parent: "请选择有效的父目录。"
 picker_smb_share_unavailable: "所选 SMB 共享不可用或无法访问。"
 invalid_stats_setting: "统计信息开关必须为布尔值。"
+android_shell_nav_label: taoSync 页面
+android_shell_tab_logs: 日志
+android_shell_tab_web: 网页
+android_shell_log_title: taoSync 运行日志
+android_shell_web_title: taoSync 网页
+android_shell_clear: 清空
+android_shell_reset_password: 重置密码
+android_shell_resetting_password: 重置中...
+android_shell_password_label: "新密码（{userName}）"
+android_shell_password_copy_hint: 点击密码或复制按钮即可复制
+android_shell_copy: 复制
+android_shell_copied: 已复制
+android_shell_copy_failed: 复制失败，请长按手动复制
+android_shell_close: 关闭
+android_shell_reset_failed: "重置密码失败：{error}"
+android_shell_password_reset_log: "已通过本地页面重置账号 {userName} 的密码"
+android_shell_local_only: 仅允许本机壳页面调用

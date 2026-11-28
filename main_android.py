@@ -16,6 +16,7 @@ import sys
 import time
 import socket
 import threading
+from urllib.parse import quote
 import warnings
 
 warnings.filterwarnings('ignore', message='.*character detection dependency.*')
@@ -102,6 +103,24 @@ def _wait_port(host, port, timeout=30):
     return False
 
 
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+_SHELL_TOKEN_PATH = os.path.join(_APP_DIR, 'data', '.shell_token')
+
+
+def _read_shell_token(path=_SHELL_TOKEN_PATH, timeout=5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                token = f.read().strip()
+            if token:
+                return token
+        except OSError:
+            pass
+        time.sleep(0.1)
+    return ''
+
+
 # ======================================================================
 # 主流程
 # ======================================================================
@@ -171,10 +190,16 @@ def _run():
         except Exception as e:
             _log('ERROR', f'请求电池优化白名单失败: {e}')
 
-        # 4. WebView 加载日记页（8024 的 / 即日记页）
+        # 4. WebView 加载日记页（通过私有目录握手令牌认证本应用 WebView，日志绝不输出令牌）
         try:
-            PythonActivity.loadUrl(LOG_URL)
-            _log('INFO', f'WebView 已加载 {LOG_URL}')
+            shell_token = _read_shell_token()
+            if shell_token:
+                auth_url = f'{LOG_URL}__shell_auth__?token={quote(shell_token, safe="")}'
+                PythonActivity.loadUrl(auth_url)
+                _log('INFO', f'WebView 已加载 {LOG_URL}')
+            else:
+                _log('ERROR', '未读取到壳页面握手令牌，跳过认证跳转')
+                PythonActivity.loadUrl(LOG_URL)
         except Exception as e:
             _log('ERROR', f'WebView 跳转失败: {e}')
 

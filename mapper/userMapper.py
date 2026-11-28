@@ -33,12 +33,20 @@ def getUserById(userId):
         raise Exception(G('user_not_found'))
 
 
+def getPrimaryUser():
+    userList = sqlBase.fetchall_to_table("select * from user_list order by id asc limit 1")
+    if userList:
+        user = userList[0]
+        users[f"uId-{user['id']}"] = user
+        return user
+    raise Exception(G('user_not_found'))
+
+
 def resetPasswd(userId, passwd):
+    sqlBase.execute_update("update user_list set passwd = ? where id = ?", (passwd, userId))
     userKey = f"uId-{userId}"
-    global users
     if userKey in users:
         users[userKey]['passwd'] = passwd
-    sqlBase.execute_update("update user_list set passwd = ? where id = ?", (passwd, userId))
 
 
 def editUserName(userId, userName):

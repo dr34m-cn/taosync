@@ -37,6 +37,14 @@ def addPwdError(clientKey=None):
         ERR_PWD.setdefault(_errKey(clientKey), []).append(int(time.time()))
 
 
+def clearPwdErrors(clientKey=None):
+    with ERR_PWD_LOCK:
+        if clientKey is None:
+            ERR_PWD.clear()
+        else:
+            ERR_PWD.pop(_errKey(clientKey), None)
+
+
 def getUser(userId, userName=None):
     """
     通过用户名获取用户信息
@@ -109,3 +117,17 @@ def resetPasswd(userName, key, passwd=None):
         userMapper.resetPasswd(user['id'], commonUtils.hashPasswd(passwd))
         return passwd
     userMapper.resetPasswd(user['id'], commonUtils.hashPasswd(passwd.strip()))
+
+
+def resetPrimaryPasswd():
+    """
+    重置主管理员密码为新的随机密码（仅用于本机壳页面）
+    """
+    user = userMapper.getPrimaryUser()
+    passwd = commonUtils.generatePasswd(8)
+    userMapper.resetPasswd(user['id'], commonUtils.hashPasswd(passwd))
+    clearPwdErrors()
+    return {
+        'userName': user['userName'],
+        'passwd': passwd,
+    }

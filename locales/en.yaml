@@ -154,3 +154,20 @@ picker_mount_type_mismatch: "The selected mount does not match this storage type
 picker_invalid_parent: "Select a valid parent directory."
 picker_smb_share_unavailable: "The selected SMB share is unavailable or inaccessible."
 invalid_stats_setting: "The statistics setting must be a boolean."
+android_shell_nav_label: taoSync views
+android_shell_tab_logs: Logs
+android_shell_tab_web: Web
+android_shell_log_title: taoSync Logs
+android_shell_web_title: taoSync Web
+android_shell_clear: Clear
+android_shell_reset_password: Reset Password
+android_shell_resetting_password: Resetting...
+android_shell_password_label: "New password ({userName})"
+android_shell_password_copy_hint: Tap the password or Copy to copy
+android_shell_copy: Copy
+android_shell_copied: Copied
+android_shell_copy_failed: Copy failed, long-press to copy manually
+android_shell_close: Close
+android_shell_reset_failed: "Password reset failed: {error}"
+android_shell_password_reset_log: "Password reset for {userName} from the local shell"
+android_shell_local_only: Only allowed from the local shell page
